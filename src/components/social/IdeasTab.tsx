@@ -7,7 +7,6 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
 import { getActiveTypeOptions, getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
-import { filterFriendsForPickerPool } from '../../lib/friend-archive';
 import { DEFAULT_HANGOUT_OCCASION } from '../../types';
 import {
   calcPlannedDurationMinutes,
@@ -21,6 +20,7 @@ import {
 } from '../../lib/idea-planned-time';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
+import { FriendPicker } from './FriendPicker';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
 
 const costs: CostLevel[] = ['Free', '$', '$$', '$$$'];
@@ -122,17 +122,6 @@ export function IdeasTab() {
     startTime: toLocalISO(),
     endTime: toLocalISO(),
   });
-  const [includeArchivedIdeas, setIncludeArchivedIdeas] = useState(false);
-
-  const ideaFormFriends = useMemo(
-    () => filterFriendsForPickerPool(data.friends, includeArchivedIdeas, form.friendIds),
-    [data.friends, includeArchivedIdeas, form.friendIds]
-  );
-
-  const convertFormFriends = useMemo(
-    () => filterFriendsForPickerPool(data.friends, includeArchivedIdeas, convertForm.friendIds),
-    [data.friends, includeArchivedIdeas, convertForm.friendIds]
-  );
 
   const ideas = useMemo(() => {
     let list = [...data.ideas];
@@ -254,9 +243,6 @@ export function IdeasTab() {
     else addIdea(payload);
     setModalOpen(false);
   };
-
-  const toggleFriend = (ids: string[], id: string) =>
-    ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
 
   const friendNames = (ids: string[]) =>
     ids.map((id) => data.friends.find((f) => f.id === id)?.name).filter(Boolean).join(', ');
@@ -475,33 +461,12 @@ export function IdeasTab() {
             options={statuses.map((s) => ({ value: s, label: s }))}
           />
           <div className="sm:col-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <span className="block text-sm font-medium text-left" style={{ color: 'var(--text-heading)' }}>
-                Interested Friends
-              </span>
-              <label className="flex items-center gap-2 cursor-pointer text-xs">
-                <input
-                  type="checkbox"
-                  checked={includeArchivedIdeas}
-                  onChange={(e) => setIncludeArchivedIdeas(e.target.checked)}
-                  className="rounded"
-                />
-                Include archived friends
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {ideaFormFriends.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, friendIds: toggleFriend(form.friendIds, f.id) })}
-                  className={`px-3 py-1.5 rounded-lg text-sm border ${form.friendIds.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
-                  style={!form.friendIds.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
+            <FriendPicker
+              label="Interested Friends"
+              selected={form.friendIds}
+              onChange={(friendIds) => setForm({ ...form, friendIds })}
+              showSelectedFirst
+            />
           </div>
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -545,37 +510,12 @@ export function IdeasTab() {
           {convertModal?.location && (
             <p className="text-sm opacity-70 text-left">📍 {convertModal.location}</p>
           )}
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <span className="block text-sm font-medium text-left" style={{ color: 'var(--text-heading)' }}>
-                Friends
-              </span>
-              <label className="flex items-center gap-2 cursor-pointer text-xs">
-                <input
-                  type="checkbox"
-                  checked={includeArchivedIdeas}
-                  onChange={(e) => setIncludeArchivedIdeas(e.target.checked)}
-                  className="rounded"
-                />
-                Include archived friends
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {convertFormFriends.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() =>
-                    setConvertForm({ ...convertForm, friendIds: toggleFriend(convertForm.friendIds, f.id) })
-                  }
-                  className={`px-3 py-1.5 rounded-lg text-sm border ${convertForm.friendIds.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
-                  style={!convertForm.friendIds.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          </div>
+          <FriendPicker
+            label="Friends"
+            selected={convertForm.friendIds}
+            onChange={(friendIds) => setConvertForm({ ...convertForm, friendIds })}
+            showSelectedFirst
+          />
           <div className="grid sm:grid-cols-2 gap-4">
             <Input
               label="Start"

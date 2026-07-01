@@ -14,6 +14,8 @@ interface FriendPickerProps {
   onChange: (ids: string[]) => void;
   label?: string;
   allowClear?: boolean;
+  /** When set, keeps selected friends at top and hides the global preference toggle. */
+  showSelectedFirst?: boolean;
   /** Return false to prevent toggling (e.g. segment-only friend prompt). */
   onBeforeSelect?: (friendId: string, willSelect: boolean) => boolean;
 }
@@ -31,6 +33,7 @@ export function FriendPicker({
   onChange,
   label = 'Friends',
   allowClear = true,
+  showSelectedFirst: showSelectedFirstProp,
   onBeforeSelect,
 }: FriendPickerProps) {
   const { data, updateSettings } = useApp();
@@ -43,7 +46,9 @@ export function FriendPicker({
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const showSelectedFirst = data.settings.friendPickerShowSelectedFirst;
+  const showSelectedFirst =
+    showSelectedFirstProp ?? data.settings.friendPickerShowSelectedFirst;
+  const showSelectedFirstToggle = showSelectedFirstProp === undefined;
 
   const poolFriends = useMemo(() => {
     let list = filterFriendsForPickerPool(data.friends, includeArchived, selected);
@@ -252,15 +257,17 @@ export function FriendPicker({
               />
               Include archived friends
             </label>
-            <label className="flex items-center gap-2 cursor-pointer text-xs whitespace-nowrap ml-auto">
-              <input
-                type="checkbox"
-                checked={showSelectedFirst}
-                onChange={(e) => updateSettings({ friendPickerShowSelectedFirst: e.target.checked })}
-                className="rounded"
-              />
-              Show selected first
-            </label>
+            {showSelectedFirstToggle && (
+              <label className="flex items-center gap-2 cursor-pointer text-xs whitespace-nowrap ml-auto">
+                <input
+                  type="checkbox"
+                  checked={showSelectedFirst}
+                  onChange={(e) => updateSettings({ friendPickerShowSelectedFirst: e.target.checked })}
+                  className="rounded"
+                />
+                Show selected first
+              </label>
+            )}
           </div>
         </div>
 
