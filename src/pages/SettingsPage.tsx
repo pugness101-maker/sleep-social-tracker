@@ -213,39 +213,6 @@ export function SettingsPage() {
         </Card>
 
         <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Notifications</h2>
-          <div className="space-y-3 text-left">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={data.settings.notificationsEnabled}
-                onChange={(e) => updateSettings({ notificationsEnabled: e.target.checked })}
-                className="rounded"
-              />
-              <span className="text-sm">Enable notifications</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={data.settings.bedtimeReminder}
-                onChange={(e) => updateSettings({ bedtimeReminder: e.target.checked })}
-                className="rounded"
-              />
-              <span className="text-sm">Bedtime reminder</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={data.settings.hangoutReminder}
-                onChange={(e) => updateSettings({ hangoutReminder: e.target.checked })}
-                className="rounded"
-              />
-              <span className="text-sm">Hangout reminder</span>
-            </label>
-          </div>
-        </Card>
-
-        <Card>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Friend Picker</h2>
           <p className="text-sm opacity-70 mb-4 text-left">
             Controls how friends are sorted when selecting them for hangouts and activity segments.

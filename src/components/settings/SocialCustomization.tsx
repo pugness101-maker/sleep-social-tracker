@@ -5,10 +5,8 @@ import {
   countFriendsWithGroup,
   countFriendsWithRelationshipStatus,
   countFriendLinksWithType,
-  countHangoutsWithType,
-  countIdeasWithType,
 } from '../../lib/social-options';
-import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
+import { DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
 import { HangoutCategoryCustomization } from './HangoutCategoryCustomization';
 
 export function SocialCustomization() {
@@ -23,9 +21,6 @@ export function SocialCustomization() {
     addRelationshipStatus,
     updateRelationshipStatus,
     deleteRelationshipStatus,
-    addHangoutType,
-    updateHangoutType,
-    deleteHangoutType,
     addRelationshipType,
     updateRelationshipType,
     deleteRelationshipType,
@@ -96,24 +91,6 @@ export function SocialCustomization() {
       />
 
       <HangoutCategoryCustomization />
-
-      <CustomOptionListCard
-        title="Hangout Types (legacy flat list)"
-        description="Customize types used when logging hangouts, ideas, and applying filters."
-        options={data.hangoutTypes}
-        usageCount={(name) =>
-          countHangoutsWithType(data.hangouts, name) + countIdeasWithType(data.ideas, name)
-        }
-        defaultFallbackLabel={DEFAULT_HANGOUT_TYPE}
-        deleteMode="hangout"
-        onAdd={addHangoutType}
-        onEdit={updateHangoutType}
-        onDelete={(name, action, otherName) => {
-          if (action === 'default') deleteHangoutType(name, { action: 'default' });
-          else if (action === 'other' && otherName) deleteHangoutType(name, { action: 'other', name: otherName });
-          else deleteHangoutType(name, { action: 'clear' });
-        }}
-      />
     </div>
   );
 }
