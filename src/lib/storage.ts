@@ -8,6 +8,13 @@ import {
   mergeTypesIntoCatalog,
   migrateHangoutCategories,
   migrateIdeaCategories,
+  migrateFunCategoryOnHangouts,
+  migrateFunCategoryOnIdeas,
+  migrateFaithCategoryOnHangouts,
+  migrateFaithCategoryOnIdeas,
+  remapFunCategory,
+  remapFaithCategory,
+  finalizeHangoutCatalog,
   allTypesFromCatalogExcludingMixed,
   isMixedHangoutCategory,
   MIXED_HANGOUT_CATEGORY,
@@ -33,7 +40,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 15;
+export const DATA_VERSION = 17;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -259,9 +266,35 @@ export function normalizeAppData(
 ): AppData {
   const friends = migrateFriends(raw.friends ?? []);
   const { categories, catalog: catalogBase } = buildHangoutCatalogFromSaved(raw);
+  const catalogConsolidated = finalizeHangoutCatalog(categories, catalogBase);
   let ideas = migrateIdeas(raw.ideas ?? []);
-  let hangouts = migrateHangouts(raw.hangouts ?? [], catalogBase);
-  const merged = mergeTypesIntoCatalog(categories, catalogBase, hangouts, ideas);
+  ideas = migrateFunCategoryOnIdeas(
+    ideas,
+    catalogConsolidated.categories,
+    catalogConsolidated.catalog
+  );
+  ideas = migrateFaithCategoryOnIdeas(
+    ideas,
+    catalogConsolidated.categories,
+    catalogConsolidated.catalog
+  );
+  let hangouts = migrateHangouts(raw.hangouts ?? [], catalogConsolidated.catalog);
+  hangouts = migrateFunCategoryOnHangouts(
+    hangouts,
+    catalogConsolidated.categories,
+    catalogConsolidated.catalog
+  );
+  hangouts = migrateFaithCategoryOnHangouts(
+    hangouts,
+    catalogConsolidated.categories,
+    catalogConsolidated.catalog
+  );
+  const merged = mergeTypesIntoCatalog(
+    catalogConsolidated.categories,
+    catalogConsolidated.catalog,
+    hangouts,
+    ideas
+  );
   hangouts = migrateHangoutCategories(hangouts, merged.catalog);
   ideas = migrateIdeaCategories(ideas, merged.catalog);
   hangouts = migrateHangoutsOccasions(hangouts);
@@ -281,8 +314,16 @@ export function normalizeAppData(
     ...raw.activeTimers,
     hangoutOccasion: normalizeOccasion(raw.activeTimers?.hangoutOccasion),
     hangoutCategory:
-      raw.activeTimers?.hangoutCategory ??
-      inferCategoryAndType(raw.activeTimers?.hangoutType ?? DEFAULT_HANGOUT_TYPE, undefined, merged.catalog).category,
+      remapFaithCategory(
+        remapFunCategory(
+          raw.activeTimers?.hangoutCategory ??
+            inferCategoryAndType(raw.activeTimers?.hangoutType ?? DEFAULT_HANGOUT_TYPE, undefined, merged.catalog).category,
+          merged.categories,
+          merged.catalog
+        ),
+        merged.categories,
+        merged.catalog
+      ),
     hangoutType:
       raw.activeTimers?.hangoutType ??
       inferCategoryAndType(DEFAULT_HANGOUT_TYPE, raw.activeTimers?.hangoutCategory, merged.catalog).type,

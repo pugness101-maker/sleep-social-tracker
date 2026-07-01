@@ -59,7 +59,7 @@ import {
   normalizeImportedFriendNames,
   renameFriendEverywhere,
 } from '../lib/data-cleanup';
-import { allTypesFromCatalogExcludingMixed, inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory } from '../lib/hangout-categories';
+import { allTypesFromCatalogExcludingMixed, applyRetiredTypeResolution, inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory, type RetiredTypeResolution } from '../lib/hangout-categories';
 import { normalizeOccasion } from '../lib/hangout-occasions';
 import { loadHangoutTabFilters, saveHangoutTabFilters, sanitizeHangoutTabFilters } from '../lib/hangout-filters';
 import { DEFAULT_HANGOUT_OCCASION, DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
@@ -155,6 +155,11 @@ interface AppContextValue {
   addTypeToCategory: (category: string, type: string) => string | null;
   updateTypeInCategory: (category: string, oldName: string, newName: string) => string | null;
   deleteTypeFromCategory: (category: string, name: string, resolution: DeleteTypeResolution) => void;
+  resolveRetiredHangoutType: (
+    fromCategory: string,
+    fromType: string,
+    resolution: RetiredTypeResolution
+  ) => void;
   addHangoutOccasion: (name: string) => string | null;
   updateHangoutOccasion: (oldName: string, newName: string) => string | null;
   deleteHangoutOccasion: (name: string, resolution: DeleteTypeResolution) => void;
@@ -1136,6 +1141,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [socialCustomizationPatch]);
 
+  const resolveRetiredHangoutType = useCallback(
+    (fromCategory: string, fromType: string, resolution: RetiredTypeResolution) => {
+      socialCustomizationPatch((prev) =>
+        finalizeHangoutCatalogMutation(applyRetiredTypeResolution(prev, fromCategory, fromType, resolution))
+      );
+    },
+    [socialCustomizationPatch]
+  );
+
   const addHangoutOccasion = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
     const error = validateOptionName(normalized, data.hangoutOccasions);
@@ -1467,6 +1481,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addTypeToCategory,
     updateTypeInCategory,
     deleteTypeFromCategory,
+    resolveRetiredHangoutType,
     addHangoutOccasion,
     updateHangoutOccasion,
     deleteHangoutOccasion,

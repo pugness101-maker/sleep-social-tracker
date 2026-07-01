@@ -51,7 +51,7 @@ export function HangoutCategoriesEditor() {
     <CustomOptionListCard
       bare
       title="Hangout Categories"
-      description="Broad activity category (Social, Food, Fun, etc.). Types belong to a category."
+      description="Broad activity category (Social, Food, Fitness, Other). Types belong to a category."
       options={data.hangoutCategories}
       usageCount={(name) => countHangoutsWithCategory(data.hangouts, name)}
       getUsageLog={(category) => getCategoryUsage(usageData, category)}

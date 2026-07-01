@@ -149,5 +149,37 @@ describe('buildHangoutCatalogFromSaved', () => {
     const normalized = normalizeAppData({ friends: [], hangouts: [], ideas: [] });
     expect(normalized.hangoutCategories).toContain('Food');
     expect(normalized.hangoutCategories).toContain('Social');
+    expect(normalized.hangoutCategories).not.toContain('Faith');
+    expect(normalized.hangoutTypesByCategory.Other).toContain('Church');
+    expect(normalized.hangoutTypesByCategory.Social).not.toContain('Concert');
+  });
+
+  it('migrates Faith category to Other on reload', () => {
+    const catalog = { ...defaultAppData.hangoutTypesByCategory };
+    catalog.Faith = ['Church', 'Bible Study'];
+    const payload = {
+      ...defaultAppData,
+      hangoutCategories: [...defaultAppData.hangoutCategories, 'Faith'].filter((c) => c !== 'Other').concat('Other'),
+      hangoutTypesByCategory: catalog,
+      hangouts: [
+        {
+          id: generateId(),
+          friendIds: [],
+          startTime: '2025-01-01T12:00:00',
+          endTime: '2025-01-01T14:00:00',
+          category: 'Faith',
+          type: 'Church',
+          location: '',
+          notes: '',
+          segments: [],
+          createdAt: '2025-01-01T12:00:00',
+        },
+      ],
+    };
+    saveAppData(payload);
+    const loaded = loadAppData();
+    expect(loaded.hangoutCategories).not.toContain('Faith');
+    expect(loaded.hangouts[0].category).toBe('Other');
+    expect(loaded.hangoutTypesByCategory.Other).toContain('Church');
   });
 });

@@ -1,17 +1,24 @@
-import type { Hangout, HangoutIdea, HangoutSegment } from '../types';
+import type { AppData, Hangout, HangoutIdea, HangoutSegment } from '../types';
 
 export type HangoutCategory = string;
 
-/** Broad activity categories (Fun replaces legacy Entertainment). Mixed is special. */
+/** Broad activity categories. Mixed is special (segments-only). */
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
   'Food',
-  'Fun',
   'Fitness',
-  'Faith',
   'Other',
   'Mixed',
 ] as const;
+
+export const FUN_LEGACY_CATEGORY = 'Fun';
+export const FAITH_LEGACY_CATEGORY = 'Faith';
+
+/** Default types removed from the catalog; records still using them need user resolution. */
+export const RETIRED_DEFAULT_TYPES: Record<string, string[]> = {
+  Social: ['Concert'],
+  Other: ['Appointment', 'Study', 'Class'],
+};
 
 export const MIXED_HANGOUT_CATEGORY = 'Mixed';
 export const MIXED_HANGOUT_MAIN_TYPE = 'Mixed';
@@ -19,21 +26,32 @@ export const MIXED_HANGOUT_MAIN_TYPE = 'Mixed';
 export const DEFAULT_HANGOUT_CATEGORY = 'Other';
 
 export const DEFAULT_HANGOUT_TYPES_BY_CATEGORY: Record<string, string[]> = {
-  Social: ['Chill', 'Group Hangout', 'Party', 'Sleepover', 'Travel', 'Car Ride'],
+  Social: [
+    'Chill',
+    'Group Hangout',
+    'Party',
+    'Sleepover',
+    'Travel',
+    'Car Ride',
+    'Movie / TV',
+    'Gaming',
+    'Shopping',
+    'Activity',
+  ],
   Food: ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Cook Together'],
-  Fun: ['Movie / TV', 'Gaming', 'Shopping', 'Concert', 'Activity'],
   Fitness: ['Gym', 'MMA', 'Running', 'Hiking', 'Outdoor', 'Wellness'],
-  Faith: ['Church', 'Bible Study', 'Small Group'],
-  Other: ['School', 'Study', 'Work', 'Class', 'Errands', 'Appointment'],
+  Other: ['Church', 'Bible Study', 'Small Group', 'School', 'Work', 'Errands'],
   Mixed: [],
 };
 
-/** Legacy category names → new catalog categories */
+/** Legacy category names → current catalog categories */
 export const LEGACY_CATEGORY_MIGRATION: Record<string, string> = {
-  Entertainment: 'Fun',
+  Entertainment: 'Social',
+  Fun: 'Social',
+  Faith: 'Other',
   School: 'Other',
   Outdoor: 'Other',
-  Shopping: 'Fun',
+  Shopping: 'Social',
   Travel: 'Social',
   Work: 'Other',
   Wellness: 'Fitness',
@@ -58,7 +76,7 @@ export const LEGACY_TYPE_RENAMES: Record<string, string> = {
   Spa: 'Wellness',
   Meditation: 'Wellness',
   Therapy: 'Wellness',
-  'Group Project': 'Study',
+  'Group Project': 'School',
   Walking: 'Running',
   Wrestling: 'MMA',
   Prayer: 'Small Group',
@@ -71,10 +89,10 @@ export const LEGACY_HANGOUT_TYPE_MIGRATION: Record<string, { category: string; t
   Chill: { category: 'Social', type: 'Chill' },
   Mixed: { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE },
   Food: { category: 'Food', type: 'Dinner' },
-  Study: { category: 'Other', type: 'Study' },
+  Study: { category: 'Other', type: 'School' },
   Gym: { category: 'Fitness', type: 'Gym' },
   Party: { category: 'Social', type: 'Party' },
-  Shopping: { category: 'Fun', type: 'Shopping' },
+  Shopping: { category: 'Social', type: 'Shopping' },
   Travel: { category: 'Social', type: 'Travel' },
   Sleepover: { category: 'Social', type: 'Sleepover' },
   Work: { category: 'Other', type: 'Work' },
@@ -90,7 +108,7 @@ export function remapLegacyCategoryType(
   let typ = LEGACY_TYPE_RENAMES[type] ?? type;
 
   if (category === 'Shopping' && type === 'Shopping') {
-    cat = 'Fun';
+    cat = 'Social';
     typ = 'Shopping';
   }
   if (category === 'Outdoor') {
@@ -100,8 +118,329 @@ export function remapLegacyCategoryType(
   if (category === 'Travel') {
     cat = 'Social';
   }
+  if (cat === FUN_LEGACY_CATEGORY || category === FUN_LEGACY_CATEGORY) {
+    cat = 'Social';
+  }
+  if (cat === FAITH_LEGACY_CATEGORY || category === FAITH_LEGACY_CATEGORY) {
+    cat = 'Other';
+  }
 
   return { category: cat, type: typ };
+}
+
+/** Resolve the catalog category that holds Social activity types (handles renames). */
+export function resolveSocialCategoryName(
+  categories: string[],
+  catalog: Record<string, string[]>
+): string {
+  if (categories.includes('Social')) return 'Social';
+  const markers = DEFAULT_HANGOUT_TYPES_BY_CATEGORY.Social.slice(0, 4);
+  for (const cat of categories) {
+    const types = catalog[cat] ?? [];
+    if (markers.some((m) => types.some((t) => t.toLowerCase() === m.toLowerCase()))) {
+      return cat;
+    }
+  }
+  return 'Social';
+}
+
+/** Merge legacy Fun category catalog entries into Social and drop Fun from settings. */
+export function consolidateFunIntoSocialCatalog(
+  categories: string[],
+  catalog: Record<string, string[]>
+): { categories: string[]; catalog: Record<string, string[]> } {
+  const funTypes = catalog[FUN_LEGACY_CATEGORY] ?? [];
+  const hadFunCategory = categories.includes(FUN_LEGACY_CATEGORY);
+
+  if (!hadFunCategory && funTypes.length === 0) {
+    return { categories: [...categories], catalog: { ...catalog } };
+  }
+
+  const nextCategories = categories.filter((c) => c !== FUN_LEGACY_CATEGORY);
+  const nextCatalog = { ...catalog };
+  delete nextCatalog[FUN_LEGACY_CATEGORY];
+
+  const socialCategory = resolveSocialCategoryName(nextCategories, nextCatalog);
+
+  if (socialCategory === 'Social' && !nextCategories.includes('Social')) {
+    nextCategories.unshift('Social');
+  }
+
+  const socialTypes = [
+    ...(nextCatalog[socialCategory] ?? DEFAULT_HANGOUT_TYPES_BY_CATEGORY.Social ?? []),
+  ];
+  for (const t of funTypes) {
+    if (!socialTypes.some((x) => x.toLowerCase() === t.toLowerCase())) {
+      socialTypes.push(t);
+    }
+  }
+  nextCatalog[socialCategory] = socialTypes;
+
+  if (socialCategory !== 'Social' && nextCatalog.Social && !nextCategories.includes('Social')) {
+    delete nextCatalog.Social;
+  }
+
+  return { categories: nextCategories, catalog: nextCatalog };
+}
+
+export function remapFunCategory(
+  category: string,
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): string {
+  if (category !== FUN_LEGACY_CATEGORY) return category;
+  if (categories && catalog) {
+    return resolveSocialCategoryName(categories, catalog);
+  }
+  return 'Social';
+}
+
+export function migrateFunCategoryOnHangouts(
+  hangouts: Hangout[],
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): Hangout[] {
+  return hangouts.map((h) => ({
+    ...h,
+    category: remapFunCategory(h.category, categories, catalog),
+    segments: (h.segments ?? []).map((s) => ({
+      ...s,
+      category: remapFunCategory(s.category, categories, catalog),
+    })),
+  }));
+}
+
+export function migrateFunCategoryOnIdeas(
+  ideas: HangoutIdea[],
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): HangoutIdea[] {
+  return ideas.map((i) => ({
+    ...i,
+    category: remapFunCategory(i.category, categories, catalog),
+  }));
+}
+
+/** Resolve the catalog category that holds Other activity types (handles renames). */
+export function resolveOtherCategoryName(
+  categories: string[],
+  catalog: Record<string, string[]>
+): string {
+  if (categories.includes('Other')) return 'Other';
+  const markers = DEFAULT_HANGOUT_TYPES_BY_CATEGORY.Other.slice(0, 4);
+  for (const cat of categories) {
+    const types = catalog[cat] ?? [];
+    if (markers.some((m) => types.some((t) => t.toLowerCase() === m.toLowerCase()))) {
+      return cat;
+    }
+  }
+  return 'Other';
+}
+
+/** Merge legacy Faith category catalog entries into Other and drop Faith from settings. */
+export function consolidateFaithIntoOtherCatalog(
+  categories: string[],
+  catalog: Record<string, string[]>
+): { categories: string[]; catalog: Record<string, string[]> } {
+  const faithTypes = catalog[FAITH_LEGACY_CATEGORY] ?? [];
+  const hadFaithCategory = categories.includes(FAITH_LEGACY_CATEGORY);
+
+  if (!hadFaithCategory && faithTypes.length === 0) {
+    return { categories: [...categories], catalog: { ...catalog } };
+  }
+
+  const nextCategories = categories.filter((c) => c !== FAITH_LEGACY_CATEGORY);
+  const nextCatalog = { ...catalog };
+  delete nextCatalog[FAITH_LEGACY_CATEGORY];
+
+  const otherCategory = resolveOtherCategoryName(nextCategories, nextCatalog);
+
+  if (otherCategory === 'Other' && !nextCategories.includes('Other')) {
+    nextCategories.push('Other');
+  }
+
+  const otherTypes = [
+    ...(nextCatalog[otherCategory] ?? DEFAULT_HANGOUT_TYPES_BY_CATEGORY.Other ?? []),
+  ];
+  for (const t of faithTypes) {
+    if (!otherTypes.some((x) => x.toLowerCase() === t.toLowerCase())) {
+      otherTypes.push(t);
+    }
+  }
+  nextCatalog[otherCategory] = otherTypes;
+
+  if (otherCategory !== 'Other' && nextCatalog.Other && !nextCategories.includes('Other')) {
+    delete nextCatalog.Other;
+  }
+
+  return { categories: nextCategories, catalog: nextCatalog };
+}
+
+export function remapFaithCategory(
+  category: string,
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): string {
+  if (category !== FAITH_LEGACY_CATEGORY) return category;
+  if (categories && catalog) {
+    return resolveOtherCategoryName(categories, catalog);
+  }
+  return 'Other';
+}
+
+export function migrateFaithCategoryOnHangouts(
+  hangouts: Hangout[],
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): Hangout[] {
+  return hangouts.map((h) => ({
+    ...h,
+    category: remapFaithCategory(h.category, categories, catalog),
+    segments: (h.segments ?? []).map((s) => ({
+      ...s,
+      category: remapFaithCategory(s.category, categories, catalog),
+    })),
+  }));
+}
+
+export function migrateFaithCategoryOnIdeas(
+  ideas: HangoutIdea[],
+  categories?: string[],
+  catalog?: Record<string, string[]>
+): HangoutIdea[] {
+  return ideas.map((i) => ({
+    ...i,
+    category: remapFaithCategory(i.category, categories, catalog),
+  }));
+}
+
+export function isRetiredDefaultType(category: string, type: string): boolean {
+  const retired = RETIRED_DEFAULT_TYPES[category] ?? [];
+  return retired.some((t) => t.toLowerCase() === type.toLowerCase());
+}
+
+export function pruneRetiredTypesFromCatalog(
+  categories: string[],
+  catalog: Record<string, string[]>
+): { categories: string[]; catalog: Record<string, string[]> } {
+  const nextCategories = categories.filter((c) => c !== FAITH_LEGACY_CATEGORY);
+  const nextCatalog = { ...catalog };
+  delete nextCatalog[FAITH_LEGACY_CATEGORY];
+
+  for (const [cat, retiredTypes] of Object.entries(RETIRED_DEFAULT_TYPES)) {
+    const list = nextCatalog[cat];
+    if (!list) continue;
+    nextCatalog[cat] = list.filter(
+      (t) => !retiredTypes.some((r) => r.toLowerCase() === t.toLowerCase())
+    );
+  }
+
+  return { categories: nextCategories, catalog: nextCatalog };
+}
+
+export interface RetiredTypeUsage {
+  category: string;
+  type: string;
+  hangouts: number;
+  segments: number;
+  ideas: number;
+  includesActiveTimer: boolean;
+}
+
+export function findRetiredTypeUsage(
+  data: Pick<AppData, 'hangouts' | 'ideas' | 'activeTimers'>
+): RetiredTypeUsage[] {
+  const map = new Map<string, RetiredTypeUsage>();
+  const bump = (
+    category: string | undefined,
+    type: string | undefined,
+    field: 'hangouts' | 'segments' | 'ideas'
+  ) => {
+    if (!category?.trim() || !type?.trim()) return;
+    if (!isRetiredDefaultType(category, type)) return;
+    const key = `${category}::${type}`;
+    const entry = map.get(key) ?? { category, type, hangouts: 0, segments: 0, ideas: 0, includesActiveTimer: false };
+    entry[field] += 1;
+    map.set(key, entry);
+  };
+
+  for (const h of data.hangouts) {
+    if (!isMixedHangoutCategory(h.category)) {
+      bump(h.category, h.type, 'hangouts');
+    }
+    for (const s of h.segments ?? []) bump(s.category, s.type, 'segments');
+  }
+  for (const i of data.ideas) bump(i.category, i.type, 'ideas');
+
+  const timers = data.activeTimers;
+  if (
+    timers.hangoutCategory &&
+    timers.hangoutType &&
+    isRetiredDefaultType(timers.hangoutCategory, timers.hangoutType)
+  ) {
+    const key = `${timers.hangoutCategory}::${timers.hangoutType}`;
+    const entry = map.get(key) ?? {
+      category: timers.hangoutCategory,
+      type: timers.hangoutType,
+      hangouts: 0,
+      segments: 0,
+      ideas: 0,
+      includesActiveTimer: false,
+    };
+    entry.includesActiveTimer = true;
+    map.set(key, entry);
+  }
+
+  return [...map.values()].sort((a, b) =>
+    `${a.category}${a.type}`.localeCompare(`${b.category}${b.type}`, undefined, { sensitivity: 'base' })
+  );
+}
+
+export type RetiredTypeResolution =
+  | { action: 'replace'; category: string; type: string }
+  | { action: 'move_other'; type: string };
+
+export function applyRetiredTypeResolution(
+  data: AppData,
+  fromCategory: string,
+  fromType: string,
+  resolution: RetiredTypeResolution
+): AppData {
+  const targetCategory = resolution.action === 'move_other' ? 'Other' : resolution.category;
+  const targetType = resolution.type;
+  const matches = (category?: string, type?: string) =>
+    category === fromCategory && type === fromType;
+
+  return {
+    ...data,
+    hangouts: data.hangouts.map((h) => ({
+      ...h,
+      category: matches(h.category, h.type) ? targetCategory : h.category,
+      type: matches(h.category, h.type) ? targetType : h.type,
+      segments:
+        h.segments?.map((s) =>
+          matches(s.category, s.type)
+            ? { ...s, category: targetCategory, type: targetType }
+            : s
+        ) ?? [],
+    })),
+    ideas: data.ideas.map((i) =>
+      matches(i.category, i.type) ? { ...i, category: targetCategory, type: targetType } : i
+    ),
+    activeTimers:
+      matches(data.activeTimers.hangoutCategory, data.activeTimers.hangoutType)
+        ? { ...data.activeTimers, hangoutCategory: targetCategory, hangoutType: targetType }
+        : data.activeTimers,
+  };
+}
+
+export function finalizeHangoutCatalog(
+  categories: string[],
+  catalog: Record<string, string[]>
+): { categories: string[]; catalog: Record<string, string[]> } {
+  let result = consolidateFunIntoSocialCatalog(categories, catalog);
+  result = consolidateFaithIntoOtherCatalog(result.categories, result.catalog);
+  return pruneRetiredTypesFromCatalog(result.categories, result.catalog);
 }
 
 export function cloneDefaultTypesByCategory(): Record<string, string[]> {
@@ -265,6 +604,7 @@ export function getDefaultTypeForCategory(
   if (isMixedHangoutCategory(category)) return MIXED_HANGOUT_MAIN_TYPE;
   const types = typesForCategory(catalog, category);
   if (types.includes('Chill') && category === 'Social') return 'Chill';
+  if (types.includes('School') && category === 'Other') return 'School';
   if (types.includes('Other')) return 'Other';
   return types[0] ?? 'Other';
 }
@@ -355,6 +695,7 @@ export function mergeTypesIntoCatalog(
     const typ = type.trim() || 'Other';
     if (typ.toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase()) return;
     if (typ.toLowerCase() === 'date') return;
+    if (isRetiredDefaultType(cat, typ)) return;
     if (!nextCategories.includes(cat)) nextCategories.push(cat);
     const list = nextCatalog[cat] ? [...nextCatalog[cat]] : [];
     if (!list.some((t) => t.toLowerCase() === typ.toLowerCase())) list.push(typ);
@@ -367,7 +708,7 @@ export function mergeTypesIntoCatalog(
   }
   for (const i of ideas) ensure(i.category ?? '', i.type);
 
-  return { categories: nextCategories, catalog: nextCatalog };
+  return finalizeHangoutCatalog(nextCategories, nextCatalog);
 }
 
 export type CategoryTypeEntity = Pick<Hangout, 'category' | 'type'> | Pick<HangoutSegment, 'category' | 'type'> | Pick<HangoutIdea, 'category' | 'type'>;

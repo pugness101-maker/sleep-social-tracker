@@ -6,6 +6,7 @@ import {
   resolveHangoutOccasion,
 } from './hangout-occasions';
 import { remapLegacyCategoryType } from './hangout-categories';
+import { consolidateFunIntoSocialCatalog } from './hangout-categories';
 
 describe('hangout-occasions', () => {
   it('migrates legacy Date type to occasion Date', () => {
@@ -45,10 +46,24 @@ describe('hangout-occasions', () => {
 });
 
 describe('hangout category migration', () => {
-  it('remaps Entertainment to Fun', () => {
+  it('remaps Entertainment to Social', () => {
     expect(remapLegacyCategoryType('Entertainment', 'Movie')).toEqual({
-      category: 'Fun',
+      category: 'Social',
       type: 'Movie / TV',
     });
+  });
+
+  it('consolidates Fun catalog into Social', () => {
+    const { categories, catalog } = consolidateFunIntoSocialCatalog(
+      ['Social', 'Fun', 'Food'],
+      {
+        Social: ['Chill'],
+        Fun: ['Gaming', 'Movie / TV'],
+        Food: ['Dinner'],
+      }
+    );
+    expect(categories).not.toContain('Fun');
+    expect(catalog.Social).toEqual(expect.arrayContaining(['Chill', 'Gaming', 'Movie / TV']));
+    expect(catalog.Fun).toBeUndefined();
   });
 });

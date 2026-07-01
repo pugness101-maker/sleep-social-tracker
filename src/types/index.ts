@@ -96,9 +96,7 @@ export const DEFAULT_HANGOUT_TYPE = 'Other';
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
   'Food',
-  'Fun',
   'Fitness',
-  'Faith',
   'Other',
   'Mixed',
 ] as const;

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
+import { RetiredTypeMigrationPrompt } from './components/settings/RetiredTypeMigrationPrompt';
 import { Layout } from './components/layout/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { SleepPage } from './pages/SleepPage';
@@ -10,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage';
 export default function App() {
   return (
     <AppProvider>
+      <RetiredTypeMigrationPrompt />
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
