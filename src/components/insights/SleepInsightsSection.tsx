@@ -21,7 +21,7 @@ interface SleepInsightsSectionProps {
   rangeLabel?: string;
   /** When set, only render these blocks. Defaults to all. */
   sectionsToShow?: Array<
-    'consistency' | 'circadian' | 'heatmap' | 'weekdayTrends' | 'debtCalendar' | 'streaks' | 'bestDays'
+    'consistency' | 'circadian' | 'heatmap' | 'weekdayTrends' | 'streaks' | 'bestDays'
   >;
 }
 
@@ -30,7 +30,6 @@ const ALL_SECTIONS = [
   'circadian',
   'heatmap',
   'weekdayTrends',
-  'debtCalendar',
   'streaks',
   'bestDays',
 ] as const;
@@ -214,34 +213,6 @@ function SleepCalendar({
   );
 }
 
-function DebtCalendar({ days }: { days: ReturnType<typeof getSleepInsights>['debtCalendarDays'] }) {
-  if (days.length === 0) {
-    return <p className="text-sm opacity-70 text-left">No sleep entries in this range.</p>;
-  }
-
-  const reversed = [...days].reverse().slice(0, 35);
-
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-      {reversed.map((day) => (
-        <div
-          key={day.dateKey}
-          className="rounded-lg p-2 text-left border text-xs"
-          style={{
-            borderColor: 'var(--border)',
-            background: day.debtMinutes != null && day.debtMinutes <= 0 ? 'rgba(52,211,153,0.12)' : day.debtMinutes != null && day.debtMinutes > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg)',
-          }}
-        >
-          <p className="font-medium opacity-80">{day.dateLabel}</p>
-          <p className="mt-1 font-semibold" style={{ color: 'var(--text-heading)' }}>
-            {day.debtMinutes != null ? formatDebtCalendarShort(day.debtMinutes) : '—'}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel, sectionsToShow }: SleepInsightsSectionProps) {
   const [calendarMode, setCalendarMode] = useState<HeatmapMode>('duration');
 
@@ -307,13 +278,6 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel, s
           formatValue={(m) => avgMinutesToTime(m)}
         />
       </div>
-      )}
-
-      {show.has('debtCalendar') && (
-      <Card>
-        <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Debt Calendar</h4>
-        <DebtCalendar days={insights.debtCalendarDays} />
-      </Card>
       )}
 
       {show.has('streaks') && (

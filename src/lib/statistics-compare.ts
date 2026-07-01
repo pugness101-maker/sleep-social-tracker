@@ -228,23 +228,14 @@ export const SOCIAL_CHART_METRICS: MetricDef[] = [
 export const COMBINED_METRICS: MetricDef[] = [
   m('combined.sleepAfterHangout', 'Avg Sleep After Hangout', 'duration', (s) => s.combined.avgSleepAfterHangout, 'sleep'),
   m('combined.sleepAfterNone', 'Avg Sleep After No Hangout', 'duration', (s) => s.combined.avgSleepAfterNoHangout, 'sleep'),
-  m('combined.awakeBefore', 'Avg Awake Before Hangouts', 'duration', (s) => s.combined.avgAwakeBeforeHangout, 'awake'),
-  m('combined.awakeBeforeMax', 'Longest Awake Before Social', 'duration', (s) => s.combined.longestAwakeBeforeHangout, 'awake'),
   m('combined.sleepLate', 'Sleep After Late-Night Hangouts', 'duration', (s) => s.combined.avgSleepAfterLateHangout, 'sleep'),
-  m('combined.sleepExercise', 'Sleep After Exercise', 'duration', (s) => s.combined.avgSleepAfterExercise, 'sleep'),
 ];
 
 export const TRENDS_METRICS: MetricDef[] = [
-  m('trends.sleepMonth', 'Monthly Sleep Total', 'hours', (s) => sumTrendValues(s.trends.monthlySleep), 'sleep'),
+  m('trends.sleepMonth', 'Monthly Sleep Avg', 'hours', (s) => avgTrendValues(s.trends.monthlySleep), 'sleep'),
   m('trends.hangoutMonth', 'Monthly Hangout Count', 'count', (s) => sumTrendValues(s.trends.monthlyHangouts), 'social'),
-  m('trends.friendGrowth', 'Friend Growth (latest)', 'count', (s) => {
-    const last = s.trends.friendGrowth[s.trends.friendGrowth.length - 1];
-    return last?.value ?? null;
-  }, 'social'),
   m('trends.hangoutFreq', 'Hangout Frequency Total', 'count', (s) => sumTrendValues(s.trends.hangoutFrequency), 'social'),
-  m('trends.consistency', 'Sleep Consistency Avg', 'percent', (s) => avgTrendValues(s.trends.consistencyTrend), 'sleep'),
-  m('trends.debt', 'Sleep Debt Trend Avg', 'debt', (s) => avgTrendValues(s.trends.debtTrend), 'sleep'),
-  m('trends.timeFriends', 'Time With Friends Total', 'hours', (s) => sumTrendValues(s.trends.timeWithFriends), 'social'),
+  m('trends.debt', 'Sleep Debt Trend Avg', 'debt', (s) => avgTrendValues(s.trends.debtTrend.filter((d) => (d.count ?? 0) > 0)), 'sleep'),
 ];
 
 export function metricsToStatItems(metrics: MetricDef[], stats: StatisticsBundle) {

@@ -237,17 +237,36 @@ export function StatisticsSocialPanel({
         ) : (
           <>
             <div className="grid lg:grid-cols-2 gap-3">
-              <BarChart title="Hours by Week" data={stats.social.hoursByWeek} valueSuffix="h" colorClass="bg-social/60" />
-              <BarChart title="Hours by Month" data={stats.social.hoursByMonth} valueSuffix="h" colorClass="bg-social/60" />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-3">
-              <HorizontalBarList
-                title="Friend Ranking Graph"
-                data={p.ranking.slice(0, 8).map((r) => ({ label: r.name, value: r.hangouts }))}
+              <BarChart
+                title="Hours by Week"
+                data={stats.social.hoursByWeek}
+                valueSuffix="h"
+                colorClass="bg-social/60"
+                emptyMessage="No hangout hours in this range."
               />
-              <HorizontalBarList title="Activity Pie (by Type)" data={a.byType.slice(0, 8)} />
+              <BarChart
+                title="Hours by Month"
+                data={stats.social.hoursByMonth}
+                valueSuffix="h"
+                colorClass="bg-social/60"
+                emptyMessage="No hangout hours in this range."
+              />
             </div>
-            <HorizontalBarList title="Category Bar Chart" data={a.byCategory} />
+            <div className="grid lg:grid-cols-3 gap-3">
+              <HorizontalBarList
+                title="Friend Ranking (by hours)"
+                data={[...p.ranking]
+                  .filter((r) => r.hours > 0)
+                  .sort((a, b) => b.hours - a.hours)
+                  .slice(0, 8)
+                  .map((r) => ({ label: r.name, value: r.hours }))}
+                formatValue={(v) => `${v.toFixed(1)}h`}
+                emptyMessage="No friend hangout time in this range."
+              />
+              <HorizontalBarList title="By Occasion" data={a.byOccasion} emptyMessage="No hangouts in this range." />
+              <HorizontalBarList title="By Category" data={a.byCategory} emptyMessage="No hangouts in this range." />
+            </div>
+            <HorizontalBarList title="By Type" data={a.byType} emptyMessage="No hangouts in this range." />
           </>
         )}
       </StatisticsCollapsibleSection>

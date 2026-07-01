@@ -2,11 +2,13 @@ import {
   addDays,
   endOfDay,
   endOfMonth,
+  endOfWeek,
   format,
   getDay,
   parseISO,
   startOfDay,
   startOfMonth,
+  startOfWeek,
   subDays,
 } from 'date-fns';
 import {
@@ -17,7 +19,6 @@ import {
 } from './dates';
 import {
   getAwakeStats,
-  getMonthlyTrends,
   getNapStats,
   getSleepDebtStats,
   getSleepStats,
@@ -125,24 +126,28 @@ export interface StatisticsBundle {
   combined: {
     avgSleepAfterHangout: number | null;
     avgSleepAfterNoHangout: number | null;
+    sleepByOccasion: LabeledValue[];
     sleepByCategory: LabeledValue[];
-    sleepByFriend: LabeledValue[];
-    sleepByWeekday: LabeledValue[];
-    avgAwakeBeforeHangout: number | null;
-    longestAwakeBeforeHangout: number | null;
     avgSleepAfterLateHangout: number | null;
+    /** @deprecated kept for compare mode */
+    sleepByFriend: LabeledValue[];
+    /** @deprecated kept for compare mode */
+    sleepByWeekday: LabeledValue[];
+    /** @deprecated */
+    avgAwakeBeforeHangout: number | null;
+    /** @deprecated */
+    longestAwakeBeforeHangout: number | null;
+    /** @deprecated */
     avgSleepAfterExercise: number | null;
+    /** @deprecated */
     consistencyWithSocial: { label: string; consistency: number; hangouts: number }[];
   };
   trends: {
     monthlySleep: TrendPoint[];
     monthlyHangouts: TrendPoint[];
-    friendGrowth: TrendPoint[];
-    hangoutFrequency: TrendPoint[];
-    consistencyTrend: TrendPoint[];
     debtTrend: TrendPoint[];
+    hangoutFrequency: TrendPoint[];
     categoryTrend: Record<string, TrendPoint[]>;
-    timeWithFriends: TrendPoint[];
   };
 }
 
@@ -244,36 +249,103 @@ function hoursInPeriod(hangouts: Hangout[], periodStart: Date, periodEnd: Date, 
   return minutes / 60;
 }
 
-function countByCategory(hangouts: Hangout[]): LabeledValue[] {
+function buildMonthBuckets(rangeStart?: Date, rangeEnd?: Date, fallbackMonths = 6) {
+  const buckets: { label: string; start: Date; end: Date }[] = [];
+  if (rangeStart && rangeEnd) {
+    let cursor = startOfMonth(rangeStart);
+    while (cursor <= rangeEnd) {
+      const bucketStart = cursor < rangeStart ? rangeStart : startOfMonth(cursor);
+      const bucketEnd = endOfMonth(cursor) > rangeEnd ? rangeEnd : endOfMonth(cursor);
+      buckets.push({ label: format(cursor, 'MMM yyyy'), start: bucketStart, end: bucketEnd });
+      cursor = addDays(endOfMonth(cursor), 1);
+    }
+  } else {
+    for (let i = fallbackMonths - 1; i >= 0; i--) {
+      const d = subDays(new Date(), i * 28);
+      const { start, end } = getMonthRange(d);
+      buckets.push({ label: format(start, 'MMM yyyy'), start, end });
+    }
+  }
+  return buckets;
+}
+
+function buildWeeklyHoursTrend(hangouts: Hangout[], rangeStart?: Date, rangeEnd?: Date): TrendPoint[] {
+  const end = rangeEnd ? endOfDay(rangeEnd) : endOfDay(new Date());
+  let start: Date;
+  if (rangeStart) {
+    start = startOfDay(rangeStart);
+  } else if (hangouts.length > 0) {
+    const sorted = [...hangouts].sort(
+      (a, b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime()
+    );
+    start = startOfWeek(startOfDay(parseISO(sorted[0].startTime)), { weekStartsOn: 0 });
+  } else {
+    start = startOfWeek(subDays(end, 7 * 11), { weekStartsOn: 0 });
+  }
+
+  const buckets: TrendPoint[] = [];
+  let cursor = startOfWeek(start, { weekStartsOn: 0 });
+  while (cursor <= end) {
+    const wEnd = endOfWeek(cursor, { weekStartsOn: 0 });
+    const effectiveEnd = wEnd > end ? end : wEnd;
+    const effectiveStart = cursor < start ? start : cursor;
+    const weekHangouts = hangouts.filter((h) => isInRange(h.startTime, effectiveStart, effectiveEnd));
+    const mins = weekHangouts.reduce((s, h) => s + calcDurationMinutes(h.startTime, h.endTime), 0);
+    buckets.push({
+      label: format(cursor, 'MMM d'),
+      value: mins / 60,
+      count: weekHangouts.length,
+    });
+    cursor = addDays(endOfWeek(cursor, { weekStartsOn: 0 }), 1);
+  }
+  return buckets.slice(-12);
+}
+
+function buildMonthlyHoursTrend(hangouts: Hangout[], rangeStart?: Date, rangeEnd?: Date): TrendPoint[] {
+  return buildMonthBuckets(rangeStart, rangeEnd).map(({ label, start, end }) => {
+    const inRange = hangouts.filter((h) => isInRange(h.startTime, start, end));
+    const mins = inRange.reduce((s, h) => s + calcDurationMinutes(h.startTime, h.endTime), 0);
+    return { label, value: mins / 60, count: inRange.length };
+  });
+}
+
+function buildCategoryTrend(hangouts: Hangout[], rangeStart?: Date, rangeEnd?: Date): Record<string, TrendPoint[]> {
+  const categories = [...new Set(hangouts.map((h) => h.category || 'Other'))];
+  const buckets = buildMonthBuckets(rangeStart, rangeEnd);
+  const result: Record<string, TrendPoint[]> = {};
+  for (const cat of categories) {
+    result[cat] = buckets.map(({ label, start, end }) => {
+      const count = hangouts.filter(
+        (h) => (h.category || 'Other') === cat && isInRange(h.startTime, start, end)
+      ).length;
+      return { label, value: count, count };
+    });
+  }
+  return result;
+}
+
+function countByField(hangouts: Hangout[], field: 'category' | 'type' | 'occasion'): LabeledValue[] {
   const counts: Record<string, number> = {};
   for (const h of hangouts) {
-    const cat = h.category || 'Other';
-    counts[cat] = (counts[cat] ?? 0) + 1;
+    const key =
+      field === 'category' ? h.category || 'Other' : field === 'occasion' ? h.occasion || 'None' : h.type;
+    counts[key] = (counts[key] ?? 0) + 1;
   }
   return Object.entries(counts)
     .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value);
 }
 
-function countByOccasion(hangouts: Hangout[]): LabeledValue[] {
-  const counts: Record<string, number> = {};
-  for (const h of hangouts) {
-    const occ = h.occasion || 'None';
-    counts[occ] = (counts[occ] ?? 0) + 1;
-  }
-  return Object.entries(counts)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
+function countByCategory(hangouts: Hangout[]) {
+  return countByField(hangouts, 'category');
 }
 
-function countByType(hangouts: Hangout[]): LabeledValue[] {
-  const counts: Record<string, number> = {};
-  for (const h of hangouts) {
-    counts[h.type] = (counts[h.type] ?? 0) + 1;
-  }
-  return Object.entries(counts)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
+function countByOccasion(hangouts: Hangout[]) {
+  return countByField(hangouts, 'occasion');
+}
+
+function countByType(hangouts: Hangout[]) {
+  return countByField(hangouts, 'type');
 }
 
 function buildCombinedStats(data: AppData, sleepEntries: SleepEntry[], hangouts: Hangout[]) {
@@ -323,6 +395,16 @@ function buildCombinedStats(data: AppData, sleepEntries: SleepEntry[], hangouts:
       const awakeMin = calcDurationMinutes(priorSleep.wakeUp, h.startTime);
       if (awakeMin > 0) awakeBefore.push(awakeMin);
     }
+  }
+
+  const sleepByOccasionMap: Record<string, number[]> = {};
+  for (const entry of sleepEntries) {
+    const prevKey = previousDayKey(entry.wakeUp);
+    const prev = hangoutsByDay.get(prevKey)?.[0];
+    if (!prev) continue;
+    const occ = prev.occasion || 'None';
+    if (!sleepByOccasionMap[occ]) sleepByOccasionMap[occ] = [];
+    sleepByOccasionMap[occ].push(calcDurationMinutes(entry.sleepStart, entry.wakeUp));
   }
 
   const sleepByCategoryMap: Record<string, number[]> = {};
@@ -382,10 +464,15 @@ function buildCombinedStats(data: AppData, sleepEntries: SleepEntry[], hangouts:
   return {
     avgSleepAfterHangout: avg(afterHangout),
     avgSleepAfterNoHangout: avg(afterNoHangout),
-    sleepByCategory: Object.entries(sleepByCategoryMap).map(([label, vals]) => ({
-      label,
-      value: avg(vals) ?? 0,
-    })),
+    sleepByOccasion: Object.entries(sleepByOccasionMap)
+      .map(([label, vals]) => ({ label, value: avg(vals) ?? 0 }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value),
+    sleepByCategory: Object.entries(sleepByCategoryMap)
+      .map(([label, vals]) => ({ label, value: avg(vals) ?? 0 }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value),
+    avgSleepAfterLateHangout: avg(afterLate),
     sleepByFriend: Object.entries(sleepByFriendMap).map(([fid, vals]) => ({
       label: data.friends.find((f) => f.id === fid)?.name ?? 'Unknown',
       value: avg(vals) ?? 0,
@@ -396,7 +483,6 @@ function buildCombinedStats(data: AppData, sleepEntries: SleepEntry[], hangouts:
     })),
     avgAwakeBeforeHangout: avg(awakeBefore),
     longestAwakeBeforeHangout: awakeBefore.length ? Math.max(...awakeBefore) : null,
-    avgSleepAfterLateHangout: avg(afterLate),
     avgSleepAfterExercise: avg(afterExercise),
     consistencyWithSocial: consistencyWithSocial.sort((a, b) => a.label.localeCompare(b.label)),
   };
@@ -412,7 +498,6 @@ export function buildStatisticsBundle(
   const naps = getNapStats(data, rangeStart, rangeEnd);
   const social = getSocialStats(data, rangeStart, rangeEnd);
   const awake = getAwakeStats(data, rangeStart, rangeEnd);
-  const monthlyTrends = getMonthlyTrends(data, 6, rangeStart, rangeEnd);
   const sleepEntries = filterSleepEntries(data, rangeStart, rangeEnd);
   const hangouts = filterHangouts(data, rangeStart, rangeEnd);
 
@@ -455,69 +540,34 @@ export function buildStatisticsBundle(
 
   const combined = buildCombinedStats(data, sleepEntries, hangouts);
 
-  const friendGrowthMap: Record<string, number> = {};
-  for (const f of allFriends) {
-    const label = format(startOfMonth(parseISO(f.createdAt)), 'MMM yyyy');
-    friendGrowthMap[label] = (friendGrowthMap[label] ?? 0) + 1;
-  }
-  let cumulative = 0;
-  const friendGrowth = Object.entries(friendGrowthMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, count]) => {
-      cumulative += count;
-      return { label, value: cumulative, count };
-    });
+  const categoryTrend = buildCategoryTrend(hangouts, rangeStart, rangeEnd);
 
-  const categoryTrend: Record<string, TrendPoint[]> = {};
-  const categories = [...new Set(hangouts.map((h) => h.category || 'Other'))];
-  for (const cat of categories) {
-    categoryTrend[cat] = monthlyTrends.socialTrend.map((t) => ({ label: t.label, value: 0 }));
-  }
-  if (rangeStart && rangeEnd) {
-    let cursor = startOfMonth(rangeStart);
-    while (cursor <= rangeEnd) {
-      const bucketStart = cursor < rangeStart ? rangeStart : startOfMonth(cursor);
-      const bucketEnd = endOfMonth(cursor) > rangeEnd ? rangeEnd : endOfMonth(cursor);
-      const label = format(cursor, 'MMM yyyy');
-      for (const cat of categories) {
-        const count = hangouts.filter(
-          (h) =>
-            (h.category || 'Other') === cat && isInRange(h.startTime, bucketStart, bucketEnd)
-        ).length;
-        if (!categoryTrend[cat]) categoryTrend[cat] = [];
-        categoryTrend[cat].push({ label, value: count });
-      }
-      cursor = addDays(endOfMonth(cursor), 1);
-    }
-  }
+  const monthBuckets = buildMonthBuckets(rangeStart, rangeEnd);
+  const monthlySleepTrend = monthBuckets.map(({ label, start, end }) => {
+    const entries = sleepEntries.filter((s) => isInRange(s.wakeUp, start, end));
+    const totalMin = entries.reduce((sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp), 0);
+    return {
+      label,
+      value: entries.length > 0 ? totalMin / entries.length / 60 : 0,
+      count: entries.length,
+    };
+  });
 
-  const debtTrend = monthlyTrends.sleepTrend.map((t) => ({
-    label: t.label,
-    value: t.count > 0 ? Math.round(t.minutes / t.count - sleep.goalMinutes) : 0,
-  }));
+  const monthlyHangoutTrend = monthBuckets.map(({ label, start, end }) => {
+    const count = hangouts.filter((h) => isInRange(h.startTime, start, end)).length;
+    return { label, value: count, count };
+  });
 
-  const consistencyTrend = monthlyTrends.sleepTrend.map((t) => ({
-    label: t.label,
-    value: t.count > 1 ? Math.max(0, 100 - Math.min(100, (t.minutes / t.count / 60) * 5)) : 100,
-  }));
+  const debtTrend = monthBuckets.map(({ label, start, end }) => {
+    const entries = sleepEntries.filter((s) => isInRange(s.wakeUp, start, end));
+    if (entries.length === 0) return { label, value: 0, count: 0 };
+    const avgMin =
+      entries.reduce((sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp), 0) / entries.length;
+    return { label, value: Math.round(avgMin - sleep.goalMinutes), count: entries.length };
+  });
 
-  const weeklySocialBuckets: TrendPoint[] = [];
-  if (hangouts.length > 0) {
-    const sorted = [...hangouts].sort(
-      (a, b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime()
-    );
-    const first = startOfDay(parseISO(sorted[0].startTime));
-    const last = startOfDay(parseISO(sorted[sorted.length - 1].startTime));
-    let cursor = startOfDay(first);
-    while (cursor <= last) {
-      const weekEndDay = addDays(cursor, 6);
-      const mins = hangouts
-        .filter((h) => isInRange(h.startTime, cursor, weekEndDay))
-        .reduce((s, h) => s + calcDurationMinutes(h.startTime, h.endTime), 0);
-      weeklySocialBuckets.push({ label: format(cursor, 'MMM d'), value: mins / 60 });
-      cursor = addDays(cursor, 7);
-    }
-  }
+  const weeklySocialBuckets = buildWeeklyHoursTrend(hangouts, rangeStart, rangeEnd);
+  const monthlySocialHours = buildMonthlyHoursTrend(hangouts, rangeStart, rangeEnd);
 
   return {
     overview: {
@@ -549,11 +599,15 @@ export function buildStatisticsBundle(
       debtLifetime: debtStats.totalDebt,
       naps,
       dailyTrend7: getDailySleepTrend(sleepEntries, 7, rangeEnd),
-      monthlySleepTrend: monthlyTrends.sleepTrend.map((t) => ({
-        label: t.label,
-        value: t.count > 0 ? Math.round(t.minutes / t.count) : 0,
-        count: t.count,
-      })),
+      monthlySleepTrend: monthBuckets.map(({ label, start, end }) => {
+        const entries = sleepEntries.filter((s) => isInRange(s.wakeUp, start, end));
+        const totalMin = entries.reduce((sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp), 0);
+        return {
+          label,
+          value: entries.length > 0 ? Math.round(totalMin / entries.length) : 0,
+          count: entries.length,
+        };
+      }),
     },
     social: {
       friends: {
@@ -594,19 +648,16 @@ export function buildStatisticsBundle(
         favoriteRestaurants: foodLocations.slice(0, 5).map((l) => ({ label: l.location, value: l.visitCount })),
         favoriteSpots: locations.slice(0, 5).map((l) => ({ label: l.location, value: l.totalHours })),
       },
-      hoursByWeek: weeklySocialBuckets.slice(-8),
-      hoursByMonth: monthlyTrends.socialTrend.map((t) => ({ label: t.label, value: t.minutes / 60 })),
+      hoursByWeek: weeklySocialBuckets,
+      hoursByMonth: monthlySocialHours,
     },
     combined,
     trends: {
-      monthlySleep: monthlyTrends.sleepTrend.map((t) => ({ label: t.label, value: t.minutes / 60 })),
-      monthlyHangouts: monthlyTrends.socialTrend.map((t) => ({ label: t.label, value: t.count })),
-      friendGrowth,
-      hangoutFrequency: monthlyTrends.socialTrend.map((t) => ({ label: t.label, value: t.count })),
-      consistencyTrend,
+      monthlySleep: monthlySleepTrend,
+      monthlyHangouts: monthlyHangoutTrend,
       debtTrend,
+      hangoutFrequency: monthlyHangoutTrend,
       categoryTrend,
-      timeWithFriends: monthlyTrends.socialTrend.map((t) => ({ label: t.label, value: t.minutes / 60 })),
     },
   };
 }

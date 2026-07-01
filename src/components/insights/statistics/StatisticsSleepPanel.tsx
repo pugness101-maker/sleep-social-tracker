@@ -78,14 +78,6 @@ export function StatisticsSleepPanel({
         nested
       >
         <AdaptiveMetrics metrics={SLEEP_DEBT_METRICS} stats={stats} compare={compare ?? null} columns={2} />
-        {!inCompare && (
-          <SleepInsightsSection
-            data={data}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            sectionsToShow={['debtCalendar']}
-          />
-        )}
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection

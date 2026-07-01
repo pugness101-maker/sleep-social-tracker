@@ -45,6 +45,57 @@ describe('buildStatisticsBundle', () => {
   });
 });
 
+describe('buildStatisticsBundle date ranges', () => {
+  const baseData: AppData = {
+    ...defaultAppData,
+    sleepEntries: [
+      {
+        id: 's1',
+        sleepStart: '2026-06-24T23:00',
+        wakeUp: '2026-06-25T07:00',
+        notes: '',
+        createdAt: '2026-06-25T07:00',
+      },
+    ],
+    hangouts: [
+      {
+        id: 'h1',
+        friendIds: [],
+        startTime: '2026-06-20T18:00',
+        endTime: '2026-06-20T20:00',
+        location: 'Cafe',
+        category: 'Social',
+        type: 'Chill',
+        occasion: 'Casual',
+        notes: '',
+        segments: [],
+        createdAt: '2026-06-20T18:00',
+      },
+    ],
+  };
+
+  it('builds trends without crashing for bounded ranges', () => {
+    const stats = buildStatisticsBundle(
+      baseData,
+      new Date('2026-06-01T00:00:00'),
+      new Date('2026-06-30T23:59:59')
+    );
+    expect(stats.trends.monthlySleep.length).toBeGreaterThan(0);
+    expect(stats.social.hoursByWeek.length).toBeGreaterThan(0);
+    expect(stats.combined.sleepByOccasion.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles today range with no matching data safely', () => {
+    const stats = buildStatisticsBundle(
+      baseData,
+      new Date('2026-07-01T00:00:00'),
+      new Date('2026-07-01T23:59:59')
+    );
+    expect(stats.overview.totalHangouts).toBe(0);
+    expect(stats.trends.monthlyHangouts.every((d) => d.count === 0 || d.value === 0)).toBe(true);
+  });
+});
+
 describe('statistics accordion defaults', () => {
   it('defaults overview open', async () => {
     const { DEFAULT_STATISTICS_ACCORDION } = await import('./statistics-accordion');

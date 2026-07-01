@@ -29,6 +29,14 @@ export function Sleep7DayTrendChart({
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const hasAnyData = data.some((d) => d.hasData);
+  const maxHours = hasAnyData ? Math.max(goalHours, ...data.map((d) => d.hours), 1) : goalHours;
+  const yMax = Math.ceil(maxHours + 1);
+  const yTicks = useMemo(() => {
+    const step = yMax <= 6 ? 1 : 2;
+    const ticks: number[] = [];
+    for (let h = 0; h <= yMax; h += step) ticks.push(h);
+    return ticks;
+  }, [yMax]);
 
   if (!hasAnyData) {
     return (
@@ -46,17 +54,8 @@ export function Sleep7DayTrendChart({
   const pad = { top: 16, right: 16, bottom: 36, left: 40 };
   const chartW = width - pad.left - pad.right;
   const chartH = height - pad.top - pad.bottom;
-  const maxHours = Math.max(goalHours, ...data.map((d) => d.hours), 1);
-  const yMax = Math.ceil(maxHours + 1);
   const goalY = chartY(goalHours, 0, yMax, chartH, pad.top);
   const barWidth = Math.min(48, chartW / Math.max(data.length, 1) - 8);
-
-  const yTicks = useMemo(() => {
-    const step = yMax <= 6 ? 1 : 2;
-    const ticks: number[] = [];
-    for (let h = 0; h <= yMax; h += step) ticks.push(h);
-    return ticks;
-  }, [yMax]);
 
   return (
     <Card>
