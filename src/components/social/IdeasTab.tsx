@@ -6,7 +6,7 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
-import { getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
+import { getDefaultHangoutCategoryPair, normalizeHangoutMainFields } from '../../lib/hangout-categories';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
@@ -236,7 +236,10 @@ export function IdeasTab() {
           <HangoutCategoryTypeSelect
             category={form.category}
             type={form.type}
-            onCategoryChange={(category) => setForm({ ...form, category })}
+            onCategoryChange={(category) => {
+              const main = normalizeHangoutMainFields(category, form.type);
+              setForm({ ...form, category: main.category, type: main.type });
+            }}
             onTypeChange={(type) => setForm({ ...form, type })}
           />
           <Select

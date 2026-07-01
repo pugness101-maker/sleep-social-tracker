@@ -4,6 +4,7 @@ export type HangoutCategory = string;
 
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
+  'Mixed',
   'Food',
   'Entertainment',
   'Fitness',
@@ -17,10 +18,14 @@ export const DEFAULT_HANGOUT_CATEGORIES = [
   'Other',
 ] as const;
 
+export const MIXED_HANGOUT_CATEGORY = 'Mixed';
+export const MIXED_HANGOUT_MAIN_TYPE = 'Mixed';
+
 export const DEFAULT_HANGOUT_CATEGORY = 'Other';
 
 export const DEFAULT_HANGOUT_TYPES_BY_CATEGORY: Record<string, string[]> = {
-  Social: ['Chill', 'Date', 'Group Hangout', 'Party', 'Sleepover', 'Mixed'],
+  Social: ['Chill', 'Date', 'Group Hangout', 'Party', 'Sleepover'],
+  Mixed: [],
   Food: ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Coffee', 'Dessert'],
   Entertainment: ['Movie', 'TV / Shows', 'Gaming', 'Concert', 'Bowling'],
   Fitness: ['Gym', 'MMA', 'Wrestling', 'Running', 'Walking'],
@@ -37,7 +42,7 @@ export const DEFAULT_HANGOUT_TYPES_BY_CATEGORY: Record<string, string[]> = {
 /** Maps legacy flat hangout.type values to { category, type } */
 export const LEGACY_HANGOUT_TYPE_MIGRATION: Record<string, { category: string; type: string }> = {
   Chill: { category: 'Social', type: 'Chill' },
-  Mixed: { category: 'Social', type: 'Mixed' },
+  Mixed: { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE },
   Food: { category: 'Food', type: 'Dinner' },
   Study: { category: 'School', type: 'Study' },
   Gym: { category: 'Fitness', type: 'Gym' },
@@ -57,6 +62,29 @@ export function cloneDefaultTypesByCategory(): Record<string, string[]> {
   return out;
 }
 
+export function isMixedHangoutCategory(category?: string): boolean {
+  return category?.trim().toLowerCase() === MIXED_HANGOUT_CATEGORY.toLowerCase();
+}
+
+export function normalizeHangoutMainFields(
+  category: string,
+  type: string
+): { category: string; type: string } {
+  if (isMixedHangoutCategory(category)) {
+    return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
+  }
+  return { category, type };
+}
+
+/** Types selectable in dropdowns — Mixed is a category-only label, not a type option. */
+export function filterTypesForDropdown(types: string[]): string[] {
+  return types.filter((t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase());
+}
+
+export function defaultSegmentCategory(hangoutCategory: string): string {
+  return isMixedHangoutCategory(hangoutCategory) ? 'Social' : hangoutCategory;
+}
+
 export function allTypesFromCatalog(catalog: Record<string, string[]>): string[] {
   const set = new Set<string>();
   for (const types of Object.values(catalog)) {
@@ -65,12 +93,22 @@ export function allTypesFromCatalog(catalog: Record<string, string[]>): string[]
   return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
+export function allTypesFromCatalogExcludingMixed(catalog: Record<string, string[]>): string[] {
+  return filterTypesForDropdown(allTypesFromCatalog(catalog));
+}
+
 export function inferCategoryAndType(
   type: string,
   category?: string,
   catalog?: Record<string, string[]>
 ): { category: string; type: string } {
   const trimmedType = (type || 'Other').trim() || 'Other';
+  if (trimmedType.toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase() && !category?.trim()) {
+    return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
+  }
+  if (isMixedHangoutCategory(category)) {
+    return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
+  }
   if (category?.trim()) {
     return { category: category.trim(), type: trimmedType };
   }
@@ -88,6 +126,7 @@ export function inferCategoryAndType(
 }
 
 export function typesForCategory(catalog: Record<string, string[]>, category: string): string[] {
+  if (isMixedHangoutCategory(category)) return [];
   return catalog[category] ?? [];
 }
 
@@ -95,6 +134,7 @@ export function getDefaultTypeForCategory(
   catalog: Record<string, string[]>,
   category: string
 ): string {
+  if (isMixedHangoutCategory(category)) return MIXED_HANGOUT_MAIN_TYPE;
   const types = typesForCategory(catalog, category);
   if (types.includes('Chill') && category === 'Social') return 'Chill';
   if (types.includes('Other')) return 'Other';
@@ -110,6 +150,7 @@ export function getDefaultHangoutCategoryPair(catalog: Record<string, string[]>)
 }
 
 export function formatHangoutCategoryType(category: string, type: string): string {
+  if (isMixedHangoutCategory(category)) return MIXED_HANGOUT_CATEGORY;
   if (!category || category === type) return type || category || '—';
   return `${category} · ${type}`;
 }
@@ -173,12 +214,22 @@ export function mergeTypesIntoCatalog(
   const nextCatalog = { ...catalog };
   for (const cat of DEFAULT_HANGOUT_CATEGORIES) {
     if (!nextCategories.includes(cat)) nextCategories.push(cat);
-    if (!nextCatalog[cat]) nextCatalog[cat] = [...(DEFAULT_HANGOUT_TYPES_BY_CATEGORY[cat] ?? ['Other'])];
+    if (!nextCatalog[cat]) {
+      nextCatalog[cat] = isMixedHangoutCategory(cat)
+        ? []
+        : [...(DEFAULT_HANGOUT_TYPES_BY_CATEGORY[cat] ?? ['Other'])];
+    }
   }
+  if (nextCatalog.Social) {
+    nextCatalog.Social = nextCatalog.Social.filter((t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase());
+  }
+  nextCatalog[MIXED_HANGOUT_CATEGORY] = [];
 
   const ensure = (category: string, type: string) => {
+    if (isMixedHangoutCategory(category)) return;
     const cat = category.trim() || DEFAULT_HANGOUT_CATEGORY;
     const typ = type.trim() || 'Other';
+    if (typ.toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase()) return;
     if (!nextCategories.includes(cat)) nextCategories.push(cat);
     const list = nextCatalog[cat] ? [...nextCatalog[cat]] : [];
     if (!list.some((t) => t.toLowerCase() === typ.toLowerCase())) list.push(typ);

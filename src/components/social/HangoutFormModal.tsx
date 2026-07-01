@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/FormFields';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
+import { normalizeHangoutMainFields } from '../../lib/hangout-categories';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
@@ -82,7 +83,10 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
           <HangoutCategoryTypeSelect
             category={form.category}
             type={form.type}
-            onCategoryChange={(category) => setForm({ ...form, category })}
+            onCategoryChange={(category) => {
+              const main = normalizeHangoutMainFields(category, form.type);
+              setForm({ ...form, category: main.category, type: main.type });
+            }}
             onTypeChange={(type) => setForm({ ...form, type })}
           />
           <LocationAutocomplete
@@ -100,7 +104,6 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
           friends={data.friends}
           hangoutStart={form.startTime}
           hangoutEnd={form.endTime}
-          defaultType={form.type}
           onChange={(segments) => setForm({ ...form, segments })}
           onHangoutFriendsChange={(friendIds) => setForm({ ...form, friendIds })}
         />

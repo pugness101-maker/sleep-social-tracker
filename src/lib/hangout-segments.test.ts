@@ -7,14 +7,17 @@ import {
   formatSegmentSummary,
   getActivityCountByType,
   getActivityTimeByType,
+  getHangoutDisplayType,
   getSegmentEffectiveDurationMinutes,
   normalizeHangoutSegments,
   parseDurationInput,
 } from './hangout-segments';
+import { MIXED_HANGOUT_CATEGORY } from './hangout-categories';
 
 function segment(partial: Partial<HangoutSegment> & Pick<HangoutSegment, 'type'>): HangoutSegment {
   return {
     id: '1',
+    category: 'Social',
     friendIds: [],
     startTime: '',
     endTime: '',
@@ -32,7 +35,8 @@ function hangout(overrides: Partial<Hangout> = {}): Hangout {
     startTime: '2026-01-01T16:45',
     endTime: '2026-01-01T21:45',
     location: '',
-    type: 'Mixed',
+    category: 'Social',
+    type: 'Chill',
     notes: '',
     segments: [],
     createdAt: '2026-01-01T16:45',
@@ -100,8 +104,43 @@ describe('normalizeHangoutSegments', () => {
   });
 });
 
+describe('Mixed category hangouts', () => {
+  it('displays Mixed in cards regardless of segments', () => {
+    expect(
+      getHangoutDisplayType(
+        hangout({
+          category: MIXED_HANGOUT_CATEGORY,
+          type: 'Mixed',
+          segments: [segment({ id: '1', type: 'Food', category: 'Food' })],
+        })
+      )
+    ).toBe('Mixed');
+  });
+
+  it('uses segment types for stats when segments exist', () => {
+    const mixed = hangout({
+      category: MIXED_HANGOUT_CATEGORY,
+      type: 'Mixed',
+      segments: [
+        segment({ id: '1', type: 'Food', category: 'Food', durationMinutes: 60 }),
+        segment({ id: '2', type: 'Movie', category: 'Entertainment', durationMinutes: 90 }),
+      ],
+    });
+    expect(getActivityTimeByType(mixed)).toEqual({ Food: 60, Movie: 90 });
+    expect(getActivityCountByType(mixed)).toEqual({ Food: 1, Movie: 1 });
+  });
+
+  it('counts as Mixed only when no segments', () => {
+    const mixed = hangout({ category: MIXED_HANGOUT_CATEGORY, type: 'Mixed', segments: [] });
+    expect(getActivityTimeByType(mixed)).toEqual({ Mixed: 300 });
+    expect(getActivityCountByType(mixed)).toEqual({ Mixed: 1 });
+  });
+});
+
 describe('activity stats', () => {
   const segmented = hangout({
+    category: MIXED_HANGOUT_CATEGORY,
+    type: 'Mixed',
     segments: [
       segment({ id: '1', type: 'Chill' }),
       segment({ id: '2', type: 'Food', durationMinutes: 45 }),

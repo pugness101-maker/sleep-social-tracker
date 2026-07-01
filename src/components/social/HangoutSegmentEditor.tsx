@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/FormFields';
 import { Modal } from '../ui/Modal';
@@ -12,6 +13,7 @@ import {
   parseDurationInput,
   segmentHasSpecificTime,
 } from '../../lib/hangout-segments';
+import { defaultSegmentCategory, getDefaultTypeForCategory, isMixedHangoutCategory } from '../../lib/hangout-categories';
 import type { Friend, HangoutSegment } from '../../types';
 import { FriendPicker } from './FriendPicker';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
@@ -24,7 +26,6 @@ interface HangoutSegmentEditorProps {
   friends: Friend[];
   hangoutStart: string;
   hangoutEnd: string;
-  defaultType: string;
   onChange: (segments: HangoutSegment[]) => void;
   onHangoutFriendsChange: (friendIds: string[]) => void;
 }
@@ -72,16 +73,19 @@ export function HangoutSegmentEditor({
   friends,
   hangoutStart,
   hangoutEnd,
-  defaultType,
   onChange,
   onHangoutFriendsChange,
 }: HangoutSegmentEditorProps) {
+  const { data } = useApp();
+  const catalog = data.hangoutTypesByCategory ?? {};
   const [pendingAdd, setPendingAdd] = useState<PendingSegmentFriendAdd | null>(null);
 
   const addSegment = () => {
+    const segCategory = defaultSegmentCategory(hangoutCategory);
+    const segType = getDefaultTypeForCategory(catalog, segCategory);
     onChange([
       ...segments,
-      createHangoutSegment(hangoutCategory, defaultType, { friendIds: [...hangoutFriendIds] }),
+      createHangoutSegment(segCategory, segType, { friendIds: [...hangoutFriendIds] }),
     ]);
   };
 
@@ -162,7 +166,11 @@ export function HangoutSegmentEditor({
       </div>
 
       {segments.length === 0 ? (
-        <p className="text-sm opacity-70 py-2">No segments — the main hangout type is used for statistics.</p>
+        <p className="text-sm opacity-70 py-2">
+          {isMixedHangoutCategory(hangoutCategory)
+            ? 'No segments yet — add segments to describe each activity.'
+            : 'No segments — the main hangout type is used for statistics.'}
+        </p>
       ) : (
         <div className="space-y-3">
           {segments.map((segment, index) => {
@@ -183,9 +191,16 @@ export function HangoutSegmentEditor({
                   </Button>
                 </div>
                 <HangoutCategoryTypeSelect
+                  mode="segment"
                   category={segment.category}
                   type={segment.type}
-                  onCategoryChange={(category) => updateSegment(segment.id, { category })}
+                  onCategoryChange={(category) => {
+                    const types = catalog[category] ?? [];
+                    const nextType = types.includes(segment.type)
+                      ? segment.type
+                      : getDefaultTypeForCategory(catalog, category);
+                    updateSegment(segment.id, { category, type: nextType });
+                  }}
                   onTypeChange={(type) => updateSegment(segment.id, { type })}
                 />
                 <FriendPicker

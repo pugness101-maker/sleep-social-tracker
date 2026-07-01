@@ -8,7 +8,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout, HangoutSegment } from '../../types';
-import { getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
+import { getDefaultHangoutCategoryPair, normalizeHangoutMainFields } from '../../lib/hangout-categories';
 import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
@@ -200,7 +200,10 @@ export function HangoutsTab() {
           <HangoutCategoryTypeSelect
             category={startForm.category}
             type={startForm.type}
-            onCategoryChange={(category) => setStartForm({ ...startForm, category })}
+            onCategoryChange={(category) => {
+              const main = normalizeHangoutMainFields(category, startForm.type);
+              setStartForm({ ...startForm, category: main.category, type: main.type });
+            }}
             onTypeChange={(type) => setStartForm({ ...startForm, type })}
           />
           <LocationAutocomplete
@@ -225,7 +228,10 @@ export function HangoutsTab() {
             <HangoutCategoryTypeSelect
               category={form.category}
               type={form.type}
-              onCategoryChange={(category) => setForm({ ...form, category })}
+              onCategoryChange={(category) => {
+              const main = normalizeHangoutMainFields(category, form.type);
+              setForm({ ...form, category: main.category, type: main.type });
+            }}
               onTypeChange={(type) => setForm({ ...form, type })}
             />
             <LocationAutocomplete
@@ -243,7 +249,6 @@ export function HangoutsTab() {
             friends={data.friends}
             hangoutStart={form.startTime}
             hangoutEnd={form.endTime}
-            defaultType={form.type}
             onChange={(segments) => setForm({ ...form, segments })}
             onHangoutFriendsChange={(friendIds) => setForm({ ...form, friendIds })}
           />

@@ -59,7 +59,7 @@ import {
   normalizeImportedFriendNames,
   renameFriendEverywhere,
 } from '../lib/data-cleanup';
-import { inferCategoryAndType } from '../lib/hangout-categories';
+import { inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory } from '../lib/hangout-categories';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 export type DeleteTagResolution =
@@ -555,14 +555,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           category ??
           prev.activeTimers.hangoutCategory ??
           inferCategoryAndType(resolvedType, undefined, catalog).category;
+        const main = normalizeHangoutMainFields(resolvedCategory, resolvedType);
         return {
           ...prev,
           activeTimers: {
             ...prev.activeTimers,
             hangoutStart: toLocalISO(),
             hangoutFriendIds: friendIds,
-            hangoutCategory: resolvedCategory,
-            hangoutType: resolvedType,
+            hangoutCategory: main.category,
+            hangoutType: main.type,
             hangoutLocation: location,
           },
         };
@@ -575,14 +576,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     patch((prev) => {
       const { hangoutStart, hangoutFriendIds, hangoutCategory, hangoutType, hangoutLocation } = prev.activeTimers;
       if (!hangoutStart) return prev;
+      const main = normalizeHangoutMainFields(hangoutCategory, hangoutType);
       const entry: Hangout = {
         id: generateId(),
         friendIds: hangoutFriendIds,
         startTime: hangoutStart,
         endTime: toLocalISO(),
         location: hangoutLocation,
-        category: hangoutCategory,
-        type: hangoutType,
+        category: main.category,
+        type: main.type,
         notes,
         segments: [],
         createdAt: toLocalISO(),
@@ -601,16 +603,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patch]);
 
   const addHangout = useCallback((hangout: Omit<Hangout, 'id' | 'createdAt'>) => {
-    patch((prev) => ({
-      ...prev,
-      hangouts: [...prev.hangouts, { ...hangout, id: generateId(), createdAt: toLocalISO() }],
-    }));
+    patch((prev) => {
+      const main = normalizeHangoutMainFields(hangout.category, hangout.type);
+      return {
+        ...prev,
+        hangouts: [...prev.hangouts, { ...hangout, ...main, id: generateId(), createdAt: toLocalISO() }],
+      };
+    });
   }, [patch]);
 
   const updateHangout = useCallback((id: string, hangout: Partial<Hangout>) => {
     patch((prev) => ({
       ...prev,
-      hangouts: prev.hangouts.map((h) => (h.id === id ? { ...h, ...hangout } : h)),
+      hangouts: prev.hangouts.map((h) => {
+        if (h.id !== id) return h;
+        const merged = { ...h, ...hangout };
+        const main = normalizeHangoutMainFields(merged.category, merged.type);
+        return { ...merged, ...main };
+      }),
     }));
   }, [patch]);
 
@@ -925,6 +935,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patch, data.hangoutCategories]);
 
   const addTypeToCategory = useCallback((category: string, type: string): string | null => {
+    if (isMixedHangoutCategory(category)) {
+      return 'The Mixed category cannot have types. Add Activity Segments instead.';
+    }
     const normalized = normalizeOptionName(type);
     const types = data.hangoutTypesByCategory[category] ?? [];
     const error = validateOptionName(normalized, types);

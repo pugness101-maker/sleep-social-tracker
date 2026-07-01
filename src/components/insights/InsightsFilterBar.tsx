@@ -11,6 +11,7 @@ import {
   type InsightsFilters,
 } from '../../lib/insights-filters';
 import { optionSelectOptions } from '../../lib/social-options';
+import { filterTypesForDropdown } from '../../lib/hangout-categories';
 import { LocationAutocomplete } from '../social/LocationAutocomplete';
 
 interface InsightsFilterBarProps {
@@ -78,8 +79,11 @@ export function InsightsFilterBar({
           options={[
             { value: '', label: 'All types' },
             ...(filters.hangoutCategory
-              ? (data.hangoutTypesByCategory[filters.hangoutCategory] ?? []).map((t) => ({ value: t, label: t }))
-              : optionSelectOptions(data.hangoutTypes)),
+              ? filterTypesForDropdown(data.hangoutTypesByCategory[filters.hangoutCategory] ?? []).map((t) => ({
+                  value: t,
+                  label: t,
+                }))
+              : optionSelectOptions(filterTypesForDropdown(data.hangoutTypes))),
           ]}
         />
         <Select

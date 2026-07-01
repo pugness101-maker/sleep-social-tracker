@@ -1,5 +1,5 @@
 import { calcDurationMinutes, formatDuration, formatTime, generateId } from './dates';
-import { inferCategoryAndType } from './hangout-categories';
+import { inferCategoryAndType, isMixedHangoutCategory, defaultSegmentCategory, MIXED_HANGOUT_CATEGORY, MIXED_HANGOUT_MAIN_TYPE } from './hangout-categories';
 import type { Hangout, HangoutSegment, HangoutCategory, HangoutType } from '../types';
 
 export function createHangoutSegment(
@@ -108,8 +108,9 @@ export function getActivityTimeByType(hangout: Hangout): Record<string, number> 
     return result;
   }
   const mins = getHangoutDurationMinutes(hangout);
-  if (mins > 0 && hangout.type) {
-    result[hangout.type] = mins;
+  const label = isMixedHangoutCategory(hangout.category) ? MIXED_HANGOUT_MAIN_TYPE : hangout.type;
+  if (mins > 0 && label) {
+    result[label] = mins;
   }
   return result;
 }
@@ -125,8 +126,9 @@ export function getActivityCountByType(hangout: Hangout): Record<string, number>
     }
     return result;
   }
-  if (hangout.type) {
-    result[hangout.type] = 1;
+  const label = isMixedHangoutCategory(hangout.category) ? MIXED_HANGOUT_MAIN_TYPE : hangout.type;
+  if (label) {
+    result[label] = 1;
   }
   return result;
 }
@@ -154,9 +156,12 @@ export function aggregateActivityCountByType(hangouts: Hangout[]): Record<string
 }
 
 export function getHangoutDisplayType(hangout: Hangout): string {
+  if (isMixedHangoutCategory(hangout.category)) {
+    return MIXED_HANGOUT_CATEGORY;
+  }
   if (hangout.segments?.length) {
     const types = new Set(hangout.segments.map((s) => s.type).filter(Boolean));
-    if (types.size > 1) return hangout.type || 'Mixed';
+    if (types.size > 1) return MIXED_HANGOUT_CATEGORY;
     if (types.size === 1) return [...types][0];
   }
   return hangout.type || 'Untyped';
@@ -164,7 +169,10 @@ export function getHangoutDisplayType(hangout: Hangout): string {
 
 export function hangoutMatchesTypeFilter(hangout: Hangout, filterType: string): boolean {
   if (!filterType) return true;
-  if (hangout.type === filterType) return true;
+  if (filterType.toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase()) {
+    return isMixedHangoutCategory(hangout.category);
+  }
+  if (hangout.type === filterType && !isMixedHangoutCategory(hangout.category)) return true;
   return hangout.segments?.some((s) => s.type === filterType) ?? false;
 }
 
@@ -236,9 +244,10 @@ export function normalizeHangoutSegments(
   hangoutCategory = 'Other',
   catalog?: Record<string, string[]>
 ): HangoutSegment[] {
+  const segDefaultCategory = defaultSegmentCategory(hangoutCategory);
   return (
     segments?.map((s) => {
-      const pair = inferCategoryAndType(s.type ?? 'Other', s.category ?? hangoutCategory, catalog);
+      const pair = inferCategoryAndType(s.type ?? 'Other', s.category ?? segDefaultCategory, catalog);
       return {
         id: s.id || generateId(),
         category: pair.category,

@@ -88,13 +88,14 @@ export interface FriendLink {
 }
 
 export const DEFAULT_HANGOUT_TYPES = [
-  'Chill', 'Mixed', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
+  'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
 ] as const;
 
 export const DEFAULT_HANGOUT_TYPE = 'Other';
 
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
+  'Mixed',
   'Food',
   'Entertainment',
   'Fitness',

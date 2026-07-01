@@ -7,6 +7,7 @@ import {
   countHangoutsWithCategoryType,
   typesForCategory,
   DEFAULT_HANGOUT_CATEGORY,
+  isMixedHangoutCategory,
 } from '../../lib/hangout-categories';
 
 export function HangoutCategoryCustomization() {
@@ -48,7 +49,12 @@ export function HangoutCategoryCustomization() {
           onChange={(e) => setSelectedCategory(e.target.value)}
           options={data.hangoutCategories.map((c) => ({ value: c, label: c }))}
         />
-        <CustomOptionListCard
+        {isMixedHangoutCategory(selectedCategory) ? (
+          <p className="text-sm opacity-70 text-left">
+            Mixed is a special category with no types. Use Activity Segments on each hangout to break down activities by category and type.
+          </p>
+        ) : (
+          <CustomOptionListCard
           title={`Types in ${selectedCategory}`}
           description="Activity types within the selected category."
           options={types}
@@ -63,6 +69,7 @@ export function HangoutCategoryCustomization() {
             else deleteTypeFromCategory(selectedCategory, name, { action: 'default' });
           }}
         />
+        )}
       </div>
     </div>
   );

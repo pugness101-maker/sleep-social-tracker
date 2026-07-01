@@ -98,6 +98,7 @@ const segmentOnlyHangout: Hangout = {
   startTime: '2026-07-01T08:00',
   endTime: '2026-07-01T19:00',
   location: 'Town',
+  category: 'Mixed',
   type: 'Mixed',
   notes: '',
   segments: [

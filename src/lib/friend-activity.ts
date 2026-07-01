@@ -18,6 +18,7 @@ import {
   getSegmentFriendIds,
   getSegmentSeenTime,
 } from './hangout-segments';
+import { isMixedHangoutCategory } from './hangout-categories';
 import type { Friend, Hangout } from '../types';
 
 export type FriendSortOption =
@@ -261,9 +262,10 @@ export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): F
 
   for (const hangout of friendHangouts) {
     const hasSegments = (hangout.segments?.length ?? 0) > 0;
+    const skipMainTypeStats = isMixedHangoutCategory(hangout.category) && hasSegments;
 
-    if (hangout.friendIds.includes(friendId)) {
-      const type = hangout.type;
+    if (hangout.friendIds.includes(friendId) && !skipMainTypeStats) {
+      const type = isMixedHangoutCategory(hangout.category) ? 'Mixed' : hangout.type;
       if (type) {
         hangoutTypeCounts[type] = (hangoutTypeCounts[type] ?? 0) + 1;
         if (!hasSegments) typeCounts[type] = (typeCounts[type] ?? 0) + 1;

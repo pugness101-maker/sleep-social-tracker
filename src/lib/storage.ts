@@ -7,7 +7,8 @@ import {
   mergeTypesIntoCatalog,
   migrateHangoutCategories,
   migrateIdeaCategories,
-  allTypesFromCatalog,
+  allTypesFromCatalogExcludingMixed,
+  isMixedHangoutCategory,
 } from './hangout-categories';
 import {
   DEFAULT_HANGOUT_CATEGORIES,
@@ -23,7 +24,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 12;
+export const DATA_VERSION = 13;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -139,12 +140,6 @@ function mergeSocialOptions(
     hangoutTypes.push(data.activeTimers.hangoutType);
   }
 
-  if (!hangoutTypes.some((t) => t.toLowerCase() === 'mixed')) {
-    const chillIndex = hangoutTypes.findIndex((t) => t.toLowerCase() === 'chill');
-    if (chillIndex >= 0) hangoutTypes.splice(chillIndex + 1, 0, 'Mixed');
-    else hangoutTypes.unshift('Mixed');
-  }
-
   return { friendTags, friendGroups, relationshipStatuses, relationshipTypes, hangoutTypes };
 }
 
@@ -227,15 +222,21 @@ export function normalizeAppData(
     hangoutTypesByCategory: merged.catalog,
   };
   const social = mergeSocialOptions(withMigrated);
-  const hangoutTypes = allTypesFromCatalog(merged.catalog);
+  const hangoutTypes = allTypesFromCatalogExcludingMixed(merged.catalog);
   const activeTimers = {
     ...defaultActiveTimers,
     ...raw.activeTimers,
     hangoutCategory:
       raw.activeTimers?.hangoutCategory ??
       inferCategoryAndType(raw.activeTimers?.hangoutType ?? DEFAULT_HANGOUT_TYPE, undefined, merged.catalog).category,
+    hangoutType:
+      raw.activeTimers?.hangoutType ??
+      inferCategoryAndType(DEFAULT_HANGOUT_TYPE, raw.activeTimers?.hangoutCategory, merged.catalog).type,
   };
-  if (!social.hangoutTypes.includes(activeTimers.hangoutType) && social.hangoutTypes.length > 0) {
+  const mainFields = inferCategoryAndType(activeTimers.hangoutType, activeTimers.hangoutCategory, merged.catalog);
+  activeTimers.hangoutCategory = mainFields.category;
+  activeTimers.hangoutType = mainFields.type;
+  if (!hangoutTypes.includes(activeTimers.hangoutType) && hangoutTypes.length > 0 && !isMixedHangoutCategory(activeTimers.hangoutCategory)) {
     activeTimers.hangoutType = social.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
       ? DEFAULT_HANGOUT_TYPE
       : social.hangoutTypes[0];
