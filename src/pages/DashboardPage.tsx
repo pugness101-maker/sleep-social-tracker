@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { useAwakeTimer } from '../hooks/useLiveTimer';
 import { useApp } from '../context/AppContext';
 import { StatCard } from '../components/ui/Card';
-import { Card } from '../components/ui/Card';
 import { CatchUpWidget } from '../components/dashboard/CatchUpWidget';
+import { TopFriendsWidget } from '../components/dashboard/TopFriendsWidget';
+import { ThisWeekSocialWidget } from '../components/dashboard/ThisWeekSocialWidget';
+import { BirthdaysWidget } from '../components/dashboard/BirthdaysWidget';
+import { RecentActivityWidget } from '../components/dashboard/RecentActivityWidget';
 import { FriendDetailModal } from '../components/social/FriendDetailModal';
 import {
   getLastNightSleep,
   getTodayWakeUp,
   getTodayNapTotal,
   getTodayHangouts,
-  getSocialHoursThisWeek,
   getAverageSleepThisWeek,
-  getRecentActivity,
   getLastNightSleepVsGoal,
   getSleepDebtStats,
 } from '../lib/stats';
@@ -30,14 +31,11 @@ export function DashboardPage() {
   const todayWake = getTodayWakeUp(data);
   const napTotal = getTodayNapTotal(data);
   const todayHangouts = getTodayHangouts(data);
-  const socialHours = getSocialHoursThisWeek(data);
   const avgSleep = getAverageSleepThisWeek(data);
-  const recent = getRecentActivity(data);
   const debtStats = getSleepDebtStats(data);
   const goalMinutes = data.settings.sleepGoalHours * 60;
 
   const isSleeping = !!data.activeTimers.sleepStart;
-
   const weeklyVsGoal = avgSleep ? avgSleep - goalMinutes : null;
 
   return (
@@ -55,70 +53,38 @@ export function DashboardPage() {
           accent="awake"
           icon="⏱️"
         />
-        <StatCard
-          label="Sleep Goal"
-          value={`${data.settings.sleepGoalHours}h`}
-          sub="Nightly target"
-          accent="sleep"
-          icon="🎯"
-        />
+        <StatCard label="Sleep Goal" value={`${data.settings.sleepGoalHours}h`} sub="Nightly target" accent="sleep" icon="🎯" />
         <StatCard
           label="Recommended Bedtime"
           value={schedule.recommendedBedtime}
-          sub={
-            schedule.autoCalculateBedtime
-              ? `Wake goal ${schedule.effectiveWakeTime} − ${schedule.goalHours}h`
-              : schedule.autoCalculateWakeTime
-                ? `Target bedtime ${schedule.effectiveBedtime}`
-                : `Target ${schedule.effectiveBedtime}`
-          }
+          sub={schedule.autoCalculateBedtime ? `Wake goal ${schedule.effectiveWakeTime} − ${schedule.goalHours}h` : `Target ${schedule.effectiveBedtime}`}
           accent="sleep"
           icon="🌙"
         />
         <StatCard
           label="Recommended Wake Time"
           value={schedule.recommendedWakeTime}
-          sub={
-            schedule.autoCalculateWakeTime
-              ? `Bedtime goal ${schedule.effectiveBedtime} + ${schedule.goalHours}h`
-              : schedule.autoCalculateBedtime
-                ? `Target wake-up ${schedule.effectiveWakeTime}`
-                : `Target ${schedule.effectiveWakeTime}`
-          }
+          sub={schedule.autoCalculateWakeTime ? `Bedtime goal ${schedule.effectiveBedtime} + ${schedule.goalHours}h` : `Target ${schedule.effectiveWakeTime}`}
           accent="sleep"
           icon="☀️"
         />
         <StatCard
           label="Last Night's Sleep"
           value={lastSleep ? formatDuration(calcDurationMinutes(lastSleep.sleepStart, lastSleep.wakeUp)) : '—'}
-          sub={
-            sleepVsGoal
-              ? formatSleepDebt(sleepVsGoal.debt)
-              : lastSleep
-                ? formatTime(lastSleep.wakeUp) + ' wake-up'
-                : 'No sleep logged'
-          }
+          sub={sleepVsGoal ? formatSleepDebt(sleepVsGoal.debt) : lastSleep ? `${formatTime(lastSleep.wakeUp)} wake-up` : 'No sleep logged'}
           accent="sleep"
           icon="😴"
         />
         <StatCard
           label="Today's Sleep Debt"
-          value={
-            debtStats.todaySleepDebt !== null
-              ? formatSleepDebt(debtStats.todaySleepDebt)
-              : '—'
-          }
+          value={debtStats.todaySleepDebt !== null ? formatSleepDebt(debtStats.todaySleepDebt) : '—'}
           sub={`Goal: ${data.settings.sleepGoalHours}h/night`}
           accent="sleep"
           icon="📉"
         />
         <StatCard
           label="This Week's Sleep Debt"
-          value={
-            debtStats.weekNightCount > 0
-              ? formatSleepDebt(debtStats.weeklyDebt)
-              : '—'
-          }
+          value={debtStats.weekNightCount > 0 ? formatSleepDebt(debtStats.weeklyDebt) : '—'}
           sub={`${debtStats.weekNightCount} night${debtStats.weekNightCount === 1 ? '' : 's'} logged this week`}
           accent="sleep"
           icon="📆"
@@ -126,85 +92,29 @@ export function DashboardPage() {
         <StatCard
           label="Sleep Goal Progress"
           value={`${debtStats.goalProgress.toFixed(0)}%`}
-          sub={
-            debtStats.nightCount > 0
-              ? `${debtStats.nightsAtGoal} of ${debtStats.nightCount} nights met goal`
-              : `Target: ${data.settings.sleepGoalHours}h/night`
-          }
+          sub={debtStats.nightCount > 0 ? `${debtStats.nightsAtGoal} of ${debtStats.nightCount} nights met goal` : `Target: ${data.settings.sleepGoalHours}h/night`}
           accent="sleep"
           icon="✅"
         />
-        <StatCard
-          label="Today's Wake-up"
-          value={todayWake ? formatTime(todayWake) : '—'}
-          sub={todayWake ? formatDateTime(todayWake).split(',')[0] : 'Not yet today'}
-          accent="sleep"
-        />
-        <StatCard
-          label="Today's Nap Total"
-          value={formatDuration(napTotal)}
-          sub={data.activeTimers.napStart ? 'Nap in progress…' : `${data.napEntries.filter((n) => n.napStart.startsWith(new Date().toISOString().slice(0, 10))).length} naps in Sleep Log`}
-          accent="nap"
-          icon="💤"
-        />
-        <StatCard
-          label="Today's Hangouts"
-          value={String(todayHangouts.length)}
-          sub={todayHangouts.length ? formatDuration(todayHangouts.reduce((s, h) => s + calcDurationMinutes(h.startTime, h.endTime), 0)) + ' total' : 'None yet'}
-          accent="social"
-          icon="🤝"
-        />
-        <StatCard
-          label="Social Hours This Week"
-          value={`${socialHours.toFixed(1)}h`}
-          sub={`${data.hangouts.length} total hangouts`}
-          accent="social"
-          icon="📅"
-        />
-        <StatCard
-          label="Avg Sleep This Week"
-          value={avgSleep ? formatDuration(avgSleep) : '—'}
-          sub={
-            weeklyVsGoal !== null
-              ? formatSleepDebt(-weeklyVsGoal)
-              : `Goal: ${data.settings.sleepGoalHours}h`
-          }
-          accent="sleep"
-          icon="📊"
-        />
+        <StatCard label="Today's Wake-up" value={todayWake ? formatTime(todayWake) : '—'} sub={todayWake ? formatDateTime(todayWake).split(',')[0] : 'Not yet today'} accent="sleep" />
+        <StatCard label="Today's Nap Total" value={formatDuration(napTotal)} sub={`${data.napEntries.filter((n) => n.napStart.startsWith(new Date().toISOString().slice(0, 10))).length} naps in Sleep Log`} accent="nap" icon="💤" />
+        <StatCard label="Today's Hangouts" value={String(todayHangouts.length)} sub={todayHangouts.length ? `${formatDuration(todayHangouts.reduce((s, h) => s + calcDurationMinutes(h.startTime, h.endTime), 0))} total` : 'None yet'} accent="social" icon="🤝" />
+        <StatCard label="Avg Sleep This Week" value={avgSleep ? formatDuration(avgSleep) : '—'} sub={weeklyVsGoal !== null ? formatSleepDebt(-weeklyVsGoal) : `Goal: ${data.settings.sleepGoalHours}h`} accent="sleep" icon="📊" />
       </div>
 
-      <CatchUpWidget onOpenFriend={setDetailFriendId} />
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <CatchUpWidget onOpenFriend={setDetailFriendId} />
+        <ThisWeekSocialWidget />
+      </div>
 
-      <Card>
-        <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>
-          Recent Activity
-        </h2>
-        {recent.length === 0 ? (
-          <p className="text-sm opacity-70 text-left">No activity yet. Start tracking sleep or hangouts!</p>
-        ) : (
-          <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {recent.map((item) => (
-              <li key={`${item.type}-${item.id}`} className="flex items-center gap-3 py-3 text-left">
-                <span className="text-xl">
-                  {item.type === 'sleep' ? '😴' : item.type === 'nap' ? '💤' : '👥'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>{item.title}</p>
-                  <p className="text-xs opacity-70">{item.detail}</p>
-                </div>
-                <span className="text-xs opacity-60 shrink-0">{formatDateTime(item.timestamp)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <TopFriendsWidget onOpenFriend={setDetailFriendId} />
+        <BirthdaysWidget onOpenFriend={setDetailFriendId} />
+      </div>
 
-      <FriendDetailModal
-        friendId={detailFriendId}
-        onClose={() => setDetailFriendId(null)}
-        onEdit={() => setDetailFriendId(null)}
-      />
+      <RecentActivityWidget />
+
+      <FriendDetailModal friendId={detailFriendId} onClose={() => setDetailFriendId(null)} onEdit={() => setDetailFriendId(null)} />
     </div>
   );
 }

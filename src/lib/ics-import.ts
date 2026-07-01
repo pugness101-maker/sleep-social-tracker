@@ -418,6 +418,7 @@ export function applyIcsCalendarImport(
       id: generateId(),
       name: name.trim(),
       tags: [],
+      groups: [],
       relationshipStatus: DEFAULT_RELATIONSHIP_STATUS,
       birthday: '',
       contactInfo: '',

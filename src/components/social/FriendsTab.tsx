@@ -8,7 +8,7 @@ import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { TagPicker } from '../ui/TagPicker';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
-import { friendMatchesTagFilter, optionSelectOptions } from '../../lib/social-options';
+import { friendMatchesTagFilter, friendMatchesGroupFilter, optionSelectOptions } from '../../lib/social-options';
 import { formatLastSeenLabel, sortFriends, type FriendSortOption } from '../../lib/friend-activity';
 import { FriendDetailModal } from './FriendDetailModal';
 import type { Friend } from '../../types';
@@ -19,6 +19,7 @@ export function FriendsTab() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<FriendSortOption>('name');
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterGroup, setFilterGroup] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
@@ -28,6 +29,7 @@ export function FriendsTab() {
   const emptyForm = {
     name: '',
     tags: [] as string[],
+    groups: [] as string[],
     relationshipStatus: DEFAULT_RELATIONSHIP_STATUS,
     relationships: [] as Friend['relationships'],
     birthday: '',
@@ -53,12 +55,15 @@ export function FriendsTab() {
     if (filterTags.length > 0) {
       list = list.filter((f) => friendMatchesTagFilter(f, filterTags));
     }
+    if (filterGroup) {
+      list = list.filter((f) => friendMatchesGroupFilter(f, filterGroup));
+    }
     if (filterStatus) {
       list = list.filter((f) => f.relationshipStatus === filterStatus);
     }
     list = sortFriends(list, sortBy);
     return list;
-  }, [data.friends, data.hangouts, search, sortBy, filterTags, filterStatus]);
+  }, [data.friends, data.hangouts, search, sortBy, filterTags, filterGroup, filterStatus]);
 
   const orphanTags = useMemo(() => {
     const known = new Set(data.friendTags);
@@ -78,6 +83,7 @@ export function FriendsTab() {
     setForm({
       name: friend.name,
       tags: [...friend.tags],
+      groups: [...(friend.groups ?? [])],
       relationshipStatus: friend.relationshipStatus || DEFAULT_RELATIONSHIP_STATUS,
       relationships: friend.relationships,
       birthday: friend.birthday,
@@ -118,6 +124,11 @@ export function FriendsTab() {
           ]}
         />
         <Select
+          value={filterGroup}
+          onChange={(e) => setFilterGroup(e.target.value)}
+          options={[{ value: '', label: 'All Groups' }, ...optionSelectOptions(data.friendGroups)]}
+        />
+        <Select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           options={[
@@ -136,12 +147,12 @@ export function FriendsTab() {
           onChange={setFilterTags}
           orphanTags={orphanTags}
         />
-        {(filterTags.length > 0 || filterStatus) && (
+        {(filterTags.length > 0 || filterGroup || filterStatus) && (
           <Button
             size="sm"
             variant="ghost"
             className="mt-2"
-            onClick={() => { setFilterTags([]); setFilterStatus(''); }}
+            onClick={() => { setFilterTags([]); setFilterGroup(''); setFilterStatus(''); }}
           >
             Clear filters
           </Button>
@@ -240,6 +251,15 @@ export function FriendsTab() {
             onChange={(e) => setForm({ ...form, relationshipStatus: e.target.value })}
             options={optionSelectOptions(data.relationshipStatuses, form.relationshipStatus)}
           />
+          <div className="sm:col-span-2">
+            <TagPicker
+              label="Friend Groups"
+              options={data.friendGroups}
+              selected={form.groups}
+              onChange={(groups) => setForm({ ...form, groups })}
+              orphanTags={form.groups.filter((g) => !data.friendGroups.includes(g))}
+            />
+          </div>
           <div className="sm:col-span-2">
             <TagPicker
               label="Friend Tags"

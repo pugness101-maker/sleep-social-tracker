@@ -91,6 +91,9 @@ interface AppContextValue {
   addFriendTag: (name: string) => string | null;
   updateFriendTag: (oldName: string, newName: string) => string | null;
   deleteFriendTag: (name: string, resolution: DeleteTagResolution) => void;
+  addFriendGroup: (name: string) => string | null;
+  updateFriendGroup: (oldName: string, newName: string) => string | null;
+  deleteFriendGroup: (name: string, resolution: DeleteTagResolution) => void;
   addRelationshipStatus: (name: string) => string | null;
   updateRelationshipStatus: (oldName: string, newName: string) => string | null;
   deleteRelationshipStatus: (name: string, resolution: DeleteTypeResolution) => void;
@@ -271,7 +274,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...prev,
       friends: [
         ...prev.friends,
-        { ...friend, relationships: friend.relationships ?? [], id: generateId(), createdAt: toLocalISO() },
+        { ...friend, groups: friend.groups ?? [], relationships: friend.relationships ?? [], id: generateId(), createdAt: toLocalISO() },
       ],
     }));
   }, [patch]);
@@ -644,6 +647,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [patch]);
 
+  const addFriendGroup = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.friendGroups);
+    if (error) return error;
+    patch((prev) => ({ ...prev, friendGroups: [...prev.friendGroups, normalized] }));
+    return null;
+  }, [patch, data.friendGroups]);
+
+  const updateFriendGroup = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.friendGroups, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      friendGroups: prev.friendGroups.map((g) => (g === oldName ? normalized : g)),
+      friends: prev.friends.map((f) => ({
+        ...f,
+        groups: [...new Set((f.groups ?? []).map((g) => (g === oldName ? normalized : g)))],
+      })),
+    }));
+    return null;
+  }, [patch, data.friendGroups]);
+
+  const deleteFriendGroup = useCallback((name: string, resolution: DeleteTagResolution) => {
+    patch((prev) => {
+      const friends = prev.friends.map((f) => {
+        if (!(f.groups ?? []).includes(name)) return f;
+        if (resolution.action === 'remove') {
+          return { ...f, groups: (f.groups ?? []).filter((g) => g !== name) };
+        }
+        const replacement = resolution.name;
+        return {
+          ...f,
+          groups: [...new Set((f.groups ?? []).map((g) => (g === name ? replacement : g)))],
+        };
+      });
+      return {
+        ...prev,
+        friendGroups: prev.friendGroups.filter((g) => g !== name),
+        friends,
+      };
+    });
+  }, [patch]);
+
   const addRelationshipStatus = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
     const error = validateOptionName(normalized, data.relationshipStatuses);
@@ -911,6 +958,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFriendTag,
     updateFriendTag,
     deleteFriendTag,
+    addFriendGroup,
+    updateFriendGroup,
+    deleteFriendGroup,
     addRelationshipStatus,
     updateRelationshipStatus,
     deleteRelationshipStatus,

@@ -2,6 +2,7 @@ import { useApp } from '../../context/AppContext';
 import { CustomOptionListCard } from './CustomOptionListCard';
 import {
   countFriendsWithTag,
+  countFriendsWithGroup,
   countFriendsWithRelationshipStatus,
   countFriendLinksWithType,
   countHangoutsWithType,
@@ -15,6 +16,9 @@ export function SocialCustomization() {
     addFriendTag,
     updateFriendTag,
     deleteFriendTag,
+    addFriendGroup,
+    updateFriendGroup,
+    deleteFriendGroup,
     addRelationshipStatus,
     updateRelationshipStatus,
     deleteRelationshipStatus,
@@ -40,6 +44,21 @@ export function SocialCustomization() {
           if (action === 'remove') deleteFriendTag(name, { action: 'remove' });
           else if (action === 'replace' && otherName) deleteFriendTag(name, { action: 'replace', name: otherName });
           else deleteFriendTag(name, { action: 'remove' });
+        }}
+      />
+
+      <CustomOptionListCard
+        title="Friend Groups"
+        description="Organize friends into groups (separate from tags). Friends can belong to multiple groups."
+        options={data.friendGroups}
+        usageCount={(name) => countFriendsWithGroup(data.friends, name)}
+        deleteMode="tag"
+        onAdd={addFriendGroup}
+        onEdit={updateFriendGroup}
+        onDelete={(name, action, otherName) => {
+          if (action === 'remove') deleteFriendGroup(name, { action: 'remove' });
+          else if (action === 'replace' && otherName) deleteFriendGroup(name, { action: 'replace', name: otherName });
+          else deleteFriendGroup(name, { action: 'remove' });
         }}
       />
 

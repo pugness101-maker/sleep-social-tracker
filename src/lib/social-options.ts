@@ -19,6 +19,15 @@ export function validateOptionName(name: string, options: string[], exclude?: st
   return null;
 }
 
+export function countFriendsWithGroup(friends: { groups?: string[] }[], group: string): number {
+  return friends.filter((f) => (f.groups ?? []).includes(group)).length;
+}
+
+export function friendMatchesGroupFilter(friend: { groups?: string[] }, group: string): boolean {
+  if (!group) return true;
+  return (friend.groups ?? []).includes(group);
+}
+
 export function countFriendsWithTag(friends: { tags: string[] }[], tag: string): number {
   return friends.filter((f) => f.tags.includes(tag)).length;
 }

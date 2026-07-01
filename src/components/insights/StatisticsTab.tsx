@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Card, StatCard } from '../ui/Card';
 import { getSleepStats, getNapStats, getSocialStats, getAwakeStats, getMonthlyTrends, getSleepDebtStats } from '../../lib/stats';
@@ -5,21 +6,28 @@ import { formatDuration, avgMinutesToTime, weekdayLabel, formatDateTime } from '
 import { formatSleepDebt, formatGoalProgressPercent } from '../../lib/sleep-goals';
 import { getAverageSleepThisWeek } from '../../lib/stats';
 import { useStatsDateRange, statsRangeArgs } from '../../hooks/useStatsDateRange';
+import { useInsightsFilters } from '../../hooks/useInsightsFilters';
 import { StatsDateRangeFilter } from './StatsDateRangeFilter';
+import { InsightsFilterBar, useFilteredAppData } from './InsightsFilterBar';
+import { getLocationHistory, friendNamesAtLocation, formatLocationDate } from '../../lib/location-history';
 
 export function StatisticsTab() {
   const { data } = useApp();
   const { range, resolved, setPreset, setCustomDates, clearFilter } = useStatsDateRange();
+  const { filters, setFilter, clearFilters, removeChip } = useInsightsFilters();
   const { start, end } = statsRangeArgs(resolved);
 
-  const sleep = getSleepStats(data, start, end);
-  const debtStats = getSleepDebtStats(data, start, end);
-  const naps = getNapStats(data, start, end);
-  const social = getSocialStats(data, start, end);
-  const awake = getAwakeStats(data, start, end);
-  const trends = getMonthlyTrends(data, 6, start, end);
+  const filteredData = useFilteredAppData(data, filters, start, end);
 
-  const weeklyAvg = resolved.isFiltered ? sleep.avg : getAverageSleepThisWeek(data);
+  const sleep = getSleepStats(filteredData, start, end);
+  const debtStats = getSleepDebtStats(filteredData, start, end);
+  const naps = getNapStats(filteredData, start, end);
+  const social = getSocialStats(filteredData, start, end);
+  const awake = getAwakeStats(filteredData, start, end);
+  const trends = getMonthlyTrends(filteredData, 6, start, end);
+  const locations = useMemo(() => getLocationHistory(filteredData.hangouts, 20), [filteredData.hangouts]);
+
+  const weeklyAvg = resolved.isFiltered ? sleep.avg : getAverageSleepThisWeek(filteredData);
   const weeklyVsGoal = weeklyAvg ? weeklyAvg - data.settings.sleepGoalHours * 60 : null;
 
   const topFriends = Object.entries(social.friendCounts)
@@ -41,6 +49,15 @@ export function StatisticsTab() {
         onCustomDates={setCustomDates}
         onClear={clearFilter}
       />
+
+      <Card>
+        <InsightsFilterBar
+          filters={filters}
+          setFilter={setFilter}
+          clearFilters={clearFilters}
+          removeChip={removeChip}
+        />
+      </Card>
 
       <section>
         <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Statistics</h2>
@@ -299,6 +316,42 @@ export function StatisticsTab() {
             </div>
           )}
         </Card>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Location History</h2>
+        {locations.length === 0 ? (
+          <p className="text-sm opacity-70 text-left">No locations in filtered hangouts.</p>
+        ) : (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="opacity-60 border-b" style={{ borderColor: 'var(--border)' }}>
+                    <th className="py-2 pr-4">Location</th>
+                    <th className="py-2 pr-4">Visits</th>
+                    <th className="py-2 pr-4">Hours</th>
+                    <th className="py-2 pr-4">Friends</th>
+                    <th className="py-2 pr-4">Top Type</th>
+                    <th className="py-2">Last Visit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locations.map((loc) => (
+                    <tr key={loc.location} className="border-b" style={{ borderColor: 'var(--border)' }}>
+                      <td className="py-2 pr-4 font-medium">{loc.location}</td>
+                      <td className="py-2 pr-4">{loc.visitCount}</td>
+                      <td className="py-2 pr-4">{loc.totalHours.toFixed(1)}h</td>
+                      <td className="py-2 pr-4 max-w-[160px] truncate">{friendNamesAtLocation(loc.friendIds, data.friends)}</td>
+                      <td className="py-2 pr-4">{loc.mostCommonType ?? '—'}</td>
+                      <td className="py-2">{formatLocationDate(loc.lastVisit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </section>
     </div>
   );

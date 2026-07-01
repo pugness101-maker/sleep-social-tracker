@@ -10,6 +10,7 @@ import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from 
 import type { Hangout, HangoutSegment } from '../../types';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
 import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
+import { collectUniqueLocations } from '../../lib/insights-filters';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
 import { IcsCalendarImport } from './IcsCalendarImport';
@@ -39,6 +40,7 @@ export function HangoutsTab() {
 
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [startModal, setStartModal] = useState(false);
   const [editHangout, setEditHangout] = useState<Hangout | null>(null);
@@ -66,8 +68,18 @@ export function HangoutsTab() {
       });
     }
     if (filterType) list = list.filter((h) => hangoutMatchesTypeFilter(h, filterType));
+    if (filterLocation) {
+      const loc = filterLocation.toLowerCase();
+      list = list.filter(
+        (h) =>
+          h.location?.trim().toLowerCase() === loc ||
+          h.segments?.some((s) => (s.location?.trim() || h.location?.trim() || '').toLowerCase() === loc)
+      );
+    }
     return list;
-  }, [data.hangouts, data.friends, search, filterType]);
+  }, [data.hangouts, data.friends, search, filterType, filterLocation]);
+
+  const locationOptions = useMemo(() => collectUniqueLocations(data.hangouts), [data.hangouts]);
 
   const friendNames = (ids: string[]) =>
     ids.map((id) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown').join(', ') || 'No friends';
@@ -125,6 +137,10 @@ export function HangoutsTab() {
         <Select value={filterType} onChange={(e) => setFilterType(e.target.value)} options={[
           { value: '', label: 'All Types' },
           ...data.hangoutTypes.map((t) => ({ value: t, label: t })),
+        ]} />
+        <Select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} options={[
+          { value: '', label: 'All Locations' },
+          ...locationOptions.map((l) => ({ value: l, label: l })),
         ]} />
       </div>
 

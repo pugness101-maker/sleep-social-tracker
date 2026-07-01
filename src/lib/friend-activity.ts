@@ -5,7 +5,9 @@ import {
   getDay,
   parseISO,
   startOfDay,
+  startOfMonth,
   startOfWeek,
+  subMonths,
   subWeeks,
 } from 'date-fns';
 import { calcDurationMinutes, formatDuration, weekdayLabel } from './dates';
@@ -39,14 +41,19 @@ export interface FriendActivitySummary {
 
 export interface FriendDetailedStats extends FriendActivitySummary {
   lastHangoutStart: string | null;
+  firstSeen: string | null;
   longestHangoutMinutes: number;
   shortestHangoutMinutes: number;
+  /** @deprecated use mostCommonHangoutType */
   mostCommonType: string | null;
+  mostCommonHangoutType: string | null;
+  mostCommonSegmentType: string | null;
   favoriteLocation: string | null;
   mostSeenWeekday: string | null;
   mostSeenTimeOfDay: string | null;
   longestGapDays: number | null;
   hangoutStreakWeeks: number;
+  hangoutStreakMonths: number;
 }
 
 export interface FriendHangoutTimelineItem {
@@ -148,6 +155,29 @@ function weekStartKey(date: Date): string {
   return format(startOfWeek(date, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 }
 
+function monthStartKey(date: Date): string {
+  return format(startOfMonth(date), 'yyyy-MM');
+}
+
+function getHangoutStreakMonths(friendId: string, friendHangouts: Hangout[]): number {
+  if (friendHangouts.length === 0) return 0;
+  const monthsWithHangouts = new Set(
+    friendHangouts
+      .map((h) => getFriendLastSeenInHangout(friendId, h))
+      .filter((t): t is string => !!t)
+      .map((t) => monthStartKey(parseISO(t)))
+  );
+  const mostRecent = [...monthsWithHangouts].sort((a, b) => b.localeCompare(a))[0];
+  if (!mostRecent) return 0;
+  let cursor = parseISO(`${mostRecent}-01`);
+  let streak = 0;
+  while (monthsWithHangouts.has(monthStartKey(cursor))) {
+    streak++;
+    cursor = subMonths(cursor, 1);
+  }
+  return streak;
+}
+
 function getHangoutStreakWeeks(friendId: string, friendHangouts: Hangout[]): number {
   if (friendHangouts.length === 0) return 0;
   const weeksWithHangouts = new Set(
@@ -223,18 +253,28 @@ export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): F
   const durations = friendHangouts.map((h) => getFriendMinutesInHangout(friendId, h));
 
   const typeCounts: Record<string, number> = {};
+  const hangoutTypeCounts: Record<string, number> = {};
+  const segmentTypeCounts: Record<string, number> = {};
   const locationCounts: Record<string, number> = {};
   const weekdayCounts: Record<number, number> = {};
   const hourCounts: Record<number, number> = {};
 
   for (const hangout of friendHangouts) {
+    const hasSegments = (hangout.segments?.length ?? 0) > 0;
+
     if (hangout.friendIds.includes(friendId)) {
       const type = hangout.type;
-      if (type) typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+      if (type) {
+        hangoutTypeCounts[type] = (hangoutTypeCounts[type] ?? 0) + 1;
+        if (!hasSegments) typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+      }
     }
     for (const segment of hangout.segments ?? []) {
       if (!getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) continue;
-      if (segment.type) typeCounts[segment.type] = (typeCounts[segment.type] ?? 0) + 1;
+      if (segment.type) {
+        segmentTypeCounts[segment.type] = (segmentTypeCounts[segment.type] ?? 0) + 1;
+        typeCounts[segment.type] = (typeCounts[segment.type] ?? 0) + 1;
+      }
     }
     const loc = hangout.location?.trim();
     if (loc && hangout.friendIds.includes(friendId)) {
@@ -282,15 +322,19 @@ export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): F
 
   return {
     ...summary,
+    firstSeen: summary.firstHangout,
     lastHangoutStart,
     longestHangoutMinutes: durations.length ? Math.max(...durations) : 0,
     shortestHangoutMinutes: durations.length ? Math.min(...durations) : 0,
-    mostCommonType: modeValue(typeCounts),
+    mostCommonType: modeValue(typeCounts) ?? modeValue(hangoutTypeCounts),
+    mostCommonHangoutType: modeValue(hangoutTypeCounts),
+    mostCommonSegmentType: modeValue(segmentTypeCounts),
     favoriteLocation: modeValue(locationCounts),
     mostSeenWeekday: topWeekdayKey != null ? weekdayLabel(Number(topWeekdayKey)) : null,
     mostSeenTimeOfDay: mostSeenHour != null ? formatHourLabel(Number(mostSeenHour)) : null,
     longestGapDays: getLongestGapDays(seenTimes),
     hangoutStreakWeeks: getHangoutStreakWeeks(friendId, friendHangouts),
+    hangoutStreakMonths: getHangoutStreakMonths(friendId, friendHangouts),
   };
 }
 
@@ -427,6 +471,12 @@ export function formatStreakLabel(weeks: number): string {
   if (weeks === 0) return '—';
   if (weeks === 1) return '1 week';
   return `${weeks} weeks`;
+}
+
+export function formatMonthStreakLabel(months: number): string {
+  if (months === 0) return '—';
+  if (months === 1) return '1 month';
+  return `${months} months`;
 }
 
 export function formatGapDays(days: number | null): string {

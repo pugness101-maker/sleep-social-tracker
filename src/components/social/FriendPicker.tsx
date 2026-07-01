@@ -36,15 +36,21 @@ export function FriendPicker({
   const [search, setSearch] = useState('');
   const [quickFilter, setQuickFilter] = useState<FriendPickerQuickFilter>('all');
   const [tagFilter, setTagFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const showSelectedFirst = data.settings.friendPickerShowSelectedFirst;
 
+  const poolFriends = useMemo(() => {
+    if (!groupFilter) return data.friends;
+    return data.friends.filter((f) => (f.groups ?? []).includes(groupFilter));
+  }, [data.friends, groupFilter]);
+
   const visibleFriends = useMemo(
     () =>
-      filterFriendsForPicker(data.friends, {
+      filterFriendsForPicker(poolFriends, {
         search,
         quickFilter,
         tagFilter,
@@ -52,7 +58,7 @@ export function FriendPicker({
         selectedIds: selected,
         showSelectedFirst,
       }),
-    [data.friends, data.hangouts, search, quickFilter, tagFilter, selected, showSelectedFirst]
+    [poolFriends, data.hangouts, search, quickFilter, tagFilter, selected, showSelectedFirst]
   );
 
   const selectedFriends = useMemo(
@@ -211,6 +217,22 @@ export function FriendPicker({
                 {tagOptions.map((tag) => (
                   <option key={tag} value={tag}>
                     {tag}
+                  </option>
+                ))}
+              </select>
+            )}
+            {data.friendGroups.length > 0 && (
+              <select
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+                className="rounded-lg border px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary/30 flex-1 min-w-[120px]"
+                style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                aria-label="Filter by group"
+              >
+                <option value="">Groups: All</option>
+                {data.friendGroups.map((group) => (
+                  <option key={group} value={group}>
+                    {group}
                   </option>
                 ))}
               </select>

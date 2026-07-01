@@ -15,6 +15,18 @@ export const DEFAULT_FRIEND_TAGS = [
   'Study Buddy',
 ] as const;
 
+export const DEFAULT_FRIEND_GROUPS = [
+  'TXST',
+  'Family',
+  'Church',
+  'MMA',
+  'Work',
+  'High School',
+  'Roommates',
+  'Dating',
+  'Close Circle',
+] as const;
+
 /** Legacy tag values migrated into relationshipStatus */
 export const RELATIONSHIP_TAGS_TO_MIGRATE = [
   'Talking',
@@ -122,6 +134,8 @@ export interface Friend {
   id: string;
   name: string;
   tags: FriendTag[];
+  /** Friend groups (separate from tags); multiple allowed. */
+  groups: string[];
   relationshipStatus: RelationshipStatus;
   birthday: string;
   contactInfo: string;
@@ -194,6 +208,7 @@ export interface AppData {
   activeTimers: ActiveTimers;
   settings: AppSettings;
   friendTags: string[];
+  friendGroups: string[];
   relationshipStatuses: string[];
   relationshipTypes: string[];
   hangoutTypes: string[];

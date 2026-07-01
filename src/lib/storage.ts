@@ -3,6 +3,7 @@ import { normalizeHangoutSegments } from './hangout-segments';
 import { normalizeSleepAutoCalcSettings } from './sleep-goals';
 import {
   DEFAULT_FRIEND_TAGS,
+  DEFAULT_FRIEND_GROUPS,
   DEFAULT_HANGOUT_TYPES,
   DEFAULT_HANGOUT_TYPE,
   DEFAULT_RELATIONSHIP_STATUSES,
@@ -13,7 +14,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 9;
+export const DATA_VERSION = 10;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -47,6 +48,7 @@ export const defaultAppData: AppData = {
   activeTimers: defaultActiveTimers,
   settings: defaultSettings,
   friendTags: [...DEFAULT_FRIEND_TAGS],
+  friendGroups: [...DEFAULT_FRIEND_GROUPS],
   relationshipStatuses: [...DEFAULT_RELATIONSHIP_STATUSES],
   relationshipTypes: [...DEFAULT_RELATIONSHIP_TYPES],
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
@@ -56,9 +58,10 @@ const migratedRelationshipTagSet = new Set<string>(RELATIONSHIP_TAGS_TO_MIGRATE)
 
 function mergeSocialOptions(
   data: Partial<AppData> & { friendCategories?: string[] }
-): Pick<AppData, 'friendTags' | 'relationshipStatuses' | 'relationshipTypes' | 'hangoutTypes'> {
+): Pick<AppData, 'friendTags' | 'friendGroups' | 'relationshipStatuses' | 'relationshipTypes' | 'hangoutTypes'> {
   const friendTags = [...(data.friendTags ?? data.friendCategories ?? defaultAppData.friendTags)]
     .filter((t) => !migratedRelationshipTagSet.has(t));
+  const friendGroups = [...(data.friendGroups ?? defaultAppData.friendGroups)];
   const relationshipStatuses = [
     ...(data.relationshipStatuses ?? defaultAppData.relationshipStatuses),
   ];
@@ -86,6 +89,14 @@ function mergeSocialOptions(
         !relationshipTypes.some((t) => t.toLowerCase() === link.type.toLowerCase())
       ) {
         relationshipTypes.push(link.type);
+      }
+    });
+    (friend.groups ?? []).forEach((group) => {
+      if (
+        group &&
+        !friendGroups.some((g) => g.toLowerCase() === group.toLowerCase())
+      ) {
+        friendGroups.push(group);
       }
     });
   });
@@ -121,7 +132,7 @@ function mergeSocialOptions(
     else hangoutTypes.unshift('Mixed');
   }
 
-  return { friendTags, relationshipStatuses, relationshipTypes, hangoutTypes };
+  return { friendTags, friendGroups, relationshipStatuses, relationshipTypes, hangoutTypes };
 }
 
 /** Migrate legacy friend.category → tags, and relationship labels out of tags */
@@ -145,7 +156,7 @@ function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string 
     const relationships = friend.relationships ?? [];
 
     const { category: _removed, ...rest } = friend;
-    return { ...rest, tags, relationshipStatus, relationships } as Friend;
+    return { ...rest, tags, groups: friend.groups ?? [], relationshipStatus, relationships } as Friend;
   });
 }
 

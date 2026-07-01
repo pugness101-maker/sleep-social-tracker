@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -7,12 +7,15 @@ import { Badge } from '../ui/Misc';
 import { formatDate, formatTime, formatDuration } from '../../lib/dates';
 import { linkTypeOptions } from '../../lib/friend-links';
 import { getDefaultRelationshipType } from '../../lib/social-options';
+import { filterHangoutsByInsights } from '../../lib/insights-filters';
+import { useInsightsFilters } from '../../hooks/useInsightsFilters';
 import {
   getFriendDetailedStats,
   getFriendHangoutTimeline,
   formatLastSeenLabel,
   formatDaysSinceLabel,
   formatStreakLabel,
+  formatMonthStreakLabel,
   formatGapDays,
 } from '../../lib/friend-activity';
 import { HangoutFormModal } from './HangoutFormModal';
@@ -26,9 +29,14 @@ interface FriendDetailModalProps {
 
 export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailModalProps) {
   const { data, addFriendLink, updateFriendLink, deleteFriendLink } = useApp();
+  const { filters } = useInsightsFilters();
   const friend = data.friends.find((f) => f.id === friendId);
-  const stats = friendId ? getFriendDetailedStats(friendId, data.hangouts) : null;
-  const timeline = friendId ? getFriendHangoutTimeline(friendId, data.hangouts, data.friends) : [];
+  const filteredHangouts = useMemo(
+    () => filterHangoutsByInsights(data.hangouts, filters, data.friends),
+    [data.hangouts, data.friends, filters]
+  );
+  const stats = friendId ? getFriendDetailedStats(friendId, filteredHangouts) : null;
+  const timeline = friendId ? getFriendHangoutTimeline(friendId, filteredHangouts, data.friends) : [];
 
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [editLink, setEditLink] = useState<FriendLink | null>(null);
@@ -107,6 +115,13 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
                 ))}
               </div>
             )}
+            {(friend.groups ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {(friend.groups ?? []).map((group) => (
+                  <Badge key={group} color="#14b8a6">{group}</Badge>
+                ))}
+              </div>
+            )}
             {friend.birthday && <p className="text-sm opacity-70 mt-2">🎂 {formatDate(friend.birthday)}</p>}
             {friend.contactInfo && <p className="text-sm opacity-70">📞 {friend.contactInfo}</p>}
             {friend.notes && <p className="text-sm opacity-70 mt-2">{friend.notes}</p>}
@@ -120,22 +135,24 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
           </div>
 
           <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-            <h3 className="font-semibold mb-3" style={{ color: 'var(--text-heading)' }}>Statistics</h3>
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--text-heading)' }}>Insights</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+              <div><span className="opacity-60 block">Most Common Hangout Type</span><span className="font-medium">{stats.mostCommonHangoutType ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Most Common Segment Type</span><span className="font-medium">{stats.mostCommonSegmentType ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Favorite Location</span><span className="font-medium">{stats.favoriteLocation ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Favorite Day of Week</span><span className="font-medium">{stats.mostSeenWeekday ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Most Common Time of Day</span><span className="font-medium">{stats.mostSeenTimeOfDay ?? '—'}</span></div>
               <div><span className="opacity-60 block">Total Hangouts</span><span className="font-medium">{stats.totalHangouts}</span></div>
-              <div><span className="opacity-60 block">Total Hours Together</span><span className="font-medium">{stats.totalHours.toFixed(1)}h</span></div>
+              <div><span className="opacity-60 block">Total Hours</span><span className="font-medium">{stats.totalHours.toFixed(1)}h</span></div>
               <div><span className="opacity-60 block">Average Duration</span><span className="font-medium">{formatDuration(stats.avgDuration)}</span></div>
-              <div><span className="opacity-60 block">First Hangout</span><span className="font-medium">{stats.firstHangout ? formatDate(stats.firstHangout) : '—'}</span></div>
-              <div><span className="opacity-60 block">Last Hangout</span><span className="font-medium">{stats.lastSeen ? formatDate(stats.lastSeen) : '—'}</span></div>
-              <div><span className="opacity-60 block">Days Since Seen</span><span className="font-medium">{formatDaysSinceLabel(stats.daysSinceSeen)}</span></div>
               <div><span className="opacity-60 block">Longest Hangout</span><span className="font-medium">{stats.totalHangouts ? formatDuration(stats.longestHangoutMinutes) : '—'}</span></div>
               <div><span className="opacity-60 block">Shortest Hangout</span><span className="font-medium">{stats.totalHangouts ? formatDuration(stats.shortestHangoutMinutes) : '—'}</span></div>
-              <div><span className="opacity-60 block">Most Common Type</span><span className="font-medium">{stats.mostCommonType ?? '—'}</span></div>
-              <div><span className="opacity-60 block">Favorite Location</span><span className="font-medium">{stats.favoriteLocation ?? '—'}</span></div>
-              <div><span className="opacity-60 block">Day Most Seen</span><span className="font-medium">{stats.mostSeenWeekday ?? '—'}</span></div>
-              <div><span className="opacity-60 block">Time Most Seen</span><span className="font-medium">{stats.mostSeenTimeOfDay ?? '—'}</span></div>
+              <div><span className="opacity-60 block">First Seen</span><span className="font-medium">{stats.firstSeen ? formatDate(stats.firstSeen) : '—'}</span></div>
+              <div><span className="opacity-60 block">Last Seen</span><span className="font-medium">{stats.lastSeen ? formatDate(stats.lastSeen) : '—'}</span></div>
+              <div><span className="opacity-60 block">Days Since Seen</span><span className="font-medium">{formatDaysSinceLabel(stats.daysSinceSeen)}</span></div>
               <div><span className="opacity-60 block">Longest Gap</span><span className="font-medium">{formatGapDays(stats.longestGapDays)}</span></div>
-              <div><span className="opacity-60 block">Current Streak</span><span className="font-medium">{formatStreakLabel(stats.hangoutStreakWeeks)}</span></div>
+              <div><span className="opacity-60 block">Weekly Streak</span><span className="font-medium">{formatStreakLabel(stats.hangoutStreakWeeks)}</span></div>
+              <div><span className="opacity-60 block">Monthly Streak</span><span className="font-medium">{formatMonthStreakLabel(stats.hangoutStreakMonths)}</span></div>
             </div>
           </div>
 
