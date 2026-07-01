@@ -244,6 +244,80 @@ export function getAwakeStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
   return { avgAwake, longestStreak, awakeBeforeBed, currentAwake };
 }
 
+export interface AwakePeriodRow {
+  id: string;
+  start: string;
+  end: string;
+  isCurrent: boolean;
+}
+
+/** Most recent wake-up from completed sleep entries (ignores active sleep timer). */
+export function getLatestCompletedWakeUp(data: AppData): string | null {
+  if (data.sleepEntries.length === 0) return null;
+  const sorted = [...data.sleepEntries].sort(
+    (a, b) => parseISO(b.wakeUp).getTime() - parseISO(a.wakeUp).getTime()
+  );
+  return sorted[0]?.wakeUp ?? null;
+}
+
+export function getAwakePeriods(data: AppData, now = Date.now()): AwakePeriodRow[] {
+  const sorted = [...data.sleepEntries].sort(
+    (a, b) => parseISO(a.sleepStart).getTime() - parseISO(b.sleepStart).getTime()
+  );
+  const periods: AwakePeriodRow[] = [];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prevWake = sorted[i - 1].wakeUp;
+    const nextStart = sorted[i].sleepStart;
+    if (parseISO(nextStart).getTime() <= parseISO(prevWake).getTime()) continue;
+    periods.push({
+      id: `awake:${prevWake}:${nextStart}`,
+      start: prevWake,
+      end: nextStart,
+      isCurrent: false,
+    });
+  }
+
+  if (data.activeTimers.sleepStart) {
+    const lastWake = getLatestCompletedWakeUp(data);
+    const sleepStart = data.activeTimers.sleepStart;
+    if (lastWake && parseISO(sleepStart).getTime() > parseISO(lastWake).getTime()) {
+      periods.push({
+        id: `awake:${lastWake}:${sleepStart}`,
+        start: lastWake,
+        end: sleepStart,
+        isCurrent: false,
+      });
+    }
+    return periods.sort((a, b) => parseISO(b.start).getTime() - parseISO(a.start).getTime());
+  }
+
+  const lastWake = getLastWakeUp(data);
+  if (lastWake) {
+    periods.push({
+      id: 'awake:current',
+      start: lastWake,
+      end: new Date(now).toISOString(),
+      isCurrent: true,
+    });
+  }
+
+  return periods.sort((a, b) => parseISO(b.start).getTime() - parseISO(a.start).getTime());
+}
+
+export function isAwakePeriodOverWarning(
+  data: AppData,
+  start: string,
+  end: string,
+  isCurrent: boolean,
+  now = Date.now()
+): boolean {
+  const minutes = isCurrent
+    ? (now - parseISO(start).getTime()) / 60000
+    : calcDurationMinutes(start, end);
+  return minutes >= data.settings.awakeWarningHours * 60;
+}
+
 // Sleep statistics
 export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date) {
   let entries = filterSleepByWakeRange([...data.sleepEntries], rangeStart, rangeEnd);
