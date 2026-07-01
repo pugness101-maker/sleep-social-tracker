@@ -9,6 +9,7 @@ import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout } from '../../types';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
+import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
   const { data, startHangout, endHangout, addHangout, updateHangout, deleteHangout, duplicateHangout } = useApp();
@@ -39,6 +40,14 @@ export function HangoutsTab() {
   const [editHangout, setEditHangout] = useState<Hangout | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [endNotes, setEndNotes] = useState('');
+  const [importMessage, setImportMessage] = useState('');
+  const [importMessageError, setImportMessageError] = useState(false);
+
+  const showImportMessage = (msg: string, isError = false) => {
+    setImportMessage(msg);
+    setImportMessageError(isError);
+    setTimeout(() => { setImportMessage(''); setImportMessageError(false); }, 4000);
+  };
 
   const isActive = !!data.activeTimers.hangoutStart;
   const hangoutElapsed = useLiveTimer(isActive, data.activeTimers.hangoutStart);
@@ -105,6 +114,14 @@ export function HangoutsTab() {
 
   return (
     <div>
+      {importMessage && (
+        <div
+          className={`mb-4 p-3 rounded-lg text-sm ${importMessageError ? '' : 'bg-social/10 text-social'}`}
+          style={importMessageError ? { background: 'rgba(239,68,68,0.1)', color: '#ef4444' } : undefined}
+        >
+          {importMessage}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 mb-4">
         {!isActive ? (
           <Button onClick={() => setStartModal(true)}>Start Hangout</Button>
@@ -112,6 +129,7 @@ export function HangoutsTab() {
           <Button variant="success" onClick={() => endHangout(endNotes)}>End Hangout</Button>
         )}
         <Button variant="secondary" onClick={openAdd}>Add Hangout</Button>
+        <IcsCalendarImport triggerLabel="Import" onMessage={showImportMessage} />
       </div>
 
       {isActive && (

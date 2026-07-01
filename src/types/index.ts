@@ -121,6 +121,8 @@ export interface Hangout {
   type: HangoutType;
   notes: string;
   createdAt: string;
+  source?: string;
+  sourceCalendarUid?: string;
 }
 
 export interface HangoutIdea {

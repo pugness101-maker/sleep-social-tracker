@@ -26,6 +26,12 @@ import {
   type ImportSectionPreset,
 } from '../lib/import-sections';
 import { applySpreadsheetImport, type SpreadsheetImportMode } from '../lib/spreadsheet-import';
+import {
+  importIcsCalendarData,
+  type FriendResolution,
+  type IcsImportOptions,
+  type IcsPreviewItem,
+} from '../lib/ics-import';
 import { generateId, toLocalISO } from '../lib/dates';
 import {
   normalizeOptionName,
@@ -104,6 +110,11 @@ interface AppContextValue {
     napEntries: Omit<NapEntry, 'id' | 'createdAt'>[],
     mode: SpreadsheetImportMode
   ) => { success: boolean; error?: string; sleepCount: number; napCount: number };
+  importIcsCalendar: (
+    items: IcsPreviewItem[],
+    friendResolutions: Record<string, FriendResolution>,
+    options: IcsImportOptions
+  ) => { success: boolean; error?: string; hangoutsImported: number; friendsCreated: number };
   resetData: () => void;
 }
 
@@ -771,6 +782,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
+  const importIcsCalendarFn = useCallback(
+    (
+      items: IcsPreviewItem[],
+      friendResolutions: Record<string, FriendResolution>,
+      options: IcsImportOptions
+    ) => {
+      const result = importIcsCalendarData(data, items, friendResolutions, options);
+      if (result.success) {
+        setData(result.data);
+        return {
+          success: true,
+          hangoutsImported: result.hangoutsImported,
+          friendsCreated: result.friendsCreated,
+        };
+      }
+      return {
+        success: false,
+        error: result.error,
+        hangoutsImported: 0,
+        friendsCreated: 0,
+      };
+    },
+    [data]
+  );
+
   const resetData = useCallback(() => {
     setData(clearAllData());
   }, []);
@@ -821,6 +857,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     importData: importDataFn,
     importSections: importSectionsFn,
     importSleepSpreadsheet: importSleepSpreadsheetFn,
+    importIcsCalendar: importIcsCalendarFn,
     resetData,
   };
 

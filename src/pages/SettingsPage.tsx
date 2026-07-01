@@ -7,6 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
 import { SectionImport } from '../components/settings/SectionImport';
 import { SleepSpreadsheetImport } from '../components/settings/SleepSpreadsheetImport';
+import { IcsCalendarImport } from '../components/social/IcsCalendarImport';
 import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
 
@@ -228,6 +229,7 @@ export function SettingsPage() {
               }
               onMessage={showMsg}
             />
+            <IcsCalendarImport onMessage={showMsg} />
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           </div>
         </Card>
