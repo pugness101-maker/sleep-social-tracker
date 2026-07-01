@@ -1,15 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLiveTimer } from '../../hooks/useLiveTimer';
+import { useHangoutFilters } from '../../hooks/useHangoutFilters';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
-import { SearchBar, EmptyState, Badge } from '../ui/Misc';
+import { SearchBar, EmptyState } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout, HangoutSegment } from '../../types';
-import { getDefaultHangoutCategoryPair, normalizeHangoutMainFields } from '../../lib/hangout-categories';
-import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
+import { getDefaultHangoutCategoryPair, isMixedHangoutCategory, normalizeHangoutMainFields } from '../../lib/hangout-categories';
+import { filterHangoutsForTab } from '../../lib/hangout-filters';
+import {
+  formatHangoutSegmentTablePreviews,
+  getHangoutTableCategory,
+  getHangoutTableType,
+} from '../../lib/hangout-segments';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
@@ -18,6 +24,21 @@ import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
   const { data, startHangout, endHangout, addHangout, updateHangout, deleteHangout, duplicateHangout } = useApp();
+
+  const {
+    filters,
+    setSearch,
+    setCategory,
+    setType,
+    setLocation,
+    categoryOptions,
+    typeOptions,
+  } = useHangoutFilters({
+    hangoutCategories: data.hangoutCategories,
+    hangoutTypesByCategory: data.hangoutTypesByCategory ?? {},
+    hangoutTypes: data.hangoutTypes,
+    hangouts: data.hangouts,
+  });
 
   const makeEmptyForm = () => {
     const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
@@ -40,9 +61,6 @@ export function HangoutsTab() {
     return { friendIds: [] as string[], category, type, location: '' };
   });
 
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterLocation, setFilterLocation] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [startModal, setStartModal] = useState(false);
   const [editHangout, setEditHangout] = useState<Hangout | null>(null);
@@ -60,26 +78,14 @@ export function HangoutsTab() {
   const isActive = !!data.activeTimers.hangoutStart;
   const hangoutElapsed = useLiveTimer(isActive, data.activeTimers.hangoutStart);
 
+  const friendNameLookup = (id: string) => data.friends.find((f) => f.id === id)?.name ?? '?';
+
   const hangouts = useMemo(() => {
-    let list = [...data.hangouts].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((h) => {
-        const names = h.friendIds.map((id) => data.friends.find((f) => f.id === id)?.name ?? '').join(' ');
-        return names.toLowerCase().includes(q) || h.location.toLowerCase().includes(q) || h.notes.toLowerCase().includes(q) || h.type.toLowerCase().includes(q) || h.segments?.some((s) => s.type.toLowerCase().includes(q) || s.notes.toLowerCase().includes(q) || s.location.toLowerCase().includes(q));
-      });
-    }
-    if (filterType) list = list.filter((h) => hangoutMatchesTypeFilter(h, filterType));
-    if (filterLocation) {
-      const loc = filterLocation.toLowerCase();
-      list = list.filter(
-        (h) =>
-          h.location?.trim().toLowerCase() === loc ||
-          h.segments?.some((s) => (s.location?.trim() || h.location?.trim() || '').toLowerCase() === loc)
-      );
-    }
-    return list;
-  }, [data.hangouts, data.friends, search, filterType, filterLocation]);
+    const sorted = [...data.hangouts].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+    return filterHangoutsForTab(sorted, data.friends, filters);
+  }, [data.hangouts, data.friends, filters]);
 
   const friendNames = (ids: string[]) =>
     ids.map((id) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown').join(', ') || 'No friends';
@@ -92,7 +98,16 @@ export function HangoutsTab() {
 
   const openEdit = (h: Hangout) => {
     setEditHangout(h);
-    setForm({ friendIds: h.friendIds, startTime: h.startTime, endTime: h.endTime, location: h.location, category: h.category, type: h.type, notes: h.notes, segments: h.segments ?? [] });
+    setForm({
+      friendIds: h.friendIds,
+      startTime: h.startTime,
+      endTime: h.endTime,
+      location: h.location,
+      category: h.category,
+      type: h.type,
+      notes: h.notes,
+      segments: h.segments ?? [],
+    });
     setModalOpen(true);
   };
 
@@ -132,62 +147,83 @@ export function HangoutsTab() {
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search hangouts..." /></div>
-        <Select value={filterType} onChange={(e) => setFilterType(e.target.value)} options={[
-          { value: '', label: 'All Types' },
-          ...data.hangoutTypes.map((t) => ({ value: t, label: t })),
-        ]} />
-        <div className="min-w-[200px] flex-1">
-          <LocationAutocomplete
-            label="Location"
-            value={filterLocation}
-            onChange={setFilterLocation}
-            filterMode
-            showFavorites={false}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="sm:col-span-2 lg:col-span-4">
+          <SearchBar
+            value={filters.search}
+            onChange={setSearch}
+            placeholder="Search friends, category, type, location, notes, date…"
           />
         </div>
+        <Select
+          label="Category"
+          value={filters.category}
+          onChange={(e) => setCategory(e.target.value)}
+          options={[{ value: '', label: 'All Categories' }, ...categoryOptions.map((c) => ({ value: c, label: c }))]}
+        />
+        <Select
+          label="Type"
+          value={filters.type}
+          onChange={(e) => setType(e.target.value)}
+          options={[{ value: '', label: 'All Types' }, ...typeOptions.map((t) => ({ value: t, label: t }))]}
+        />
+        <LocationAutocomplete
+          label="Location"
+          value={filters.location}
+          onChange={setLocation}
+          filterMode
+          showFavorites={false}
+        />
       </div>
 
       {hangouts.length === 0 ? (
         <EmptyState title="No hangouts logged" action={<Button onClick={openAdd}>Add Hangout</Button>} />
       ) : (
         <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border)' }}>
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left min-w-[720px]">
             <thead style={{ background: 'var(--bg)' }}>
               <tr>
                 <th className="px-4 py-3">Friends</th>
                 <th className="px-4 py-3">Start</th>
                 <th className="px-4 py-3 hidden md:table-cell">End</th>
                 <th className="px-4 py-3">Duration</th>
+                <th className="px-4 py-3 hidden sm:table-cell">Category</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Type</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {hangouts.map((h) => (
-                <tr key={h.id} className="border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-                  <td className="px-4 py-3">{friendNames(h.friendIds)}</td>
-                  <td className="px-4 py-3">{formatDateTime(h.startTime)}</td>
-                  <td className="px-4 py-3 hidden md:table-cell">{formatDateTime(h.endTime)}</td>
-                  <td className="px-4 py-3 font-medium">{formatDuration(calcDurationMinutes(h.startTime, h.endTime))}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
-                    <Badge>{getHangoutDisplayType(h)}</Badge>
-                    {h.segments?.length ? (
-                      <p className="text-xs opacity-60 mt-1 max-w-[240px] truncate">
-                        {formatSegmentSummary(h, (id) => data.friends.find((f) => f.id === id)?.name ?? '?')}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(h)}>Edit</Button>
-                      <Button size="sm" variant="ghost" onClick={() => duplicateHangout(h.id)}>Dup</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setDeleteId(h.id)}>Del</Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {hangouts.map((h) => {
+                const segmentPreviews = formatHangoutSegmentTablePreviews(h, friendNameLookup);
+                return (
+                  <tr key={h.id} className="border-t align-top" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
+                    <td className="px-4 py-3">{friendNames(h.friendIds)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(h.startTime)}</td>
+                    <td className="px-4 py-3 hidden md:table-cell whitespace-nowrap">{formatDateTime(h.endTime)}</td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">
+                      {formatDuration(calcDurationMinutes(h.startTime, h.endTime))}
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">{getHangoutTableCategory(h)}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className="font-medium">{getHangoutTableType(h)}</span>
+                      {isMixedHangoutCategory(h.category) && segmentPreviews.length > 0 && (
+                        <ul className="text-xs opacity-70 mt-1.5 space-y-0.5 max-w-[280px]">
+                          {segmentPreviews.map((line, i) => (
+                            <li key={i}>{line}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(h)}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => duplicateHangout(h.id)}>Dup</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteId(h.id)}>Del</Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -229,9 +265,9 @@ export function HangoutsTab() {
               category={form.category}
               type={form.type}
               onCategoryChange={(category) => {
-              const main = normalizeHangoutMainFields(category, form.type);
-              setForm({ ...form, category: main.category, type: main.type });
-            }}
+                const main = normalizeHangoutMainFields(category, form.type);
+                setForm({ ...form, category: main.category, type: main.type });
+              }}
               onTypeChange={(type) => setForm({ ...form, type })}
             />
             <LocationAutocomplete

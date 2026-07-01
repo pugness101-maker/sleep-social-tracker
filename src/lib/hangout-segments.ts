@@ -216,6 +216,45 @@ export function formatSegmentLabel(
   return `${segment.type}${friendsPart}`;
 }
 
+export function getHangoutTableCategory(hangout: Hangout): string {
+  return hangout.category?.trim() || '—';
+}
+
+export function getHangoutTableType(hangout: Hangout): string {
+  if (isMixedHangoutCategory(hangout.category)) return 'Segments';
+  return hangout.type?.trim() || '—';
+}
+
+/** Table row preview: `Food / Dinner — JuJu — 1h` */
+export function formatHangoutSegmentTablePreview(
+  segment: HangoutSegment,
+  hangoutFriendIds: string[] = [],
+  nameLookup?: (id: string) => string
+): string {
+  const cat = segment.category?.trim() || 'Other';
+  const typ = segment.type?.trim() || '—';
+  const segFriends = getSegmentFriendIds(segment, hangoutFriendIds);
+  const friendsPart =
+    nameLookup && segFriends.length
+      ? ` — ${formatFriendNamesLabel(segFriends, nameLookup)}`
+      : '';
+
+  if (segment.startTime?.trim() && segment.endTime?.trim()) {
+    return `${cat} / ${typ}${friendsPart} — ${formatSegmentTimeRange(segment)}`;
+  }
+  const mins = getSegmentEffectiveDurationMinutes(segment);
+  if (mins > 0) return `${cat} / ${typ}${friendsPart} — ${formatDuration(mins)}`;
+  return `${cat} / ${typ}${friendsPart}`;
+}
+
+export function formatHangoutSegmentTablePreviews(
+  hangout: Hangout,
+  nameLookup?: (id: string) => string
+): string[] {
+  if (!hangout.segments?.length) return [];
+  return hangout.segments.map((s) => formatHangoutSegmentTablePreview(s, hangout.friendIds, nameLookup));
+}
+
 function formatSegmentTimeRange(segment: HangoutSegment): string {
   return `${formatTime(segment.startTime)}–${formatTime(segment.endTime)}`;
 }
