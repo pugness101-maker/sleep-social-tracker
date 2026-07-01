@@ -181,6 +181,8 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   bedtimeReminder: boolean;
   hangoutReminder: boolean;
+  /** Friend picker: show selected friends before the rest when sorting. */
+  friendPickerShowSelectedFirst: boolean;
 }
 
 export interface AppData {

@@ -26,6 +26,7 @@ export const defaultSettings: AppSettings = {
   notificationsEnabled: false,
   bedtimeReminder: false,
   hangoutReminder: false,
+  friendPickerShowSelectedFirst: true,
 };
 
 export const defaultActiveTimers: ActiveTimers = {

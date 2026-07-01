@@ -242,6 +242,22 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <Card>
+          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Friend Picker</h2>
+          <p className="text-sm opacity-70 mb-4 text-left">
+            Controls how friends are sorted when selecting them for hangouts and activity segments.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer text-left">
+            <input
+              type="checkbox"
+              checked={data.settings.friendPickerShowSelectedFirst}
+              onChange={(e) => updateSettings({ friendPickerShowSelectedFirst: e.target.checked })}
+              className="rounded"
+            />
+            <span className="text-sm">Show selected friends first</span>
+          </label>
+        </Card>
+
         <div>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Social Customization</h2>
           <SocialCustomization />

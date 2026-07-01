@@ -11,6 +11,7 @@ import type { Hangout, HangoutSegment } from '../../types';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
 import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
+import { FriendPicker } from './FriendPicker';
 import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
@@ -68,9 +69,6 @@ export function HangoutsTab() {
     return list;
   }, [data.hangouts, data.friends, search, filterType]);
 
-  const toggleFriend = (ids: string[], id: string) =>
-    ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
-
   const friendNames = (ids: string[]) =>
     ids.map((id) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown').join(', ') || 'No friends';
 
@@ -91,29 +89,6 @@ export function HangoutsTab() {
     else addHangout(form);
     setModalOpen(false);
   };
-
-  const FriendPicker = ({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) => (
-    <div>
-      <span className="block text-sm font-medium mb-2 text-left" style={{ color: 'var(--text-heading)' }}>Friends</span>
-      {data.friends.length === 0 ? (
-        <p className="text-sm opacity-70 text-left">Add friends first in the Friends tab.</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {data.friends.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => onChange(toggleFriend(selected, f.id))}
-              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${selected.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
-              style={!selected.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
-            >
-              {f.name}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div>

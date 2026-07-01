@@ -14,6 +14,7 @@ import {
 } from '../../lib/hangout-segments';
 import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import type { Friend, HangoutSegment } from '../../types';
+import { FriendPicker } from './FriendPicker';
 
 interface HangoutSegmentEditorProps {
   segments: HangoutSegment[];
@@ -117,15 +118,13 @@ export function HangoutSegmentEditor({
     updateSegment(segmentId, { friendIds: next });
   };
 
-  const toggleSegmentFriend = (segment: HangoutSegment, friendId: string) => {
-    const selected = getSegmentFriendIds(segment, hangoutFriendIds);
-    const adding = !selected.includes(friendId);
-    if (adding && !hangoutFriendIds.includes(friendId)) {
+  const beforeSegmentFriendSelect = (segment: HangoutSegment, friendId: string, willSelect: boolean) => {
+    if (willSelect && !hangoutFriendIds.includes(friendId)) {
       const friend = friends.find((f) => f.id === friendId);
       setPendingAdd({ segmentId: segment.id, friendId, friendName: friend?.name ?? 'This friend' });
-      return;
+      return false;
     }
-    applySegmentFriendToggle(segment.id, friendId, selected);
+    return true;
   };
 
   const confirmPendingAdd = (addToMain: boolean) => {
@@ -188,28 +187,15 @@ export function HangoutSegmentEditor({
                   onChange={(e) => updateSegment(segment.id, { type: e.target.value })}
                   options={hangoutTypeSelectOptions(hangoutTypes, segment.type)}
                 />
-                <div>
-                  <span className="block text-sm font-medium mb-2" style={{ color: 'var(--text-heading)' }}>
-                    Friends involved
-                  </span>
-                  {friends.length === 0 ? (
-                    <p className="text-sm opacity-70">Add friends first in the Friends tab.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {friends.map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => toggleSegmentFriend(segment, f.id)}
-                          className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${segmentFriends.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
-                          style={!segmentFriends.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
-                        >
-                          {f.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <FriendPicker
+                  label="Friends involved"
+                  selected={segmentFriends}
+                  allowClear={false}
+                  onChange={(friendIds) => updateSegment(segment.id, { friendIds })}
+                  onBeforeSelect={(friendId, willSelect) =>
+                    beforeSegmentFriendSelect(segment, friendId, willSelect)
+                  }
+                />
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"

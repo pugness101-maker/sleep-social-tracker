@@ -6,6 +6,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
+import { FriendPicker } from './FriendPicker';
 import type { HangoutSegment } from '../../types';
 
 interface HangoutFormModalProps {
@@ -41,15 +42,6 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
     });
   }, [hangout]);
 
-  const toggleFriend = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      friendIds: prev.friendIds.includes(id)
-        ? prev.friendIds.filter((fid) => fid !== id)
-        : [...prev.friendIds, id],
-    }));
-  };
-
   const handleSave = () => {
     if (!hangoutId) return;
     updateHangout(hangoutId, form);
@@ -72,22 +64,10 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
       }
     >
       <div className="space-y-4 text-left">
-        <div>
-          <span className="block text-sm font-medium mb-2" style={{ color: 'var(--text-heading)' }}>Friends</span>
-          <div className="flex flex-wrap gap-2">
-            {data.friends.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => toggleFriend(f.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${form.friendIds.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
-                style={!form.friendIds.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FriendPicker
+          selected={form.friendIds}
+          onChange={(friendIds) => setForm({ ...form, friendIds })}
+        />
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Start Time" type="datetime-local" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
           <Input label="End Time" type="datetime-local" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
