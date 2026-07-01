@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useAwakeTimer } from '../hooks/useLiveTimer';
 import { useApp } from '../context/AppContext';
 import { StatCard } from '../components/ui/Card';
 import { Card } from '../components/ui/Card';
+import { CatchUpWidget } from '../components/dashboard/CatchUpWidget';
+import { FriendDetailModal } from '../components/social/FriendDetailModal';
 import {
   getLastNightSleep,
   getTodayWakeUp,
@@ -18,6 +21,7 @@ import { getSleepSchedule, formatSleepDebt } from '../lib/sleep-goals';
 
 export function DashboardPage() {
   const { data } = useApp();
+  const [detailFriendId, setDetailFriendId] = useState<string | null>(null);
   const awakeMs = useAwakeTimer(data);
   const schedule = getSleepSchedule(data.settings);
 
@@ -170,6 +174,8 @@ export function DashboardPage() {
         />
       </div>
 
+      <CatchUpWidget onOpenFriend={setDetailFriendId} />
+
       <Card>
         <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>
           Recent Activity
@@ -193,6 +199,12 @@ export function DashboardPage() {
           </ul>
         )}
       </Card>
+
+      <FriendDetailModal
+        friendId={detailFriendId}
+        onClose={() => setDetailFriendId(null)}
+        onEdit={() => setDetailFriendId(null)}
+      />
     </div>
   );
 }

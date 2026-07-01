@@ -9,6 +9,7 @@ import { TagPicker } from '../ui/TagPicker';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
 import { friendMatchesTagFilter, optionSelectOptions } from '../../lib/social-options';
+import { formatLastSeenLabel, sortFriends, type FriendSortOption } from '../../lib/friend-activity';
 import { FriendDetailModal } from './FriendDetailModal';
 import type { Friend } from '../../types';
 import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
@@ -16,7 +17,7 @@ import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
 export function FriendsTab() {
   const { data, addFriend, updateFriend, deleteFriend } = useApp();
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState<FriendSortOption>('name');
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,13 +56,7 @@ export function FriendsTab() {
     if (filterStatus) {
       list = list.filter((f) => f.relationshipStatus === filterStatus);
     }
-    list.sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'hangouts') return b.totalHangouts - a.totalHangouts;
-      if (sortBy === 'hours') return b.totalHours - a.totalHours;
-      if (sortBy === 'last') return (b.lastHangout ?? '').localeCompare(a.lastHangout ?? '');
-      return 0;
-    });
+    list = sortFriends(list, sortBy);
     return list;
   }, [data.friends, data.hangouts, search, sortBy, filterTags, filterStatus]);
 
@@ -111,12 +106,15 @@ export function FriendsTab() {
         </div>
         <Select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
+          onChange={(e) => setSortBy(e.target.value as FriendSortOption)}
           options={[
             { value: 'name', label: 'Sort: Name' },
-            { value: 'hangouts', label: 'Sort: Hangouts' },
-            { value: 'hours', label: 'Sort: Hours' },
-            { value: 'last', label: 'Sort: Last Hangout' },
+            { value: 'last_seen_newest', label: 'Sort: Last Seen (Newest)' },
+            { value: 'last_seen_oldest', label: 'Sort: Last Seen (Oldest)' },
+            { value: 'hangouts', label: 'Sort: Most Hangouts' },
+            { value: 'hours', label: 'Sort: Most Hours' },
+            { value: 'created_newest', label: 'Sort: Most Recent Added' },
+            { value: 'birthday', label: 'Sort: Birthday' },
           ]}
         />
         <Select
@@ -158,7 +156,9 @@ export function FriendsTab() {
         />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {friends.map((friend) => (
+          {friends.map((friend) => {
+            const lastSeen = formatLastSeenLabel(friend.lastSeen);
+            return (
             <Card key={friend.id}>
               <div className="text-left">
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -185,7 +185,17 @@ export function FriendsTab() {
                   <div><span className="opacity-60">Hangouts</span><p className="font-medium">{friend.totalHangouts}</p></div>
                   <div><span className="opacity-60">Hours</span><p className="font-medium">{friend.totalHours.toFixed(1)}h</p></div>
                   <div><span className="opacity-60">Avg Duration</span><p className="font-medium">{formatDuration(friend.avgDuration)}</p></div>
-                  <div><span className="opacity-60">Last Hangout</span><p className="font-medium">{friend.lastHangout ? formatDate(friend.lastHangout) : '—'}</p></div>
+                  <div>
+                    <span className="opacity-60">Last Seen</span>
+                    {lastSeen.relative ? (
+                      <>
+                        <p className="font-medium">{lastSeen.relative}</p>
+                        {lastSeen.absolute && <p className="opacity-70">{lastSeen.absolute}</p>}
+                      </>
+                    ) : (
+                      <p className="font-medium">—</p>
+                    )}
+                  </div>
                 </div>
                 {friend.favoriteActivities.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-3">
@@ -205,7 +215,8 @@ export function FriendsTab() {
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

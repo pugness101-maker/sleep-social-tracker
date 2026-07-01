@@ -4,10 +4,18 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Textarea, Select } from '../ui/FormFields';
 import { Badge } from '../ui/Misc';
-import { enrichFriend } from '../../lib/stats';
-import { formatDate, formatDuration } from '../../lib/dates';
+import { formatDate, formatTime, formatDuration } from '../../lib/dates';
 import { linkTypeOptions } from '../../lib/friend-links';
 import { getDefaultRelationshipType } from '../../lib/social-options';
+import {
+  getFriendDetailedStats,
+  getFriendHangoutTimeline,
+  formatLastSeenLabel,
+  formatDaysSinceLabel,
+  formatStreakLabel,
+  formatGapDays,
+} from '../../lib/friend-activity';
+import { HangoutFormModal } from './HangoutFormModal';
 import type { Friend, FriendLink } from '../../types';
 
 interface FriendDetailModalProps {
@@ -19,12 +27,14 @@ interface FriendDetailModalProps {
 export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailModalProps) {
   const { data, addFriendLink, updateFriendLink, deleteFriendLink } = useApp();
   const friend = data.friends.find((f) => f.id === friendId);
-  const stats = friend ? enrichFriend(friend, data.hangouts) : null;
+  const stats = friendId ? getFriendDetailedStats(friendId, data.hangouts) : null;
+  const timeline = friendId ? getFriendHangoutTimeline(friendId, data.hangouts, data.friends) : [];
 
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [editLink, setEditLink] = useState<FriendLink | null>(null);
   const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [editHangoutId, setEditHangoutId] = useState<string | null>(null);
 
   const [linkForm, setLinkForm] = useState({
     relatedFriendId: '',
@@ -33,8 +43,8 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
   });
 
   const otherFriends = data.friends.filter((f) => f.id !== friendId);
-
   const friendName = (id: string) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown';
+  const lastSeenLabel = formatLastSeenLabel(stats?.lastSeen ?? null);
 
   const openAddLink = () => {
     setEditLink(null);
@@ -100,13 +110,71 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
             {friend.birthday && <p className="text-sm opacity-70 mt-2">🎂 {formatDate(friend.birthday)}</p>}
             {friend.contactInfo && <p className="text-sm opacity-70">📞 {friend.contactInfo}</p>}
             {friend.notes && <p className="text-sm opacity-70 mt-2">{friend.notes}</p>}
+            {lastSeenLabel.relative && (
+              <div className="mt-3 text-sm">
+                <p className="opacity-60">Last Seen</p>
+                <p className="font-medium" style={{ color: 'var(--text-heading)' }}>{lastSeenLabel.relative}</p>
+                {lastSeenLabel.absolute && <p className="text-xs opacity-70 mt-0.5">{lastSeenLabel.absolute}</p>}
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <div><span className="opacity-60 block">Hangouts</span><span className="font-medium">{stats.totalHangouts}</span></div>
-            <div><span className="opacity-60 block">Hours</span><span className="font-medium">{stats.totalHours.toFixed(1)}h</span></div>
-            <div><span className="opacity-60 block">Avg Duration</span><span className="font-medium">{formatDuration(stats.avgDuration)}</span></div>
-            <div><span className="opacity-60 block">Last Hangout</span><span className="font-medium">{stats.lastHangout ? formatDate(stats.lastHangout) : '—'}</span></div>
+          <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--text-heading)' }}>Statistics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+              <div><span className="opacity-60 block">Total Hangouts</span><span className="font-medium">{stats.totalHangouts}</span></div>
+              <div><span className="opacity-60 block">Total Hours Together</span><span className="font-medium">{stats.totalHours.toFixed(1)}h</span></div>
+              <div><span className="opacity-60 block">Average Duration</span><span className="font-medium">{formatDuration(stats.avgDuration)}</span></div>
+              <div><span className="opacity-60 block">First Hangout</span><span className="font-medium">{stats.firstHangout ? formatDate(stats.firstHangout) : '—'}</span></div>
+              <div><span className="opacity-60 block">Last Hangout</span><span className="font-medium">{stats.lastSeen ? formatDate(stats.lastSeen) : '—'}</span></div>
+              <div><span className="opacity-60 block">Days Since Seen</span><span className="font-medium">{formatDaysSinceLabel(stats.daysSinceSeen)}</span></div>
+              <div><span className="opacity-60 block">Longest Hangout</span><span className="font-medium">{stats.totalHangouts ? formatDuration(stats.longestHangoutMinutes) : '—'}</span></div>
+              <div><span className="opacity-60 block">Shortest Hangout</span><span className="font-medium">{stats.totalHangouts ? formatDuration(stats.shortestHangoutMinutes) : '—'}</span></div>
+              <div><span className="opacity-60 block">Most Common Type</span><span className="font-medium">{stats.mostCommonType ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Favorite Location</span><span className="font-medium">{stats.favoriteLocation ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Day Most Seen</span><span className="font-medium">{stats.mostSeenWeekday ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Time Most Seen</span><span className="font-medium">{stats.mostSeenTimeOfDay ?? '—'}</span></div>
+              <div><span className="opacity-60 block">Longest Gap</span><span className="font-medium">{formatGapDays(stats.longestGapDays)}</span></div>
+              <div><span className="opacity-60 block">Current Streak</span><span className="font-medium">{formatStreakLabel(stats.hangoutStreakWeeks)}</span></div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--text-heading)' }}>Recent Activity</h3>
+            {timeline.length === 0 ? (
+              <p className="text-sm opacity-70">No hangouts logged with {friend.name} yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {timeline.map((item) => (
+                  <li key={item.hangoutId}>
+                    <button
+                      type="button"
+                      onClick={() => setEditHangoutId(item.hangoutId)}
+                      className="w-full text-left p-3 rounded-lg border transition-colors hover:opacity-90"
+                      style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>
+                            {formatDate(item.date)} · {item.type}
+                          </p>
+                          <p className="text-xs opacity-70 mt-1">
+                            {formatTime(item.startTime)} – {formatTime(item.endTime)} · {formatDuration(item.durationMinutes)}
+                          </p>
+                          {item.location && <p className="text-xs opacity-70 mt-1">📍 {item.location}</p>}
+                          {item.otherFriends.length > 0 && (
+                            <p className="text-xs opacity-70 mt-1">
+                              Also with {item.otherFriends.map((f) => f.name).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs opacity-50 shrink-0">Edit</span>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
@@ -149,6 +217,12 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
           </div>
         </div>
       </Modal>
+
+      <HangoutFormModal
+        hangoutId={editHangoutId}
+        open={!!editHangoutId}
+        onClose={() => setEditHangoutId(null)}
+      />
 
       <Modal
         open={linkModalOpen}

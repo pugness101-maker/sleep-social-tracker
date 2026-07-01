@@ -1,5 +1,6 @@
 import type { AppData, Friend, Hangout, SleepEntry } from '../types';
 import { aggregateActivityTimeByType, aggregateActivityCountByType } from './hangout-segments';
+import { getFriendActivitySummary } from './friend-activity';
 import { calcSleepDebtMinutes } from './sleep-goals';
 import {
   calcDurationMinutes,
@@ -449,7 +450,13 @@ function stdDev(values: number[]): number {
 }
 
 export function enrichFriend(friend: Friend, hangouts: Hangout[]) {
-  return { ...friend, ...getFriendStats(friend.id, hangouts) };
+  const activity = getFriendActivitySummary(friend.id, hangouts);
+  return {
+    ...friend,
+    ...activity,
+    /** @deprecated use lastSeen */
+    lastHangout: activity.lastSeen,
+  };
 }
 
 export function getRecentActivity(data: AppData, limit = 8) {
