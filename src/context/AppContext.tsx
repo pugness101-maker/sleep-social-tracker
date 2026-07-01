@@ -22,15 +22,11 @@ import {
   normalizeOptionName,
   validateOptionName,
 } from '../lib/social-options';
-import {
-  DEFAULT_FRIEND_CATEGORY,
-  DEFAULT_HANGOUT_TYPE,
-} from '../types';
+import { DEFAULT_HANGOUT_TYPE } from '../types';
 
-export type DeleteCategoryResolution =
-  | { action: 'default' }
-  | { action: 'other'; name: string }
-  | { action: 'clear' };
+export type DeleteTagResolution =
+  | { action: 'remove' }
+  | { action: 'replace'; name: string };
 
 export type DeleteTypeResolution =
   | { action: 'default' }
@@ -72,9 +68,9 @@ interface AppContextValue {
   archiveIdea: (id: string) => void;
   convertIdeaToHangout: (id: string, friendIds: string[], startTime: string, endTime: string) => void;
   // Social customization
-  addFriendCategory: (name: string) => string | null;
-  updateFriendCategory: (oldName: string, newName: string) => string | null;
-  deleteFriendCategory: (name: string, resolution: DeleteCategoryResolution) => void;
+  addFriendTag: (name: string) => string | null;
+  updateFriendTag: (oldName: string, newName: string) => string | null;
+  deleteFriendTag: (name: string, resolution: DeleteTagResolution) => void;
   addHangoutType: (name: string) => string | null;
   updateHangoutType: (oldName: string, newName: string) => string | null;
   deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
@@ -373,43 +369,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
-  const addFriendCategory = useCallback((name: string): string | null => {
+  const addFriendTag = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
-    const error = validateOptionName(normalized, data.friendCategories);
+    const error = validateOptionName(normalized, data.friendTags);
     if (error) return error;
-    patch((prev) => ({ ...prev, friendCategories: [...prev.friendCategories, normalized] }));
+    patch((prev) => ({ ...prev, friendTags: [...prev.friendTags, normalized] }));
     return null;
-  }, [patch, data.friendCategories]);
+  }, [patch, data.friendTags]);
 
-  const updateFriendCategory = useCallback((oldName: string, newName: string): string | null => {
+  const updateFriendTag = useCallback((oldName: string, newName: string): string | null => {
     const normalized = normalizeOptionName(newName);
-    const error = validateOptionName(normalized, data.friendCategories, oldName);
+    const error = validateOptionName(normalized, data.friendTags, oldName);
     if (error) return error;
     patch((prev) => ({
       ...prev,
-      friendCategories: prev.friendCategories.map((c) => (c === oldName ? normalized : c)),
-      friends: prev.friends.map((f) => (f.category === oldName ? { ...f, category: normalized } : f)),
+      friendTags: prev.friendTags.map((t) => (t === oldName ? normalized : t)),
+      friends: prev.friends.map((f) => ({
+        ...f,
+        tags: [...new Set(f.tags.map((t) => (t === oldName ? normalized : t)))],
+      })),
     }));
     return null;
-  }, [patch, data.friendCategories]);
+  }, [patch, data.friendTags]);
 
-  const deleteFriendCategory = useCallback((name: string, resolution: DeleteCategoryResolution) => {
+  const deleteFriendTag = useCallback((name: string, resolution: DeleteTagResolution) => {
     patch((prev) => {
-      let replacement = '';
-      if (resolution.action === 'default') {
-        replacement = prev.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
-          ? DEFAULT_FRIEND_CATEGORY
-          : prev.friendCategories.find((c) => c !== name) ?? '';
-      } else if (resolution.action === 'other') {
-        replacement = resolution.name;
-      }
+      const friends = prev.friends.map((f) => {
+        if (!f.tags.includes(name)) return f;
+        if (resolution.action === 'remove') {
+          return { ...f, tags: f.tags.filter((t) => t !== name) };
+        }
+        const replacement = resolution.name;
+        return {
+          ...f,
+          tags: [...new Set(f.tags.map((t) => (t === name ? replacement : t)))],
+        };
+      });
 
       return {
         ...prev,
-        friendCategories: prev.friendCategories.filter((c) => c !== name),
-        friends: prev.friends.map((f) =>
-          f.category === name ? { ...f, category: replacement } : f
-        ),
+        friendTags: prev.friendTags.filter((t) => t !== name),
+        friends,
       };
     });
   }, [patch]);
@@ -504,9 +504,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleFavoriteIdea,
     archiveIdea,
     convertIdeaToHangout,
-    addFriendCategory,
-    updateFriendCategory,
-    deleteFriendCategory,
+    addFriendTag,
+    updateFriendTag,
+    deleteFriendTag,
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,

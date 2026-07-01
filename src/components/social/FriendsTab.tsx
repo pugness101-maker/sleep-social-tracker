@@ -5,25 +5,29 @@ import { Card } from '../ui/Card';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
+import { TagPicker } from '../ui/TagPicker';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
+import { friendMatchesTagFilter } from '../../lib/social-options';
 import type { Friend } from '../../types';
-import { DEFAULT_FRIEND_CATEGORY } from '../../types';
 
 export function FriendsTab() {
   const { data, addFriend, updateFriend, deleteFriend } = useApp();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
-  const [filterCategory, setFilterCategory] = useState('');
+  const [filterTags, setFilterTags] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const defaultCategory = data.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
-    ? DEFAULT_FRIEND_CATEGORY
-    : data.friendCategories[0] ?? '';
-
-  const emptyForm = { name: '', category: defaultCategory, birthday: '', contactInfo: '', notes: '', favoriteActivities: '' };
+  const emptyForm = {
+    name: '',
+    tags: [] as string[],
+    birthday: '',
+    contactInfo: '',
+    notes: '',
+    favoriteActivities: '',
+  };
   const [form, setForm] = useState(emptyForm);
 
   const friends = useMemo(() => {
@@ -34,10 +38,13 @@ export function FriendsTab() {
         (f) =>
           f.name.toLowerCase().includes(q) ||
           f.notes.toLowerCase().includes(q) ||
-          f.contactInfo.toLowerCase().includes(q)
+          f.contactInfo.toLowerCase().includes(q) ||
+          f.tags.some((t) => t.toLowerCase().includes(q))
       );
     }
-    if (filterCategory) list = list.filter((f) => f.category === filterCategory);
+    if (filterTags.length > 0) {
+      list = list.filter((f) => friendMatchesTagFilter(f, filterTags));
+    }
     list.sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'hangouts') return b.totalHangouts - a.totalHangouts;
@@ -46,20 +53,18 @@ export function FriendsTab() {
       return 0;
     });
     return list;
-  }, [data.friends, data.hangouts, search, sortBy, filterCategory]);
+  }, [data.friends, data.hangouts, search, sortBy, filterTags]);
+
+  const orphanTags = useMemo(() => {
+    const known = new Set(data.friendTags);
+    const extras = new Set<string>();
+    data.friends.forEach((f) => f.tags.forEach((t) => { if (!known.has(t)) extras.add(t); }));
+    return [...extras];
+  }, [data.friends, data.friendTags]);
 
   const openAdd = () => {
     setEditFriend(null);
-    setForm({
-      name: '',
-      category: data.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
-        ? DEFAULT_FRIEND_CATEGORY
-        : data.friendCategories[0] ?? '',
-      birthday: '',
-      contactInfo: '',
-      notes: '',
-      favoriteActivities: '',
-    });
+    setForm(emptyForm);
     setModalOpen(true);
   };
 
@@ -67,7 +72,7 @@ export function FriendsTab() {
     setEditFriend(friend);
     setForm({
       name: friend.name,
-      category: friend.category,
+      tags: [...friend.tags],
       birthday: friend.birthday,
       contactInfo: friend.contactInfo,
       notes: friend.notes,
@@ -89,22 +94,43 @@ export function FriendsTab() {
   return (
     <div>
       <div className="flex flex-wrap gap-3 mb-4">
-        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search friends..." /></div>
-        <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} options={[
-          { value: 'name', label: 'Sort: Name' },
-          { value: 'hangouts', label: 'Sort: Hangouts' },
-          { value: 'hours', label: 'Sort: Hours' },
-          { value: 'last', label: 'Sort: Last Hangout' },
-        ]} />
-        <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} options={[
-          { value: '', label: 'All Categories' },
-          ...data.friendCategories.map((c) => ({ value: c, label: c })),
-        ]} />
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search friends..." />
+        </div>
+        <Select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          options={[
+            { value: 'name', label: 'Sort: Name' },
+            { value: 'hangouts', label: 'Sort: Hangouts' },
+            { value: 'hours', label: 'Sort: Hours' },
+            { value: 'last', label: 'Sort: Last Hangout' },
+          ]}
+        />
         <Button onClick={openAdd}>Add Friend</Button>
       </div>
 
+      <Card className="mb-4">
+        <TagPicker
+          label="Filter by tags"
+          options={data.friendTags}
+          selected={filterTags}
+          onChange={setFilterTags}
+          orphanTags={orphanTags}
+        />
+        {filterTags.length > 0 && (
+          <Button size="sm" variant="ghost" className="mt-2" onClick={() => setFilterTags([])}>
+            Clear tag filters
+          </Button>
+        )}
+      </Card>
+
       {friends.length === 0 ? (
-        <EmptyState title="No friends yet" description="Add friends to track hangouts and social time." action={<Button onClick={openAdd}>Add Friend</Button>} />
+        <EmptyState
+          title="No friends yet"
+          description="Add friends to track hangouts and social time."
+          action={<Button onClick={openAdd}>Add Friend</Button>}
+        />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {friends.map((friend) => (
@@ -112,8 +138,16 @@ export function FriendsTab() {
               <div className="text-left">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
-                  <Badge>{friend.category || 'Uncategorized'}</Badge>
                 </div>
+                {friend.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {friend.tags.map((tag) => (
+                      <Badge key={tag} color="#6366f1">{tag}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs opacity-60 mb-2">No tags</p>
+                )}
                 {friend.birthday && <p className="text-xs opacity-70 mb-1">🎂 {formatDate(friend.birthday)}</p>}
                 {friend.contactInfo && <p className="text-xs opacity-70 mb-1">📞 {friend.contactInfo}</p>}
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
@@ -138,21 +172,37 @@ export function FriendsTab() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editFriend ? 'Edit Friend' : 'Add Friend'} wide
-        footer={<><Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></>}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editFriend ? 'Edit Friend' : 'Add Friend'}
+        wide
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save</Button>
+          </>
+        }
+      >
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Select label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
-            options={[
-              ...(form.category && !data.friendCategories.includes(form.category)
-                ? [{ value: form.category, label: form.category }]
-                : []),
-              ...data.friendCategories.map((c) => ({ value: c, label: c })),
-            ]} />
+          <div className="sm:col-span-2">
+            <TagPicker
+              label="Tags"
+              options={data.friendTags}
+              selected={form.tags}
+              onChange={(tags) => setForm({ ...form, tags })}
+              orphanTags={form.tags.filter((t) => !data.friendTags.includes(t))}
+            />
+          </div>
           <Input label="Birthday" type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
           <Input label="Contact Info" value={form.contactInfo} onChange={(e) => setForm({ ...form, contactInfo: e.target.value })} />
           <div className="sm:col-span-2">
-            <Input label="Favorite Activities (comma-separated)" value={form.favoriteActivities} onChange={(e) => setForm({ ...form, favoriteActivities: e.target.value })} />
+            <Input
+              label="Favorite Activities (comma-separated)"
+              value={form.favoriteActivities}
+              onChange={(e) => setForm({ ...form, favoriteActivities: e.target.value })}
+            />
           </div>
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -160,7 +210,13 @@ export function FriendsTab() {
         </div>
       </Modal>
 
-      <ConfirmModal open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteId && deleteFriend(deleteId)} title="Delete Friend" message="Delete this friend? Hangouts will remain but lose this friend reference." />
+      <ConfirmModal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => deleteId && deleteFriend(deleteId)}
+        title="Delete Friend"
+        message="Delete this friend? Hangouts will remain but lose this friend reference."
+      />
     </div>
   );
 }

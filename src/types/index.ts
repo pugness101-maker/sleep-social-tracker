@@ -1,14 +1,22 @@
-export type FriendCategory = string;
+export type FriendTag = string;
 
 export type HangoutType = string;
 
-export const DEFAULT_FRIEND_CATEGORIES = ['Family', 'Friend', 'Good Friend', 'Best Friend'] as const;
+export const DEFAULT_FRIEND_TAGS = [
+  'Family',
+  'Friend',
+  'Good Friend',
+  'Best Friend',
+  'Acquaintance',
+  'Coworker',
+  'Classmate',
+  'Online Friend',
+] as const;
 
 export const DEFAULT_HANGOUT_TYPES = [
   'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
 ] as const;
 
-export const DEFAULT_FRIEND_CATEGORY = 'Friend';
 export const DEFAULT_HANGOUT_TYPE = 'Other';
 
 export type CostLevel = 'Free' | '$' | '$$' | '$$$';
@@ -36,7 +44,7 @@ export interface NapEntry {
 export interface Friend {
   id: string;
   name: string;
-  category: FriendCategory;
+  tags: FriendTag[];
   birthday: string;
   contactInfo: string;
   notes: string;
@@ -97,7 +105,7 @@ export interface AppData {
   ideas: HangoutIdea[];
   activeTimers: ActiveTimers;
   settings: AppSettings;
-  friendCategories: string[];
+  friendTags: string[];
   hangoutTypes: string[];
 }
 

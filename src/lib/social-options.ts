@@ -19,8 +19,17 @@ export function validateOptionName(name: string, options: string[], exclude?: st
   return null;
 }
 
-export function countFriendsWithCategory(friends: { category: string }[], category: string): number {
-  return friends.filter((f) => f.category === category).length;
+export function countFriendsWithTag(friends: { tags: string[] }[], tag: string): number {
+  return friends.filter((f) => f.tags.includes(tag)).length;
+}
+
+export function friendMatchesTagFilter(friend: { tags: string[] }, filterTags: string[]): boolean {
+  if (filterTags.length === 0) return true;
+  return filterTags.some((tag) => friend.tags.includes(tag));
+}
+
+export function toggleTag(tags: string[], tag: string): string[] {
+  return tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
 }
 
 export function countHangoutsWithType(hangouts: { type: string }[], type: string): number {

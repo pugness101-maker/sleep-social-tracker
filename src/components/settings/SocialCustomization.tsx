@@ -1,14 +1,14 @@
 import { useApp } from '../../context/AppContext';
 import { CustomOptionListCard } from './CustomOptionListCard';
-import { countFriendsWithCategory, countHangoutsWithType, countIdeasWithType } from '../../lib/social-options';
-import { DEFAULT_FRIEND_CATEGORY, DEFAULT_HANGOUT_TYPE } from '../../types';
+import { countFriendsWithTag, countHangoutsWithType, countIdeasWithType } from '../../lib/social-options';
+import { DEFAULT_HANGOUT_TYPE } from '../../types';
 
 export function SocialCustomization() {
   const {
     data,
-    addFriendCategory,
-    updateFriendCategory,
-    deleteFriendCategory,
+    addFriendTag,
+    updateFriendTag,
+    deleteFriendTag,
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,
@@ -17,28 +17,29 @@ export function SocialCustomization() {
   return (
     <div className="space-y-4">
       <CustomOptionListCard
-        title="Friend Categories"
-        description="Customize categories used when adding or filtering friends."
-        options={data.friendCategories}
-        usageCount={(name) => countFriendsWithCategory(data.friends, name)}
-        defaultFallbackLabel={DEFAULT_FRIEND_CATEGORY}
-        onAdd={addFriendCategory}
-        onEdit={updateFriendCategory}
+        title="Friend Tags"
+        description="Customize tags used when adding or filtering friends. Friends can have multiple tags."
+        options={data.friendTags}
+        usageCount={(name) => countFriendsWithTag(data.friends, name)}
+        deleteMode="tag"
+        onAdd={addFriendTag}
+        onEdit={updateFriendTag}
         onDelete={(name, action, otherName) => {
-          if (action === 'default') deleteFriendCategory(name, { action: 'default' });
-          else if (action === 'other' && otherName) deleteFriendCategory(name, { action: 'other', name: otherName });
-          else deleteFriendCategory(name, { action: 'clear' });
+          if (action === 'remove') deleteFriendTag(name, { action: 'remove' });
+          else if (action === 'replace' && otherName) deleteFriendTag(name, { action: 'replace', name: otherName });
+          else deleteFriendTag(name, { action: 'remove' });
         }}
       />
 
       <CustomOptionListCard
         title="Hangout Types"
-        description="Customize types used when logging hangouts and applying filters."
+        description="Customize types used when logging hangouts, ideas, and applying filters."
         options={data.hangoutTypes}
         usageCount={(name) =>
           countHangoutsWithType(data.hangouts, name) + countIdeasWithType(data.ideas, name)
         }
         defaultFallbackLabel={DEFAULT_HANGOUT_TYPE}
+        deleteMode="hangout"
         onAdd={addHangoutType}
         onEdit={updateHangoutType}
         onDelete={(name, action, otherName) => {

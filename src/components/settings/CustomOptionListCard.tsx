@@ -9,10 +9,11 @@ interface CustomOptionListCardProps {
   description: string;
   options: string[];
   usageCount: (name: string) => number;
-  defaultFallbackLabel: string;
+  defaultFallbackLabel?: string;
+  deleteMode?: 'hangout' | 'tag';
   onAdd: (name: string) => string | null;
   onEdit: (oldName: string, newName: string) => string | null;
-  onDelete: (name: string, resolution: 'default' | 'other' | 'clear', otherName?: string) => void;
+  onDelete: (name: string, resolution: string, otherName?: string) => void;
 }
 
 export function CustomOptionListCard({
@@ -20,7 +21,8 @@ export function CustomOptionListCard({
   description,
   options,
   usageCount,
-  defaultFallbackLabel,
+  defaultFallbackLabel = 'Other',
+  deleteMode = 'hangout',
   onAdd,
   onEdit,
   onDelete,
@@ -30,7 +32,7 @@ export function CustomOptionListCard({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [error, setError] = useState('');
-  const [deleteAction, setDeleteAction] = useState<'default' | 'other' | 'clear'>('default');
+  const [deleteAction, setDeleteAction] = useState<string>(deleteMode === 'tag' ? 'remove' : 'default');
   const [deleteOther, setDeleteOther] = useState('');
 
   const openAdd = () => {
@@ -47,7 +49,7 @@ export function CustomOptionListCard({
 
   const openDelete = (name: string) => {
     setDeleteTarget(name);
-    setDeleteAction('default');
+    setDeleteAction(deleteMode === 'tag' ? 'remove' : 'default');
     setDeleteOther(options.find((o) => o !== name) ?? '');
     setError('');
   };
@@ -79,7 +81,11 @@ export function CustomOptionListCard({
       setError('Please choose a replacement.');
       return;
     }
-    onDelete(deleteTarget, deleteAction, deleteAction === 'other' ? deleteOther : undefined);
+    if (deleteAction === 'replace' && !deleteOther) {
+      setError('Please choose a replacement tag.');
+      return;
+    }
+    onDelete(deleteTarget, deleteAction, deleteAction === 'other' || deleteAction === 'replace' ? deleteOther : undefined);
     setDeleteTarget(null);
     setError('');
   };
@@ -177,7 +183,28 @@ export function CustomOptionListCard({
           )}
         </p>
 
-        {deleteUsage > 0 && (
+        {deleteUsage > 0 && deleteMode === 'tag' && (
+          <div className="space-y-2 text-left">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-heading)' }}>What should happen to friends using this tag?</p>
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="radio" name="deleteAction" checked={deleteAction === 'remove'} onChange={() => { setDeleteAction('remove'); setError(''); }} />
+              Remove only that tag
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="radio" name="deleteAction" checked={deleteAction === 'replace'} onChange={() => { setDeleteAction('replace'); setError(''); }} />
+              Replace it with another tag
+            </label>
+            {deleteAction === 'replace' && (
+              <Select
+                value={deleteOther}
+                onChange={(e) => { setDeleteOther(e.target.value); setError(''); }}
+                options={otherOptions.map((o) => ({ value: o, label: o }))}
+              />
+            )}
+          </div>
+        )}
+
+        {deleteUsage > 0 && deleteMode === 'hangout' && (
           <div className="space-y-2 text-left">
             <p className="text-sm font-medium" style={{ color: 'var(--text-heading)' }}>What should happen to affected items?</p>
             <label className="flex items-center gap-2 cursor-pointer text-sm">

@@ -1,12 +1,12 @@
-import type { AppData, AppSettings, ActiveTimers, HangoutIdea } from '../types';
+import type { AppData, AppSettings, ActiveTimers, HangoutIdea, Friend } from '../types';
 import {
-  DEFAULT_FRIEND_CATEGORIES,
+  DEFAULT_FRIEND_TAGS,
   DEFAULT_HANGOUT_TYPES,
   DEFAULT_HANGOUT_TYPE,
 } from '../types';
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -34,16 +34,23 @@ export const defaultAppData: AppData = {
   ideas: [],
   activeTimers: defaultActiveTimers,
   settings: defaultSettings,
-  friendCategories: [...DEFAULT_FRIEND_CATEGORIES],
+  friendTags: [...DEFAULT_FRIEND_TAGS],
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
 };
 
-function mergeSocialOptions(data: Partial<AppData>): Pick<AppData, 'friendCategories' | 'hangoutTypes'> {
-  const friendCategories = [...(data.friendCategories ?? defaultAppData.friendCategories)];
+function mergeSocialOptions(
+  data: Partial<AppData> & { friendCategories?: string[] }
+): Pick<AppData, 'friendTags' | 'hangoutTypes'> {
+  const friendTags = [...(data.friendTags ?? data.friendCategories ?? defaultAppData.friendTags)];
+
   data.friends?.forEach((f) => {
-    if (f.category && !friendCategories.some((c) => c.toLowerCase() === f.category.toLowerCase())) {
-      friendCategories.push(f.category);
-    }
+    const friend = f as Friend & { category?: string };
+    const tags = friend.tags?.length ? friend.tags : friend.category ? [friend.category] : [];
+    tags.forEach((tag) => {
+      if (tag && !friendTags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+        friendTags.push(tag);
+      }
+    });
   });
 
   const hangoutTypes = [...(data.hangoutTypes ?? defaultAppData.hangoutTypes)];
@@ -59,11 +66,26 @@ function mergeSocialOptions(data: Partial<AppData>): Pick<AppData, 'friendCatego
     }
   });
 
-  if (data.activeTimers?.hangoutType && !hangoutTypes.some((t) => t.toLowerCase() === data.activeTimers!.hangoutType.toLowerCase())) {
+  if (
+    data.activeTimers?.hangoutType &&
+    !hangoutTypes.some((t) => t.toLowerCase() === data.activeTimers!.hangoutType.toLowerCase())
+  ) {
     hangoutTypes.push(data.activeTimers.hangoutType);
   }
 
-  return { friendCategories, hangoutTypes };
+  return { friendTags, hangoutTypes };
+}
+
+/** Migrate legacy friend.category → friend.tags */
+function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string }>): Friend[] {
+  return rawFriends.map((friend) => {
+    let tags = friend.tags ?? [];
+    if (tags.length === 0 && friend.category) {
+      tags = [friend.category];
+    }
+    const { category: _removed, ...rest } = friend;
+    return { ...rest, tags } as Friend;
+  });
 }
 
 /** Migrate legacy idea.category → idea.type */
@@ -75,10 +97,17 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
   });
 }
 
-export function normalizeAppData(raw: Partial<AppData> & { ideas?: Array<Partial<HangoutIdea> & { category?: string }> }): AppData {
+export function normalizeAppData(
+  raw: Partial<AppData> & {
+    friendCategories?: string[];
+    ideas?: Array<Partial<HangoutIdea> & { category?: string }>;
+    friends?: Array<Partial<Friend> & { category?: string }>;
+  }
+): AppData {
+  const friends = migrateFriends(raw.friends ?? []);
   const ideas = migrateIdeas(raw.ideas ?? []);
-  const withMigratedIdeas = { ...raw, ideas };
-  const social = mergeSocialOptions(withMigratedIdeas);
+  const withMigrated = { ...raw, friends, ideas };
+  const social = mergeSocialOptions(withMigrated);
   const activeTimers = { ...defaultActiveTimers, ...raw.activeTimers };
   if (!social.hangoutTypes.includes(activeTimers.hangoutType) && social.hangoutTypes.length > 0) {
     activeTimers.hangoutType = social.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
@@ -88,7 +117,8 @@ export function normalizeAppData(raw: Partial<AppData> & { ideas?: Array<Partial
 
   return {
     ...defaultAppData,
-    ...withMigratedIdeas,
+    ...withMigrated,
+    friends,
     ideas,
     activeTimers,
     settings: { ...defaultSettings, ...raw.settings },
