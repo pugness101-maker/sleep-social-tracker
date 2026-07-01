@@ -8,34 +8,36 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout, HangoutSegment } from '../../types';
-import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
+import { getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
 import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
+import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
   const { data, startHangout, endHangout, addHangout, updateHangout, deleteHangout, duplicateHangout } = useApp();
 
-  const defaultType = getDefaultHangoutType(data.hangoutTypes);
-
-  const makeEmptyForm = () => ({
-    friendIds: [] as string[],
-    startTime: toLocalISO(),
-    endTime: toLocalISO(),
-    location: '',
-    type: defaultType,
-    notes: '',
-    segments: [] as HangoutSegment[],
-  });
+  const makeEmptyForm = () => {
+    const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
+    return {
+      friendIds: [] as string[],
+      startTime: toLocalISO(),
+      endTime: toLocalISO(),
+      location: '',
+      category,
+      type,
+      notes: '',
+      segments: [] as HangoutSegment[],
+    };
+  };
 
   const [form, setForm] = useState(makeEmptyForm);
 
-  const [startForm, setStartForm] = useState({
-    friendIds: [] as string[],
-    type: defaultType,
-    location: '',
+  const [startForm, setStartForm] = useState(() => {
+    const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
+    return { friendIds: [] as string[], category, type, location: '' };
   });
 
   const [search, setSearch] = useState('');
@@ -90,7 +92,7 @@ export function HangoutsTab() {
 
   const openEdit = (h: Hangout) => {
     setEditHangout(h);
-    setForm({ friendIds: h.friendIds, startTime: h.startTime, endTime: h.endTime, location: h.location, type: h.type, notes: h.notes, segments: h.segments ?? [] });
+    setForm({ friendIds: h.friendIds, startTime: h.startTime, endTime: h.endTime, location: h.location, category: h.category, type: h.type, notes: h.notes, segments: h.segments ?? [] });
     setModalOpen(true);
   };
 
@@ -192,11 +194,15 @@ export function HangoutsTab() {
       )}
 
       <Modal open={startModal} onClose={() => setStartModal(false)} title="Start Hangout"
-        footer={<><Button variant="secondary" onClick={() => setStartModal(false)}>Cancel</Button><Button onClick={() => { startHangout(startForm.friendIds, startForm.type, startForm.location); setStartModal(false); }}>Start</Button></>}>
+        footer={<><Button variant="secondary" onClick={() => setStartModal(false)}>Cancel</Button><Button onClick={() => { startHangout(startForm.friendIds, startForm.category, startForm.type, startForm.location); setStartModal(false); }}>Start</Button></>}>
         <div className="space-y-4">
           <FriendPicker selected={startForm.friendIds} onChange={(ids) => setStartForm({ ...startForm, friendIds: ids })} />
-          <Select label="Type" value={startForm.type} onChange={(e) => setStartForm({ ...startForm, type: e.target.value })}
-            options={hangoutTypeSelectOptions(data.hangoutTypes, startForm.type)} />
+          <HangoutCategoryTypeSelect
+            category={startForm.category}
+            type={startForm.type}
+            onCategoryChange={(category) => setStartForm({ ...startForm, category })}
+            onTypeChange={(type) => setStartForm({ ...startForm, type })}
+          />
           <LocationAutocomplete
             label="Location"
             value={startForm.location}
@@ -216,8 +222,12 @@ export function HangoutsTab() {
           </div>
           {form.startTime && form.endTime && <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>}
           <div className="grid sm:grid-cols-2 gap-4">
-            <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
-              options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)} />
+            <HangoutCategoryTypeSelect
+              category={form.category}
+              type={form.type}
+              onCategoryChange={(category) => setForm({ ...form, category })}
+              onTypeChange={(type) => setForm({ ...form, type })}
+            />
             <LocationAutocomplete
               label="Location"
               value={form.location}
@@ -229,8 +239,8 @@ export function HangoutsTab() {
           <HangoutSegmentEditor
             segments={form.segments}
             hangoutFriendIds={form.friendIds}
+            hangoutCategory={form.category}
             friends={data.friends}
-            hangoutTypes={data.hangoutTypes}
             hangoutStart={form.startTime}
             hangoutEnd={form.endTime}
             defaultType={form.type}

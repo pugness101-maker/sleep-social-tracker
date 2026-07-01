@@ -39,6 +39,27 @@ import {
 } from '../lib/social-options';
 import { getReciprocalLinkType, removeLinksToFriend, replaceFriendLinkType, updateAllFriendLinkTypes } from '../lib/friend-links';
 import { applyBulkAddRelationships, applyBulkRemoveRelationships } from '../lib/bulk-relationships';
+import {
+  addBackupToHistory,
+  clearUndoSnapshot,
+  deleteBackupFromHistory,
+  loadBackupHistory,
+  loadUndoSnapshot,
+  saveUndoSnapshot,
+  UNDO_CLEANUP_KEY,
+  UNDO_IMPORT_KEY,
+} from '../lib/backup-history';
+import {
+  buildCleanupPreview,
+  bulkUpdateHangoutCategoryType,
+  bulkUpdateHangoutLocations,
+  deleteFriendsById,
+  deleteHangoutsById,
+  mergeFriends,
+  normalizeImportedFriendNames,
+  renameFriendEverywhere,
+} from '../lib/data-cleanup';
+import { inferCategoryAndType } from '../lib/hangout-categories';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 export type DeleteTagResolution =
@@ -84,7 +105,7 @@ interface AppContextValue {
     typeFilter?: string
   ) => { removedPairs: number };
   // Hangouts
-  startHangout: (friendIds: string[], type?: HangoutType, location?: string) => void;
+  startHangout: (friendIds: string[], category?: string, type?: HangoutType, location?: string) => void;
   endHangout: (notes?: string) => void;
   addHangout: (hangout: Omit<Hangout, 'id' | 'createdAt'>) => void;
   updateHangout: (id: string, hangout: Partial<Hangout>) => void;
@@ -111,11 +132,18 @@ interface AppContextValue {
   addHangoutType: (name: string) => string | null;
   updateHangoutType: (oldName: string, newName: string) => string | null;
   deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
+  addHangoutCategory: (name: string) => string | null;
+  updateHangoutCategory: (oldName: string, newName: string) => string | null;
+  deleteHangoutCategory: (name: string, resolution: DeleteTypeResolution) => void;
+  addTypeToCategory: (category: string, type: string) => string | null;
+  updateTypeInCategory: (category: string, oldName: string, newName: string) => string | null;
+  deleteTypeFromCategory: (category: string, name: string, resolution: DeleteTypeResolution) => void;
   addRelationshipType: (name: string) => string | null;
   updateRelationshipType: (oldName: string, newName: string) => string | null;
   deleteRelationshipType: (name: string, resolution: DeleteTypeResolution) => void;
   // Data
   exportData: () => string;
+  saveManualBackupToHistory: () => void;
   importData: (json: string) => { success: boolean; error?: string };
   importSections: (
     json: string,
@@ -133,6 +161,19 @@ interface AppContextValue {
     options: IcsImportOptions
   ) => { success: boolean; error?: string; hangoutsImported: number; friendsCreated: number };
   resetData: () => void;
+  getBackupHistory: () => ReturnType<typeof loadBackupHistory>;
+  restoreBackup: (id: string) => boolean;
+  deleteBackup: (id: string) => void;
+  undoLastImport: () => boolean;
+  undoLastCleanup: () => boolean;
+  runCleanupMergeFriends: (primaryId: string, duplicateIds: string[]) => void;
+  runCleanupRenameFriend: (friendId: string, newName: string) => void;
+  runCleanupDeleteFriends: (friendIds: string[]) => void;
+  runCleanupDeleteHangouts: (hangoutIds: string[]) => void;
+  runCleanupBulkCategoryType: (hangoutIds: string[], category: string, type: string) => void;
+  runCleanupBulkLocations: (hangoutIds: string[], location: string) => void;
+  runCleanupNormalizeNames: () => void;
+  getCleanupPreview: () => ReturnType<typeof buildCleanupPreview>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -506,24 +547,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const startHangout = useCallback(
-    (friendIds: string[], type?: HangoutType, location = '') => {
-      patch((prev) => ({
-        ...prev,
-        activeTimers: {
-          ...prev.activeTimers,
-          hangoutStart: toLocalISO(),
-          hangoutFriendIds: friendIds,
-          hangoutType: type ?? prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE,
-          hangoutLocation: location,
-        },
-      }));
+    (friendIds: string[], category?: string, type?: HangoutType, location = '') => {
+      patch((prev) => {
+        const catalog = prev.hangoutTypesByCategory ?? {};
+        const resolvedType = type ?? prev.activeTimers.hangoutType ?? prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE;
+        const resolvedCategory =
+          category ??
+          prev.activeTimers.hangoutCategory ??
+          inferCategoryAndType(resolvedType, undefined, catalog).category;
+        return {
+          ...prev,
+          activeTimers: {
+            ...prev.activeTimers,
+            hangoutStart: toLocalISO(),
+            hangoutFriendIds: friendIds,
+            hangoutCategory: resolvedCategory,
+            hangoutType: resolvedType,
+            hangoutLocation: location,
+          },
+        };
+      });
     },
     [patch]
   );
 
   const endHangout = useCallback((notes = '') => {
     patch((prev) => {
-      const { hangoutStart, hangoutFriendIds, hangoutType, hangoutLocation } = prev.activeTimers;
+      const { hangoutStart, hangoutFriendIds, hangoutCategory, hangoutType, hangoutLocation } = prev.activeTimers;
       if (!hangoutStart) return prev;
       const entry: Hangout = {
         id: generateId(),
@@ -531,6 +581,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         startTime: hangoutStart,
         endTime: toLocalISO(),
         location: hangoutLocation,
+        category: hangoutCategory,
         type: hangoutType,
         notes,
         segments: [],
@@ -642,6 +693,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startTime,
           endTime,
           location: idea.location,
+          category: idea.category,
           type: ideaType,
           notes: notesParts.join('\n\n'),
           segments: [],
@@ -808,19 +860,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.hangoutTypes, oldName);
     if (error) return error;
-    patch((prev) => ({
-      ...prev,
-      hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
-      hangouts: prev.hangouts.map((h) => ({
-        ...h,
-        type: h.type === oldName ? normalized : h.type,
-        segments: h.segments?.map((s) => (s.type === oldName ? { ...s, type: normalized } : s)) ?? [],
-      })),
-      ideas: prev.ideas.map((i) => (i.type === oldName ? { ...i, type: normalized } : i)),
-      activeTimers: prev.activeTimers.hangoutType === oldName
-        ? { ...prev.activeTimers, hangoutType: normalized }
-        : prev.activeTimers,
-    }));
+    patch((prev) => {
+      const nextCatalog = { ...prev.hangoutTypesByCategory };
+      for (const [cat, types] of Object.entries(nextCatalog)) {
+        nextCatalog[cat] = types.map((t) => (t === oldName ? normalized : t));
+      }
+      return {
+        ...prev,
+        hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
+        hangoutTypesByCategory: nextCatalog,
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          type: h.type === oldName ? normalized : h.type,
+          segments: h.segments?.map((s) => (s.type === oldName ? { ...s, type: normalized } : s)) ?? [],
+        })),
+        ideas: prev.ideas.map((i) => (i.type === oldName ? { ...i, type: normalized } : i)),
+        activeTimers: prev.activeTimers.hangoutType === oldName
+          ? { ...prev.activeTimers, hangoutType: normalized }
+          : prev.activeTimers,
+      };
+    });
     return null;
   }, [patch, data.hangoutTypes]);
 
@@ -849,6 +908,160 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeTimers: prev.activeTimers.hangoutType === name
           ? { ...prev.activeTimers, hangoutType: replacement || (prev.hangoutTypes.find((t) => t !== name) ?? '') }
           : prev.activeTimers,
+      };
+    });
+  }, [patch]);
+
+  const addHangoutCategory = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.hangoutCategories);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      hangoutCategories: [...prev.hangoutCategories, normalized],
+      hangoutTypesByCategory: { ...prev.hangoutTypesByCategory, [normalized]: ['Other'] },
+    }));
+    return null;
+  }, [patch, data.hangoutCategories]);
+
+  const addTypeToCategory = useCallback((category: string, type: string): string | null => {
+    const normalized = normalizeOptionName(type);
+    const types = data.hangoutTypesByCategory[category] ?? [];
+    const error = validateOptionName(normalized, types);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      hangoutTypesByCategory: {
+        ...prev.hangoutTypesByCategory,
+        [category]: [...(prev.hangoutTypesByCategory[category] ?? []), normalized],
+      },
+      hangoutTypes: prev.hangoutTypes.includes(normalized) ? prev.hangoutTypes : [...prev.hangoutTypes, normalized],
+    }));
+    return null;
+  }, [patch, data.hangoutTypesByCategory]);
+
+  const updateHangoutCategory = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.hangoutCategories, oldName);
+    if (error) return error;
+    patch((prev) => {
+      const nextCatalog = { ...prev.hangoutTypesByCategory };
+      if (nextCatalog[oldName]) {
+        nextCatalog[normalized] = nextCatalog[oldName];
+        delete nextCatalog[oldName];
+      }
+      return {
+        ...prev,
+        hangoutCategories: prev.hangoutCategories.map((c) => (c === oldName ? normalized : c)),
+        hangoutTypesByCategory: nextCatalog,
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          category: h.category === oldName ? normalized : h.category,
+          segments: h.segments?.map((s) => (s.category === oldName ? { ...s, category: normalized } : s)) ?? [],
+        })),
+        ideas: prev.ideas.map((i) => (i.category === oldName ? { ...i, category: normalized } : i)),
+        activeTimers: prev.activeTimers.hangoutCategory === oldName
+          ? { ...prev.activeTimers, hangoutCategory: normalized }
+          : prev.activeTimers,
+      };
+    });
+    return null;
+  }, [patch, data.hangoutCategories]);
+
+  const deleteHangoutCategory = useCallback((name: string, resolution: DeleteTypeResolution) => {
+    patch((prev) => {
+      let replacement = prev.hangoutCategories.includes('Other') ? 'Other' : prev.hangoutCategories.find((c) => c !== name) ?? 'Other';
+      if (resolution.action === 'other') replacement = resolution.name;
+
+      const mergedTypes = [...(prev.hangoutTypesByCategory[replacement] ?? [])];
+      for (const t of prev.hangoutTypesByCategory[name] ?? []) {
+        if (!mergedTypes.some((x) => x.toLowerCase() === t.toLowerCase())) mergedTypes.push(t);
+      }
+      const { [name]: _removed, ...restCatalog } = prev.hangoutTypesByCategory;
+
+      return {
+        ...prev,
+        hangoutCategories: prev.hangoutCategories.filter((c) => c !== name),
+        hangoutTypesByCategory: { ...restCatalog, [replacement]: mergedTypes },
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          category: h.category === name ? replacement : h.category,
+          segments: h.segments?.map((s) => (s.category === name ? { ...s, category: replacement } : s)) ?? [],
+        })),
+        ideas: prev.ideas.map((i) => (i.category === name ? { ...i, category: replacement } : i)),
+        activeTimers: prev.activeTimers.hangoutCategory === name
+          ? { ...prev.activeTimers, hangoutCategory: replacement }
+          : prev.activeTimers,
+      };
+    });
+  }, [patch]);
+
+  const updateTypeInCategory = useCallback((category: string, oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const types = data.hangoutTypesByCategory[category] ?? [];
+    const error = validateOptionName(normalized, types, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
+      hangoutTypesByCategory: {
+        ...prev.hangoutTypesByCategory,
+        [category]: (prev.hangoutTypesByCategory[category] ?? []).map((t) => (t === oldName ? normalized : t)),
+      },
+      hangouts: prev.hangouts.map((h) => ({
+        ...h,
+        type: h.category === category && h.type === oldName ? normalized : h.type,
+        segments: h.segments?.map((s) =>
+          s.category === category && s.type === oldName ? { ...s, type: normalized } : s
+        ) ?? [],
+      })),
+      ideas: prev.ideas.map((i) =>
+        i.category === category && i.type === oldName ? { ...i, type: normalized } : i
+      ),
+      activeTimers:
+        prev.activeTimers.hangoutCategory === category && prev.activeTimers.hangoutType === oldName
+          ? { ...prev.activeTimers, hangoutType: normalized }
+          : prev.activeTimers,
+    }));
+    return null;
+  }, [patch, data.hangoutTypesByCategory]);
+
+  const deleteTypeFromCategory = useCallback((category: string, name: string, resolution: DeleteTypeResolution) => {
+    patch((prev) => {
+      const types = prev.hangoutTypesByCategory[category] ?? [];
+      let replacement = types.includes('Other') ? 'Other' : types.find((t) => t !== name) ?? 'Other';
+      if (resolution.action === 'other') replacement = resolution.name;
+      else if (resolution.action === 'default') {
+        replacement = types.includes(DEFAULT_HANGOUT_TYPE) ? DEFAULT_HANGOUT_TYPE : types.find((t) => t !== name) ?? 'Other';
+      }
+
+      const stillUsedElsewhere = Object.entries(prev.hangoutTypesByCategory).some(
+        ([cat, list]) => cat !== category && list.includes(name)
+      );
+
+      return {
+        ...prev,
+        hangoutTypesByCategory: {
+          ...prev.hangoutTypesByCategory,
+          [category]: types.filter((t) => t !== name),
+        },
+        hangoutTypes: stillUsedElsewhere || !prev.hangoutTypes.includes(name)
+          ? prev.hangoutTypes
+          : prev.hangoutTypes.filter((t) => t !== name),
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          type: h.category === category && h.type === name ? replacement : h.type,
+          segments: h.segments?.map((s) =>
+            s.category === category && s.type === name ? { ...s, type: replacement } : s
+          ) ?? [],
+        })),
+        ideas: prev.ideas.map((i) =>
+          i.category === category && i.type === name ? { ...i, type: replacement } : i
+        ),
+        activeTimers:
+          prev.activeTimers.hangoutCategory === category && prev.activeTimers.hangoutType === name
+            ? { ...prev.activeTimers, hangoutType: replacement }
+            : prev.activeTimers,
       };
     });
   }, [patch]);
@@ -896,18 +1109,117 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const exportDataFn = useCallback(() => exportAppData(data), [data]);
 
+  const saveManualBackupToHistoryFn = useCallback(() => {
+    addBackupToHistory(data, 'manual');
+  }, [data]);
+
+  const prepareImportBackup = useCallback((current: AppData) => {
+    addBackupToHistory(current, 'import');
+    saveUndoSnapshot(UNDO_IMPORT_KEY, current);
+    createPreImportBackup();
+  }, []);
+
   const importDataFn = useCallback((json: string) => {
     const parsed = parseBackupJson(json);
     if (!parsed.ok) {
       return { success: false, error: parsed.error };
     }
+    addBackupToHistory(data, 'import');
+    saveUndoSnapshot(UNDO_IMPORT_KEY, data);
     createPreImportBackup();
     setData(importAppData(json));
     return { success: true };
+  }, [data]);
+
+  const getBackupHistoryFn = useCallback(() => loadBackupHistory(), []);
+
+  const restoreBackupFn = useCallback((id: string) => {
+    const entry = loadBackupHistory().backups.find((b) => b.id === id);
+    if (!entry) return false;
+    addBackupToHistory(data, 'manual');
+    setData(entry.snapshot);
+    return true;
+  }, [data]);
+
+  const deleteBackupFn = useCallback((id: string) => {
+    deleteBackupFromHistory(id);
   }, []);
+
+  const undoLastImportFn = useCallback(() => {
+    const snapshot = loadUndoSnapshot(UNDO_IMPORT_KEY);
+    if (!snapshot) return false;
+    setData(snapshot);
+    clearUndoSnapshot(UNDO_IMPORT_KEY);
+    return true;
+  }, []);
+
+  const undoLastCleanupFn = useCallback(() => {
+    const snapshot = loadUndoSnapshot(UNDO_CLEANUP_KEY);
+    if (!snapshot) return false;
+    setData(snapshot);
+    clearUndoSnapshot(UNDO_CLEANUP_KEY);
+    return true;
+  }, []);
+
+  const withCleanupBackup = useCallback((fn: (prev: AppData) => AppData) => {
+    patch((prev) => {
+      addBackupToHistory(prev, 'cleanup');
+      saveUndoSnapshot(UNDO_CLEANUP_KEY, prev);
+      return fn(prev);
+    });
+  }, [patch]);
+
+  const getCleanupPreviewFn = useCallback(() => buildCleanupPreview(data), [data]);
+
+  const runCleanupMergeFriendsFn = useCallback(
+    (primaryId: string, duplicateIds: string[]) => {
+      withCleanupBackup((prev) => mergeFriends(prev, primaryId, duplicateIds));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupRenameFriendFn = useCallback(
+    (friendId: string, newName: string) => {
+      withCleanupBackup((prev) => renameFriendEverywhere(prev, friendId, newName));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupDeleteFriendsFn = useCallback(
+    (friendIds: string[]) => {
+      withCleanupBackup((prev) => deleteFriendsById(prev, friendIds));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupDeleteHangoutsFn = useCallback(
+    (hangoutIds: string[]) => {
+      withCleanupBackup((prev) => deleteHangoutsById(prev, hangoutIds));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupBulkCategoryTypeFn = useCallback(
+    (hangoutIds: string[], category: string, type: string) => {
+      withCleanupBackup((prev) => bulkUpdateHangoutCategoryType(prev, hangoutIds, category, type));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupBulkLocationsFn = useCallback(
+    (hangoutIds: string[], location: string) => {
+      withCleanupBackup((prev) => bulkUpdateHangoutLocations(prev, hangoutIds, location));
+    },
+    [withCleanupBackup]
+  );
+
+  const runCleanupNormalizeNamesFn = useCallback(() => {
+    withCleanupBackup((prev) => normalizeImportedFriendNames(prev));
+  }, [withCleanupBackup]);
 
   const importSectionsFn = useCallback(
     (json: string, preset: ImportSectionPreset, mode: ImportMode) => {
+      prepareImportBackup(data);
       const result = importSectionsFromJsonData(data, json, { preset, mode });
       if (result.success) {
         setData(result.data);
@@ -915,7 +1227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error };
     },
-    [data]
+    [data, prepareImportBackup]
   );
 
   const importSleepSpreadsheetFn = useCallback(
@@ -928,7 +1240,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'No entries to import.', sleepCount: 0, napCount: 0 };
       }
 
-      createPreImportBackup();
+      prepareImportBackup(data);
 
       const sleepCount = sleepEntries.length;
       const napCount = napEntries.length;
@@ -950,7 +1262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       return { success: true, sleepCount, napCount };
     },
-    [patch]
+    [patch, data, prepareImportBackup]
   );
 
   const importIcsCalendarFn = useCallback(
@@ -959,6 +1271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       friendResolutions: Record<string, FriendResolution>,
       options: IcsImportOptions
     ) => {
+      prepareImportBackup(data);
       const result = importIcsCalendarData(data, items, friendResolutions, options);
       if (result.success) {
         setData(result.data);
@@ -975,7 +1288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         friendsCreated: 0,
       };
     },
-    [data]
+    [data, prepareImportBackup]
   );
 
   const resetData = useCallback(() => {
@@ -1030,15 +1343,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,
+    addHangoutCategory,
+    updateHangoutCategory,
+    deleteHangoutCategory,
+    addTypeToCategory,
+    updateTypeInCategory,
+    deleteTypeFromCategory,
     addRelationshipType,
     updateRelationshipType,
     deleteRelationshipType,
     exportData: exportDataFn,
+    saveManualBackupToHistory: saveManualBackupToHistoryFn,
     importData: importDataFn,
     importSections: importSectionsFn,
     importSleepSpreadsheet: importSleepSpreadsheetFn,
     importIcsCalendar: importIcsCalendarFn,
     resetData,
+    getBackupHistory: getBackupHistoryFn,
+    restoreBackup: restoreBackupFn,
+    deleteBackup: deleteBackupFn,
+    undoLastImport: undoLastImportFn,
+    undoLastCleanup: undoLastCleanupFn,
+    runCleanupMergeFriends: runCleanupMergeFriendsFn,
+    runCleanupRenameFriend: runCleanupRenameFriendFn,
+    runCleanupDeleteFriends: runCleanupDeleteFriendsFn,
+    runCleanupDeleteHangouts: runCleanupDeleteHangoutsFn,
+    runCleanupBulkCategoryType: runCleanupBulkCategoryTypeFn,
+    runCleanupBulkLocations: runCleanupBulkLocationsFn,
+    runCleanupNormalizeNames: runCleanupNormalizeNamesFn,
+    getCleanupPreview: getCleanupPreviewFn,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

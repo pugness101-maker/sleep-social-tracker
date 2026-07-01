@@ -1,7 +1,7 @@
 import { differenceInDays, format, parseISO, startOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { calcDurationMinutes, getWeekRange, isInRange } from './dates';
 import { getFriendActivitySummary, getFriendMinutesInHangout } from './friend-activity';
-import { aggregateActivityCountByType, getHangoutDisplayType } from './hangout-segments';
+import { aggregateActivityCountByType, friendInHangout, getHangoutDisplayType, getSegmentFriendIds } from './hangout-segments';
 import type { AppData, Friend } from '../types';
 
 export interface TopFriendThisMonth {
@@ -52,13 +52,7 @@ export function getTopFriendsThisMonth(data: AppData, limit = 5): TopFriendThisM
 
   return data.friends
     .map((friend) => {
-      const involved = monthHangouts.filter(
-        (h) =>
-          h.friendIds.includes(friend.id) ||
-          h.segments?.some((s) =>
-            (s.friendIds?.length ? s.friendIds : h.friendIds).includes(friend.id)
-          )
-      );
+      const involved = monthHangouts.filter((h) => friendInHangout(friend.id, h));
       const totalMinutes = involved.reduce(
         (sum, h) => sum + getFriendMinutesInHangout(friend.id, h),
         0
@@ -153,11 +147,13 @@ export function getDashboardRecentActivity(data: AppData, limit = 10): RecentAct
       hangoutId: h.id,
     });
     for (const s of h.segments ?? []) {
-      const segFriends = (s.friendIds?.length ? s.friendIds : h.friendIds).map(friendName).join(' + ');
+      const segFriends = getSegmentFriendIds(s, h.friendIds);
+      const segmentOnlyFriends = segFriends.filter((id) => !h.friendIds.includes(id));
+      if (segmentOnlyFriends.length === 0) continue;
       items.push({
         id: `segment-${h.id}-${s.id}`,
         kind: 'segment',
-        title: `${s.type} — ${segFriends}`,
+        title: `${s.category ? `${s.category} · ` : ''}${s.type} — ${segmentOnlyFriends.map(friendName).join(' + ')}`,
         detail: h.location || s.location || 'Segment',
         timestamp: s.endTime?.trim() || s.startTime?.trim() || h.endTime || h.startTime,
         refId: s.id,

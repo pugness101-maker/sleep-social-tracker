@@ -1,6 +1,7 @@
 export type FriendTag = string;
 
 export type HangoutType = string;
+export type HangoutCategory = string;
 
 export const DEFAULT_FRIEND_TAGS = [
   'Family',
@@ -92,8 +93,26 @@ export const DEFAULT_HANGOUT_TYPES = [
 
 export const DEFAULT_HANGOUT_TYPE = 'Other';
 
+export const DEFAULT_HANGOUT_CATEGORIES = [
+  'Social',
+  'Food',
+  'Entertainment',
+  'Fitness',
+  'Faith',
+  'School',
+  'Outdoor',
+  'Shopping',
+  'Travel',
+  'Work',
+  'Wellness',
+  'Other',
+] as const;
+
+export const DEFAULT_HANGOUT_CATEGORY = 'Other';
+
 export interface HangoutSegment {
   id: string;
+  category: HangoutCategory;
   type: HangoutType;
   /** Friends involved in this segment; defaults to main hangout friends when empty. */
   friendIds: string[];
@@ -151,6 +170,7 @@ export interface Hangout {
   startTime: string;
   endTime: string;
   location: string;
+  category: HangoutCategory;
   type: HangoutType;
   notes: string;
   segments: HangoutSegment[];
@@ -162,6 +182,7 @@ export interface Hangout {
 export interface HangoutIdea {
   id: string;
   title: string;
+  category: HangoutCategory;
   type: HangoutType;
   estimatedCost: CostLevel;
   estimatedDurationMinutes: number;
@@ -180,6 +201,7 @@ export interface ActiveTimers {
   napStart: string | null;
   hangoutStart: string | null;
   hangoutFriendIds: string[];
+  hangoutCategory: HangoutCategory;
   hangoutType: HangoutType;
   hangoutLocation: string;
 }
@@ -212,6 +234,8 @@ export interface AppData {
   relationshipStatuses: string[];
   relationshipTypes: string[];
   hangoutTypes: string[];
+  hangoutCategories: string[];
+  hangoutTypesByCategory: Record<string, string[]>;
   /** User-starred locations for quick pick in autocomplete. */
   favoriteLocations: string[];
 }

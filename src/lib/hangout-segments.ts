@@ -1,12 +1,15 @@
 import { calcDurationMinutes, formatDuration, formatTime, generateId } from './dates';
-import type { Hangout, HangoutSegment, HangoutType } from '../types';
+import { inferCategoryAndType } from './hangout-categories';
+import type { Hangout, HangoutSegment, HangoutCategory, HangoutType } from '../types';
 
 export function createHangoutSegment(
+  category: HangoutCategory,
   type: HangoutType,
-  partial: Partial<Omit<HangoutSegment, 'id' | 'type'>> = {}
+  partial: Partial<Omit<HangoutSegment, 'id' | 'category' | 'type'>> = {}
 ): HangoutSegment {
   return {
     id: generateId(),
+    category,
     type,
     friendIds: [],
     startTime: '',
@@ -165,6 +168,12 @@ export function hangoutMatchesTypeFilter(hangout: Hangout, filterType: string): 
   return hangout.segments?.some((s) => s.type === filterType) ?? false;
 }
 
+export function hangoutMatchesCategoryFilter(hangout: Hangout, filterCategory: string): boolean {
+  if (!filterCategory) return true;
+  if (hangout.category === filterCategory) return true;
+  return hangout.segments?.some((s) => s.category === filterCategory) ?? false;
+}
+
 export function formatFriendNamesLabel(friendIds: string[], nameLookup: (id: string) => string): string {
   if (friendIds.length === 0) return '';
   return friendIds.map(nameLookup).join(' + ');
@@ -223,20 +232,26 @@ export function newSegmentDefaults(
 
 export function normalizeHangoutSegments(
   segments: HangoutSegment[] | undefined,
-  hangoutFriendIds: string[] = []
+  hangoutFriendIds: string[] = [],
+  hangoutCategory = 'Other',
+  catalog?: Record<string, string[]>
 ): HangoutSegment[] {
   return (
-    segments?.map((s) => ({
-      id: s.id || generateId(),
-      type: s.type,
-      friendIds: s.friendIds?.length ? [...s.friendIds] : [...hangoutFriendIds],
-      startTime: s.startTime ?? '',
-      endTime: s.endTime ?? '',
-      durationMinutes:
-        s.durationMinutes != null && s.durationMinutes > 0 ? s.durationMinutes : null,
-      location: s.location ?? '',
-      notes: s.notes ?? '',
-    })) ?? []
+    segments?.map((s) => {
+      const pair = inferCategoryAndType(s.type ?? 'Other', s.category ?? hangoutCategory, catalog);
+      return {
+        id: s.id || generateId(),
+        category: pair.category,
+        type: pair.type,
+        friendIds: s.friendIds?.length ? [...s.friendIds] : [...hangoutFriendIds],
+        startTime: s.startTime ?? '',
+        endTime: s.endTime ?? '',
+        durationMinutes:
+          s.durationMinutes != null && s.durationMinutes > 0 ? s.durationMinutes : null,
+        location: s.location ?? '',
+        notes: s.notes ?? '',
+      };
+    }) ?? []
   );
 }
 

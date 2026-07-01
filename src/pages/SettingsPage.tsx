@@ -7,6 +7,9 @@ import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
 import { SectionImport } from '../components/settings/SectionImport';
 import { SleepSpreadsheetImport } from '../components/settings/SleepSpreadsheetImport';
+import { BackupRestorePanel } from '../components/settings/BackupRestorePanel';
+import { CleanupTools } from '../components/settings/CleanupTools';
+import { DashboardSettings } from '../components/settings/DashboardSettings';
 import { IcsCalendarImport } from '../components/social/IcsCalendarImport';
 import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
@@ -258,6 +261,12 @@ export function SettingsPage() {
           </label>
         </Card>
 
+        <Card>
+          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Dashboard</h2>
+          <p className="text-sm opacity-70 mb-4 text-left">Choose which widgets appear on your dashboard and their order.</p>
+          <DashboardSettings onMessage={showMsg} />
+        </Card>
+
         <div>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Social Customization</h2>
           <SocialCustomization />
@@ -286,13 +295,14 @@ export function SettingsPage() {
             <IcsCalendarImport onMessage={showMsg} />
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           </div>
+          <div className="mt-6">
+            <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Backup History</h3>
+            <BackupRestorePanel onMessage={showMsg} />
+          </div>
         </Card>
 
         <Card>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Data Management</h2>
-          <p className="text-sm opacity-70 mb-4 text-left">
-            All data is stored locally in your browser. Clearing data cannot be undone.
-          </p>
           <div className="text-left text-sm opacity-70 mb-4">
             <p>Sleep entries (Sleep Log): {data.sleepEntries.length}</p>
             <p>Nap entries (Sleep Log): {data.napEntries.length}</p>
@@ -300,7 +310,12 @@ export function SettingsPage() {
             <p>Hangouts: {data.hangouts.length}</p>
             <p>Ideas: {data.ideas.length}</p>
           </div>
-          <Button variant="danger" onClick={() => setConfirmReset(true)}>Clear All Data</Button>
+          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Cleanup Tools</h3>
+          <CleanupTools onMessage={showMsg} />
+          <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-sm opacity-70 mb-4 text-left">All data is stored locally in your browser. Clearing data cannot be undone.</p>
+            <Button variant="danger" onClick={() => setConfirmReset(true)}>Clear All Data</Button>
+          </div>
         </Card>
       </div>
 

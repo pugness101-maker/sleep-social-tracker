@@ -1,5 +1,5 @@
 import { isInRange } from './dates';
-import { friendInHangout, getSegmentFriendIds, hangoutMatchesTypeFilter } from './hangout-segments';
+import { friendInHangout, getSegmentFriendIds, hangoutMatchesCategoryFilter, hangoutMatchesTypeFilter } from './hangout-segments';
 import type { AppData, Friend, Hangout } from '../types';
 
 export { collectUniqueLocations } from './location-history';
@@ -11,6 +11,7 @@ export interface InsightsFilters {
   friendTag: string;
   friendGroup: string;
   relationshipStatus: string;
+  hangoutCategory: string;
   hangoutType: string;
   segmentType: string;
   location: string;
@@ -26,6 +27,7 @@ export const defaultInsightsFilters: InsightsFilters = {
   friendTag: '',
   friendGroup: '',
   relationshipStatus: '',
+  hangoutCategory: '',
   hangoutType: '',
   segmentType: '',
   location: '',
@@ -56,6 +58,7 @@ export function hasActiveInsightsFilters(filters: InsightsFilters): boolean {
     !!filters.friendTag ||
     !!filters.friendGroup ||
     !!filters.relationshipStatus ||
+    !!filters.hangoutCategory ||
     !!filters.hangoutType ||
     !!filters.segmentType ||
     !!filters.location ||
@@ -84,6 +87,7 @@ export function getInsightsFilterChips(
   if (filters.friendTag) chips.push({ key: 'friendTag', label: `Tag: ${filters.friendTag}` });
   if (filters.friendGroup) chips.push({ key: 'friendGroup', label: `Group: ${filters.friendGroup}` });
   if (filters.relationshipStatus) chips.push({ key: 'relationshipStatus', label: `Status: ${filters.relationshipStatus}` });
+  if (filters.hangoutCategory) chips.push({ key: 'hangoutCategory', label: `Category: ${filters.hangoutCategory}` });
   if (filters.hangoutType) chips.push({ key: 'hangoutType', label: `Type: ${filters.hangoutType}` });
   if (filters.segmentType) chips.push({ key: 'segmentType', label: `Segment: ${filters.segmentType}` });
   if (filters.location) chips.push({ key: 'location', label: `Location: ${filters.location}` });
@@ -146,6 +150,8 @@ export function hangoutMatchesInsightsFilters(
     const anyMatch = involvedFriends.some((f) => friendMatchesInsightsFilters(f, filters));
     if (!anyMatch) return false;
   }
+
+  if (filters.hangoutCategory && !hangoutMatchesCategoryFilter(hangout, filters.hangoutCategory)) return false;
 
   if (filters.hangoutType && !hangoutMatchesTypeFilter(hangout, filters.hangoutType)) return false;
 

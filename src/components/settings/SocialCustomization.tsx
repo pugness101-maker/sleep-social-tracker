@@ -9,6 +9,7 @@ import {
   countIdeasWithType,
 } from '../../lib/social-options';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
+import { HangoutCategoryCustomization } from './HangoutCategoryCustomization';
 
 export function SocialCustomization() {
   const {
@@ -94,8 +95,10 @@ export function SocialCustomization() {
         }}
       />
 
+      <HangoutCategoryCustomization />
+
       <CustomOptionListCard
-        title="Hangout Types"
+        title="Hangout Types (legacy flat list)"
         description="Customize types used when logging hangouts, ideas, and applying filters."
         options={data.hangoutTypes}
         usageCount={(name) =>

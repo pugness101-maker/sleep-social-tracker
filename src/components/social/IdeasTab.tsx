@@ -6,8 +6,9 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
-import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
+import { getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
 
 const costs: CostLevel[] = ['Free', '$', '$$', '$$$'];
@@ -16,20 +17,22 @@ const statuses: IdeaStatus[] = ['Want to Try', 'Planned', 'Completed', 'Archived
 export function IdeasTab() {
   const { data, addIdea, updateIdea, deleteIdea, toggleFavoriteIdea, archiveIdea, convertIdeaToHangout } = useApp();
 
-  const defaultType = getDefaultHangoutType(data.hangoutTypes);
-
-  const makeEmptyForm = () => ({
-    title: '',
-    type: defaultType,
-    estimatedCost: 'Free' as CostLevel,
-    estimatedDurationMinutes: 60,
-    location: '',
-    priority: 3,
-    status: 'Want to Try' as IdeaStatus,
-    friendIds: [] as string[],
-    notes: '',
-    links: '',
-  });
+  const makeEmptyForm = () => {
+    const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
+    return {
+      title: '',
+      category,
+      type,
+      estimatedCost: 'Free' as CostLevel,
+      estimatedDurationMinutes: 60,
+      location: '',
+      priority: 3,
+      status: 'Want to Try' as IdeaStatus,
+      friendIds: [] as string[],
+      notes: '',
+      links: '',
+    };
+  };
 
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -86,6 +89,7 @@ export function IdeasTab() {
     setEditIdea(idea);
     setForm({
       title: idea.title,
+      category: idea.category,
       type: idea.type,
       estimatedCost: idea.estimatedCost,
       estimatedDurationMinutes: idea.estimatedDurationMinutes,
@@ -229,11 +233,11 @@ export function IdeasTab() {
       >
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <Select
-            label="Type"
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-            options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)}
+          <HangoutCategoryTypeSelect
+            category={form.category}
+            type={form.type}
+            onCategoryChange={(category) => setForm({ ...form, category })}
+            onTypeChange={(type) => setForm({ ...form, type })}
           />
           <Select
             label="Estimated Cost"

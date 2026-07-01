@@ -314,9 +314,9 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Consistency Score</h4>
         <p className="text-xs opacity-60 mb-3 text-left">Based on bedtime and wake-up time variation. Higher = more consistent.</p>
         <div className="grid sm:grid-cols-3 gap-4">
-          <StatCard label="Last 7 Days" value={`${insights.consistency.last7}%`} accent="sleep" />
-          <StatCard label="Last 30 Days" value={`${insights.consistency.last30}%`} accent="sleep" />
-          <StatCard label={rangeLabel ?? 'Selected Range'} value={`${insights.consistency.range}%`} accent="sleep" />
+          <StatCard label="Last 7 Days" value={`${insights.consistency.last7.overall}%`} sub={`Bed ${insights.consistency.last7.bedtime}% · Wake ${insights.consistency.last7.wakeUp}% · Dur ${insights.consistency.last7.duration}%`} accent="sleep" />
+          <StatCard label="Last 30 Days" value={`${insights.consistency.last30.overall}%`} sub={`Bed ${insights.consistency.last30.bedtime}% · Wake ${insights.consistency.last30.wakeUp}% · Dur ${insights.consistency.last30.duration}%`} accent="sleep" />
+          <StatCard label={rangeLabel ?? 'Selected Range'} value={`${insights.consistency.range.overall}%`} sub={`Bed ${insights.consistency.range.bedtime}% · Wake ${insights.consistency.range.wakeUp}% · Dur ${insights.consistency.range.duration}%`} accent="sleep" />
         </div>
       </Card>
 

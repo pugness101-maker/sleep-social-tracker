@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
-import { Input, Select, Textarea } from '../ui/FormFields';
+import { Input, Textarea } from '../ui/FormFields';
 import { Modal } from '../ui/Modal';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import {
@@ -12,16 +12,16 @@ import {
   parseDurationInput,
   segmentHasSpecificTime,
 } from '../../lib/hangout-segments';
-import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import type { Friend, HangoutSegment } from '../../types';
 import { FriendPicker } from './FriendPicker';
+import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import { LocationAutocomplete } from './LocationAutocomplete';
 
 interface HangoutSegmentEditorProps {
   segments: HangoutSegment[];
   hangoutFriendIds: string[];
+  hangoutCategory: string;
   friends: Friend[];
-  hangoutTypes: string[];
   hangoutStart: string;
   hangoutEnd: string;
   defaultType: string;
@@ -68,8 +68,8 @@ function SegmentDurationInput({
 export function HangoutSegmentEditor({
   segments,
   hangoutFriendIds,
+  hangoutCategory,
   friends,
-  hangoutTypes,
   hangoutStart,
   hangoutEnd,
   defaultType,
@@ -81,7 +81,7 @@ export function HangoutSegmentEditor({
   const addSegment = () => {
     onChange([
       ...segments,
-      createHangoutSegment(defaultType, { friendIds: [...hangoutFriendIds] }),
+      createHangoutSegment(hangoutCategory, defaultType, { friendIds: [...hangoutFriendIds] }),
     ]);
   };
 
@@ -182,11 +182,11 @@ export function HangoutSegmentEditor({
                     Delete
                   </Button>
                 </div>
-                <Select
-                  label="Type"
-                  value={segment.type}
-                  onChange={(e) => updateSegment(segment.id, { type: e.target.value })}
-                  options={hangoutTypeSelectOptions(hangoutTypes, segment.type)}
+                <HangoutCategoryTypeSelect
+                  category={segment.category}
+                  type={segment.type}
+                  onCategoryChange={(category) => updateSegment(segment.id, { category })}
+                  onTypeChange={(type) => updateSegment(segment.id, { type })}
                 />
                 <FriendPicker
                   label="Friends involved"

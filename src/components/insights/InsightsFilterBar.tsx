@@ -66,10 +66,21 @@ export function InsightsFilterBar({
           options={[{ value: '', label: 'All statuses' }, ...optionSelectOptions(data.relationshipStatuses)]}
         />
         <Select
+          label="Hangout category"
+          value={filters.hangoutCategory}
+          onChange={(e) => setFilter('hangoutCategory', e.target.value)}
+          options={[{ value: '', label: 'All categories' }, ...optionSelectOptions(data.hangoutCategories)]}
+        />
+        <Select
           label="Hangout type"
           value={filters.hangoutType}
           onChange={(e) => setFilter('hangoutType', e.target.value)}
-          options={[{ value: '', label: 'All types' }, ...optionSelectOptions(data.hangoutTypes)]}
+          options={[
+            { value: '', label: 'All types' },
+            ...(filters.hangoutCategory
+              ? (data.hangoutTypesByCategory[filters.hangoutCategory] ?? []).map((t) => ({ value: t, label: t }))
+              : optionSelectOptions(data.hangoutTypes)),
+          ]}
         />
         <Select
           label="Segment type"

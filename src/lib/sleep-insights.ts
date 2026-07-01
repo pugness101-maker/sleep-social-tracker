@@ -59,8 +59,19 @@ export interface BestSleepAnalysis {
   highestDebtDay: { date: string; debtMinutes: number } | null;
 }
 
+export interface ConsistencyBreakdown {
+  overall: number;
+  bedtime: number;
+  wakeUp: number;
+  duration: number;
+}
+
 export interface SleepInsights {
-  consistency: { last7: number; last30: number; range: number };
+  consistency: {
+    last7: ConsistencyBreakdown;
+    last30: ConsistencyBreakdown;
+    range: ConsistencyBreakdown;
+  };
   circadian: CircadianPoint[];
   heatmapDays: HeatmapDay[];
   bedtimeByWeekday: Record<number, number | null>;
@@ -94,15 +105,29 @@ export function normalizeBedtimeMinutes(minutes: number): number {
   return minutes;
 }
 
-export function calcScheduleConsistencyScore(entries: SleepEntry[]): number {
-  if (entries.length === 0) return 0;
-  if (entries.length === 1) return 100;
+function consistencyFromStdDev(stdMinutes: number, maxStd = 120): number {
+  return Math.round(Math.max(0, Math.min(100, 100 - (stdMinutes / maxStd) * 100)));
+}
+
+export function calcConsistencyBreakdown(entries: SleepEntry[]): ConsistencyBreakdown {
+  if (entries.length === 0) return { overall: 0, bedtime: 0, wakeUp: 0, duration: 0 };
+  if (entries.length === 1) return { overall: 100, bedtime: 100, wakeUp: 100, duration: 100 };
 
   const bedtimes = entries.map((e) => normalizeBedtimeMinutes(timeOfDayMinutes(e.sleepStart)));
   const wakeups = entries.map((e) => timeOfDayMinutes(e.wakeUp));
-  const avgStd = (stdDev(bedtimes) + stdDev(wakeups)) / 2;
-  // ~2h combined variation → 0%; 0 variation → 100%
-  return Math.round(Math.max(0, Math.min(100, 100 - (avgStd / 120) * 100)));
+  const durations = entries.map((e) => calcDurationMinutes(e.sleepStart, e.wakeUp));
+
+  const bedtime = consistencyFromStdDev(stdDev(bedtimes));
+  const wakeUp = consistencyFromStdDev(stdDev(wakeups));
+  const duration = consistencyFromStdDev(stdDev(durations), 180);
+
+  const overall = Math.round(bedtime * 0.4 + wakeUp * 0.4 + duration * 0.2);
+  return { overall, bedtime, wakeUp, duration };
+}
+
+/** @deprecated use calcConsistencyBreakdown */
+export function calcScheduleConsistencyScore(entries: SleepEntry[]): number {
+  return calcConsistencyBreakdown(entries).overall;
 }
 
 function sortByWake(entries: SleepEntry[]): SleepEntry[] {
@@ -382,9 +407,9 @@ export function getSleepInsights(
 
   return {
     consistency: {
-      last7: calcScheduleConsistencyScore(last7),
-      last30: calcScheduleConsistencyScore(last30),
-      range: calcScheduleConsistencyScore(rangeEntries),
+      last7: calcConsistencyBreakdown(last7),
+      last30: calcConsistencyBreakdown(last30),
+      range: calcConsistencyBreakdown(rangeEntries),
     },
     circadian: sorted.map((e) => {
       const duration = calcDurationMinutes(e.sleepStart, e.wakeUp);

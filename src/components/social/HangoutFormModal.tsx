@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { Input, Textarea, Select } from '../ui/FormFields';
+import { Input, Textarea } from '../ui/FormFields';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
-import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
 import type { HangoutSegment } from '../../types';
@@ -25,6 +25,7 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
     startTime: '',
     endTime: '',
     location: '',
+    category: '',
     type: '',
     notes: '',
     segments: [] as HangoutSegment[],
@@ -37,6 +38,7 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
       startTime: hangout.startTime,
       endTime: hangout.endTime,
       location: hangout.location,
+      category: hangout.category,
       type: hangout.type,
       notes: hangout.notes,
       segments: hangout.segments ?? [],
@@ -77,11 +79,11 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
           <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>
         )}
         <div className="grid sm:grid-cols-2 gap-4">
-          <Select
-            label="Type"
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-            options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)}
+          <HangoutCategoryTypeSelect
+            category={form.category}
+            type={form.type}
+            onCategoryChange={(category) => setForm({ ...form, category })}
+            onTypeChange={(type) => setForm({ ...form, type })}
           />
           <LocationAutocomplete
             label="Location"
@@ -94,8 +96,8 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
         <HangoutSegmentEditor
           segments={form.segments}
           hangoutFriendIds={form.friendIds}
+          hangoutCategory={form.category}
           friends={data.friends}
-          hangoutTypes={data.hangoutTypes}
           hangoutStart={form.startTime}
           hangoutEnd={form.endTime}
           defaultType={form.type}

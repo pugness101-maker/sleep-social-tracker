@@ -2,6 +2,15 @@ import type { AppData, AppSettings, ActiveTimers, HangoutIdea, Friend, Hangout }
 import { normalizeHangoutSegments } from './hangout-segments';
 import { normalizeSleepAutoCalcSettings } from './sleep-goals';
 import {
+  cloneDefaultTypesByCategory,
+  inferCategoryAndType,
+  mergeTypesIntoCatalog,
+  migrateHangoutCategories,
+  migrateIdeaCategories,
+  allTypesFromCatalog,
+} from './hangout-categories';
+import {
+  DEFAULT_HANGOUT_CATEGORIES,
   DEFAULT_FRIEND_TAGS,
   DEFAULT_FRIEND_GROUPS,
   DEFAULT_HANGOUT_TYPES,
@@ -14,7 +23,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 11;
+export const DATA_VERSION = 12;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -35,6 +44,7 @@ export const defaultActiveTimers: ActiveTimers = {
   napStart: null,
   hangoutStart: null,
   hangoutFriendIds: [],
+  hangoutCategory: 'Social',
   hangoutType: DEFAULT_HANGOUT_TYPES[0],
   hangoutLocation: '',
 };
@@ -52,6 +62,8 @@ export const defaultAppData: AppData = {
   relationshipStatuses: [...DEFAULT_RELATIONSHIP_STATUSES],
   relationshipTypes: [...DEFAULT_RELATIONSHIP_TYPES],
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
+  hangoutCategories: [...DEFAULT_HANGOUT_CATEGORIES],
+  hangoutTypesByCategory: cloneDefaultTypesByCategory(),
   favoriteLocations: [],
 };
 
@@ -170,11 +182,19 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
   });
 }
 
-function migrateHangouts(rawHangouts: Partial<Hangout>[]): Hangout[] {
-  return rawHangouts.map((h) => ({
-    ...h,
-    segments: normalizeHangoutSegments(h.segments, h.friendIds ?? []),
-  })) as Hangout[];
+function migrateHangouts(rawHangouts: Partial<Hangout>[], catalog: Record<string, string[]>): Hangout[] {
+  return rawHangouts.map((h) => {
+    const pair = inferCategoryAndType(h.type ?? 'Other', h.category, catalog);
+    const friendIds = h.friendIds ?? [];
+    const segments = normalizeHangoutSegments(h.segments, friendIds, pair.category, catalog);
+    return {
+      ...h,
+      friendIds,
+      category: pair.category,
+      type: pair.type,
+      segments,
+    } as Hangout;
+  });
 }
 
 export function normalizeAppData(
@@ -185,11 +205,36 @@ export function normalizeAppData(
   }
 ): AppData {
   const friends = migrateFriends(raw.friends ?? []);
-  const ideas = migrateIdeas(raw.ideas ?? []);
-  const hangouts = migrateHangouts(raw.hangouts ?? []);
-  const withMigrated = { ...raw, friends, ideas, hangouts };
+  const catalogBase = {
+    ...cloneDefaultTypesByCategory(),
+    ...(raw.hangoutTypesByCategory ?? {}),
+  };
+  const categories = [
+    ...DEFAULT_HANGOUT_CATEGORIES,
+    ...(raw.hangoutCategories ?? []).filter((c) => !DEFAULT_HANGOUT_CATEGORIES.includes(c as typeof DEFAULT_HANGOUT_CATEGORIES[number])),
+  ];
+  let ideas = migrateIdeas(raw.ideas ?? []);
+  let hangouts = migrateHangouts(raw.hangouts ?? [], catalogBase);
+  const merged = mergeTypesIntoCatalog(categories, catalogBase, hangouts, ideas);
+  hangouts = migrateHangoutCategories(hangouts, merged.catalog);
+  ideas = migrateIdeaCategories(ideas, merged.catalog);
+  const withMigrated = {
+    ...raw,
+    friends,
+    ideas,
+    hangouts,
+    hangoutCategories: merged.categories,
+    hangoutTypesByCategory: merged.catalog,
+  };
   const social = mergeSocialOptions(withMigrated);
-  const activeTimers = { ...defaultActiveTimers, ...raw.activeTimers };
+  const hangoutTypes = allTypesFromCatalog(merged.catalog);
+  const activeTimers = {
+    ...defaultActiveTimers,
+    ...raw.activeTimers,
+    hangoutCategory:
+      raw.activeTimers?.hangoutCategory ??
+      inferCategoryAndType(raw.activeTimers?.hangoutType ?? DEFAULT_HANGOUT_TYPE, undefined, merged.catalog).category,
+  };
   if (!social.hangoutTypes.includes(activeTimers.hangoutType) && social.hangoutTypes.length > 0) {
     activeTimers.hangoutType = social.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
       ? DEFAULT_HANGOUT_TYPE
@@ -212,6 +257,9 @@ export function normalizeAppData(
       }),
     },
     ...social,
+    hangoutTypes,
+    hangoutCategories: merged.categories,
+    hangoutTypesByCategory: merged.catalog,
     favoriteLocations: raw.favoriteLocations ?? defaultAppData.favoriteLocations,
   };
 }

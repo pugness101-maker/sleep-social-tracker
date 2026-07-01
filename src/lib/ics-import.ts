@@ -13,6 +13,7 @@ import {
 import type { AppData, Friend, Hangout } from '../types';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
 import { generateId, toLocalISO } from './dates';
+import { inferCategoryAndType } from './hangout-categories';
 import { createPreImportBackup } from './import-sections';
 
 export type IcsImportMode = 'merge' | 'replace';
@@ -446,13 +447,16 @@ export function applyIcsCalendarImport(
       })
       .filter((id): id is string => !!id);
 
+    const type = item.type || DEFAULT_HANGOUT_TYPE;
+    const { category } = inferCategoryAndType(type);
     const hangout: Hangout = {
       id: generateId(),
       friendIds,
       startTime: item.startTime,
       endTime: item.endTime,
       location: options.importLocation ? item.location : '',
-      type: item.type || DEFAULT_HANGOUT_TYPE,
+      category,
+      type,
       notes: options.importDescription ? item.notes : '',
       segments: [],
       createdAt: stamp,
