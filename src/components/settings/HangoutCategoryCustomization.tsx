@@ -9,7 +9,39 @@ import {
   DEFAULT_HANGOUT_CATEGORY,
   isMixedHangoutCategory,
 } from '../../lib/hangout-categories';
-import { getCategoryUsage, getCategoryTypeUsage } from '../../lib/social-customization-usage';
+import { countHangoutsWithOccasion, DEFAULT_HANGOUT_OCCASION } from '../../lib/hangout-occasions';
+import { getCategoryUsage, getCategoryTypeUsage, getOccasionUsage } from '../../lib/social-customization-usage';
+
+export function HangoutOccasionsEditor() {
+  const { data, addHangoutOccasion, updateHangoutOccasion, deleteHangoutOccasion } = useApp();
+  const usageData = { friends: data.friends, hangouts: data.hangouts };
+
+  return (
+    <CustomOptionListCard
+      bare
+      title="Occasions"
+      description="Purpose of the meetup (Date, Friends, Family, etc.). Separate from activity category and type."
+      options={data.hangoutOccasions}
+      usageCount={(name) => countHangoutsWithOccasion(data.hangouts, name)}
+      getUsageLog={(occasion) => getOccasionUsage(usageData, occasion)}
+      defaultFallbackLabel={DEFAULT_HANGOUT_OCCASION}
+      deleteMode="hangout"
+      deleteResolutionCopy={{
+        defaultOption: 'Move connected hangouts to None',
+        otherOption: 'Choose another occasion',
+        clearOption: 'Clear occasion (set to None)',
+      }}
+      onAdd={addHangoutOccasion}
+      onEdit={updateHangoutOccasion}
+      onDelete={(name, action, otherName) => {
+        if (action === 'default') deleteHangoutOccasion(name, { action: 'default' });
+        else if (action === 'other' && otherName) deleteHangoutOccasion(name, { action: 'other', name: otherName });
+        else if (action === 'clear') deleteHangoutOccasion(name, { action: 'clear' });
+        else deleteHangoutOccasion(name, { action: 'default' });
+      }}
+    />
+  );
+}
 
 export function HangoutCategoriesEditor() {
   const { data, addHangoutCategory, updateHangoutCategory, deleteHangoutCategory } = useApp();
@@ -19,7 +51,7 @@ export function HangoutCategoriesEditor() {
     <CustomOptionListCard
       bare
       title="Hangout Categories"
-      description="Top-level hangout classification. Types belong to a category."
+      description="Broad activity category (Social, Food, Fun, etc.). Types belong to a category."
       options={data.hangoutCategories}
       usageCount={(name) => countHangoutsWithCategory(data.hangouts, name)}
       getUsageLog={(category) => getCategoryUsage(usageData, category)}

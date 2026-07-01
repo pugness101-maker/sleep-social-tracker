@@ -2,20 +2,15 @@ import type { Hangout, HangoutIdea, HangoutSegment } from '../types';
 
 export type HangoutCategory = string;
 
+/** Broad activity categories (Fun replaces legacy Entertainment). Mixed is special. */
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
-  'Mixed',
   'Food',
-  'Entertainment',
+  'Fun',
   'Fitness',
   'Faith',
-  'School',
-  'Outdoor',
-  'Shopping',
-  'Travel',
-  'Work',
-  'Wellness',
   'Other',
+  'Mixed',
 ] as const;
 
 export const MIXED_HANGOUT_CATEGORY = 'Mixed';
@@ -24,19 +19,51 @@ export const MIXED_HANGOUT_MAIN_TYPE = 'Mixed';
 export const DEFAULT_HANGOUT_CATEGORY = 'Other';
 
 export const DEFAULT_HANGOUT_TYPES_BY_CATEGORY: Record<string, string[]> = {
-  Social: ['Chill', 'Date', 'Group Hangout', 'Party', 'Sleepover'],
+  Social: ['Chill', 'Group Hangout', 'Party', 'Sleepover', 'Travel', 'Car Ride'],
+  Food: ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Cook Together'],
+  Fun: ['Movie / TV', 'Gaming', 'Shopping', 'Concert', 'Activity'],
+  Fitness: ['Gym', 'MMA', 'Running', 'Hiking', 'Outdoor', 'Wellness'],
+  Faith: ['Church', 'Bible Study', 'Small Group'],
+  Other: ['School', 'Study', 'Work', 'Class', 'Errands', 'Appointment'],
   Mixed: [],
-  Food: ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Coffee', 'Dessert'],
-  Entertainment: ['Movie', 'TV / Shows', 'Gaming', 'Concert', 'Bowling'],
-  Fitness: ['Gym', 'MMA', 'Wrestling', 'Running', 'Walking'],
-  Faith: ['Church', 'Bible Study', 'Prayer'],
-  School: ['Study', 'Class', 'Group Project'],
-  Outdoor: ['Hike', 'Park', 'Beach', 'Camping'],
-  Shopping: ['Shopping', 'Mall', 'Grocery'],
-  Travel: ['Road Trip', 'Vacation'],
-  Work: ['Work', 'Networking'],
-  Wellness: ['Spa', 'Meditation', 'Therapy'],
-  Other: ['Other'],
+};
+
+/** Legacy category names → new catalog categories */
+export const LEGACY_CATEGORY_MIGRATION: Record<string, string> = {
+  Entertainment: 'Fun',
+  School: 'Other',
+  Outdoor: 'Other',
+  Shopping: 'Fun',
+  Travel: 'Social',
+  Work: 'Other',
+  Wellness: 'Fitness',
+};
+
+/** Legacy type labels → new type labels within migrated categories */
+export const LEGACY_TYPE_RENAMES: Record<string, string> = {
+  Date: 'Other',
+  Movie: 'Movie / TV',
+  'TV / Shows': 'Movie / TV',
+  Brunch: 'Breakfast',
+  Coffee: 'Breakfast',
+  Hike: 'Hiking',
+  Park: 'Activity',
+  Beach: 'Activity',
+  Camping: 'Outdoor',
+  Mall: 'Shopping',
+  Grocery: 'Errands',
+  'Road Trip': 'Travel',
+  Vacation: 'Travel',
+  Networking: 'Work',
+  Spa: 'Wellness',
+  Meditation: 'Wellness',
+  Therapy: 'Wellness',
+  'Group Project': 'Study',
+  Walking: 'Running',
+  Wrestling: 'MMA',
+  Prayer: 'Small Group',
+  Bowling: 'Activity',
+  'Cook Together': 'Cook Together',
 };
 
 /** Maps legacy flat hangout.type values to { category, type } */
@@ -44,15 +71,38 @@ export const LEGACY_HANGOUT_TYPE_MIGRATION: Record<string, { category: string; t
   Chill: { category: 'Social', type: 'Chill' },
   Mixed: { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE },
   Food: { category: 'Food', type: 'Dinner' },
-  Study: { category: 'School', type: 'Study' },
+  Study: { category: 'Other', type: 'Study' },
   Gym: { category: 'Fitness', type: 'Gym' },
   Party: { category: 'Social', type: 'Party' },
-  Shopping: { category: 'Shopping', type: 'Shopping' },
-  Travel: { category: 'Travel', type: 'Vacation' },
+  Shopping: { category: 'Fun', type: 'Shopping' },
+  Travel: { category: 'Social', type: 'Travel' },
   Sleepover: { category: 'Social', type: 'Sleepover' },
-  Work: { category: 'Work', type: 'Work' },
+  Work: { category: 'Other', type: 'Work' },
   Other: { category: 'Other', type: 'Other' },
+  Date: { category: 'Social', type: 'Other' },
 };
+
+export function remapLegacyCategoryType(
+  category: string,
+  type: string
+): { category: string; type: string } {
+  let cat = LEGACY_CATEGORY_MIGRATION[category] ?? category;
+  let typ = LEGACY_TYPE_RENAMES[type] ?? type;
+
+  if (category === 'Shopping' && type === 'Shopping') {
+    cat = 'Fun';
+    typ = 'Shopping';
+  }
+  if (category === 'Outdoor') {
+    cat = typ === 'Hiking' || typ === 'Outdoor' ? 'Fitness' : 'Other';
+    if (typ === 'Hike') typ = 'Hiking';
+  }
+  if (category === 'Travel') {
+    cat = 'Social';
+  }
+
+  return { category: cat, type: typ };
+}
 
 export function cloneDefaultTypesByCategory(): Record<string, string[]> {
   const out: Record<string, string[]> = {};
@@ -80,9 +130,6 @@ export function normalizeHangoutMainFields(
   return { category, type };
 }
 
-/**
- * Resolve category/type for hangout forms — handles Mixed and invalid/leaving-Mixed types.
- */
 export function resolveHangoutMainFields(
   category: string,
   type: string,
@@ -104,7 +151,6 @@ export function resolveHangoutMainFields(
   return { category, type: match };
 }
 
-/** Normalize stored hangout fields when opening Add/Edit form. */
 export function hangoutMainFieldsForForm(
   hangout: { category?: string; type?: string },
   catalog: Record<string, string[]>,
@@ -114,7 +160,6 @@ export function hangoutMainFieldsForForm(
   return resolveHangoutMainFields(inferred.category, inferred.type, catalog, settingsCategories);
 }
 
-/** Types selectable in dropdowns — Mixed is a category-only label, not a type option. */
 export function filterTypesForDropdown(types: string[]): string[] {
   return types.filter((t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase());
 }
@@ -148,7 +193,8 @@ export function inferCategoryAndType(
     return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
   }
   if (category?.trim()) {
-    return { category: category.trim(), type: trimmedType };
+    const remapped = remapLegacyCategoryType(category.trim(), trimmedType);
+    return remapped;
   }
   const legacy = LEGACY_HANGOUT_TYPE_MIGRATION[trimmedType];
   if (legacy) return legacy;
@@ -168,16 +214,10 @@ export function typesForCategory(catalog: Record<string, string[]>, category: st
   return catalog[category] ?? [];
 }
 
-/** Active category options from saved Settings only (sorted). */
 export function getActiveCategoryOptions(settingsCategories: string[]): string[] {
   return [...settingsCategories].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
-/**
- * Active type options from saved Settings catalog only.
- * When selectedCategory is set, returns types for that category (empty for Mixed).
- * When omitted/empty, returns all types across active settings categories.
- */
 export function getActiveTypeOptions(
   catalog: Record<string, string[]>,
   settingsCategories: string[],
@@ -304,7 +344,9 @@ export function mergeTypesIntoCatalog(
     nextCatalog[MIXED_HANGOUT_CATEGORY] = [];
   }
   if (nextCatalog.Social) {
-    nextCatalog.Social = nextCatalog.Social.filter((t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase());
+    nextCatalog.Social = nextCatalog.Social.filter(
+      (t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase() && t.toLowerCase() !== 'date'
+    );
   }
 
   const ensure = (category: string, type: string) => {
@@ -312,6 +354,7 @@ export function mergeTypesIntoCatalog(
     const cat = category.trim() || DEFAULT_HANGOUT_CATEGORY;
     const typ = type.trim() || 'Other';
     if (typ.toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase()) return;
+    if (typ.toLowerCase() === 'date') return;
     if (!nextCategories.includes(cat)) nextCategories.push(cat);
     const list = nextCatalog[cat] ? [...nextCatalog[cat]] : [];
     if (!list.some((t) => t.toLowerCase() === typ.toLowerCase())) list.push(typ);

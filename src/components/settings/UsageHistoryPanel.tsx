@@ -173,7 +173,9 @@ export function UsageHistoryPanel({ content }: UsageHistoryPanelProps) {
   const title =
     content.kind === 'category'
       ? content.category
-      : `${content.category} → ${content.type}`;
+      : content.kind === 'occasion'
+        ? content.occasion
+        : `${content.category} → ${content.type}`;
 
   const filteredLogs = filterLogEntries(summary.logs, search);
   const needsSearch = summary.logs.length > SEARCH_THRESHOLD;

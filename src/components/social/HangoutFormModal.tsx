@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { Input, Textarea } from '../ui/FormFields';
+import { Input, Select, Textarea } from '../ui/FormFields';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import { hangoutMainFieldsForForm } from '../../lib/hangout-categories';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
+import { DEFAULT_HANGOUT_OCCASION } from '../../types';
 import type { HangoutSegment } from '../../types';
 
 interface HangoutFormModalProps {
@@ -28,6 +29,7 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
     startTime: '',
     endTime: '',
     location: '',
+    occasion: DEFAULT_HANGOUT_OCCASION,
     category: '',
     type: '',
     notes: '',
@@ -42,6 +44,7 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
       startTime: hangout.startTime,
       endTime: hangout.endTime,
       location: hangout.location,
+      occasion: hangout.occasion || DEFAULT_HANGOUT_OCCASION,
       category: main.category,
       type: main.type,
       notes: hangout.notes,
@@ -82,19 +85,23 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
         {form.startTime && form.endTime && (
           <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>
         )}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <HangoutCategoryTypeSelect
-            category={form.category}
-            type={form.type}
-            onMainFieldsChange={(category, type) => setForm((prev) => ({ ...prev, category, type }))}
-          />
-          <LocationAutocomplete
-            label="Location"
-            value={form.location}
-            onChange={(location) => setForm((prev) => ({ ...prev, location }))}
-            placeholder="Search locations…"
-          />
-        </div>
+        <Select
+          label="Occasion"
+          value={form.occasion}
+          onChange={(e) => setForm((prev) => ({ ...prev, occasion: e.target.value }))}
+          options={data.hangoutOccasions.map((o) => ({ value: o, label: o }))}
+        />
+        <HangoutCategoryTypeSelect
+          category={form.category}
+          type={form.type}
+          onMainFieldsChange={(category, type) => setForm((prev) => ({ ...prev, category, type }))}
+        />
+        <LocationAutocomplete
+          label="Location"
+          value={form.location}
+          onChange={(location) => setForm((prev) => ({ ...prev, location }))}
+          placeholder="Search locations…"
+        />
         <Textarea label="Notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
         <HangoutSegmentEditor
           segments={form.segments}

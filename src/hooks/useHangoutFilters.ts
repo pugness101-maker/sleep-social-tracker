@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getHangoutCategoryFilterOptions,
+  getHangoutOccasionFilterOptions,
   getHangoutTypeFilterOptions,
   loadHangoutTabFilters,
   saveHangoutTabFilters,
@@ -12,20 +13,23 @@ import {
 interface UseHangoutFiltersArgs {
   hangoutCategories: string[];
   hangoutTypesByCategory: Record<string, string[]>;
+  hangoutOccasions: string[];
 }
 
 export function useHangoutFilters({
   hangoutCategories,
   hangoutTypesByCategory,
+  hangoutOccasions,
 }: UseHangoutFiltersArgs) {
   const [filters, setFilters] = useState<HangoutTabFilters>(() => loadHangoutTabFilters());
 
   useEffect(() => {
     setFilters((prev) => {
-      const next = sanitizeHangoutTabFilters(prev, hangoutCategories, hangoutTypesByCategory);
+      const next = sanitizeHangoutTabFilters(prev, hangoutCategories, hangoutTypesByCategory, hangoutOccasions);
       if (
         next.category !== prev.category ||
         next.type !== prev.type ||
+        next.occasion !== prev.occasion ||
         next.location !== prev.location ||
         next.search !== prev.search
       ) {
@@ -34,7 +38,7 @@ export function useHangoutFilters({
       }
       return prev;
     });
-  }, [hangoutTypesByCategory, hangoutCategories]);
+  }, [hangoutTypesByCategory, hangoutCategories, hangoutOccasions]);
 
   const setSearch = useCallback((search: string) => {
     setFilters((prev) => {
@@ -47,6 +51,14 @@ export function useHangoutFilters({
   const setLocation = useCallback((location: string) => {
     setFilters((prev) => {
       const next = { ...prev, location };
+      saveHangoutTabFilters(next);
+      return next;
+    });
+  }, []);
+
+  const setOccasion = useCallback((occasion: string) => {
+    setFilters((prev) => {
+      const next = { ...prev, occasion };
       saveHangoutTabFilters(next);
       return next;
     });
@@ -80,6 +92,11 @@ export function useHangoutFilters({
     [hangoutCategories]
   );
 
+  const occasionOptions = useMemo(
+    () => getHangoutOccasionFilterOptions(hangoutOccasions),
+    [hangoutOccasions]
+  );
+
   const typeOptions = useMemo(
     () => getHangoutTypeFilterOptions(hangoutTypesByCategory, hangoutCategories, filters.category),
     [hangoutTypesByCategory, hangoutCategories, filters.category]
@@ -88,10 +105,12 @@ export function useHangoutFilters({
   return {
     filters,
     setSearch,
+    setOccasion,
     setCategory,
     setType,
     setLocation,
     categoryOptions,
+    occasionOptions,
     typeOptions,
   };
 }

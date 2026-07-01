@@ -15,7 +15,7 @@ import {
   getRelationshipTypeUsage,
 } from '../../lib/social-customization-usage';
 import { DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
-import { HangoutCategoriesEditor, HangoutTypesByCategoryEditor } from './HangoutCategoryCustomization';
+import { HangoutCategoriesEditor, HangoutOccasionsEditor, HangoutTypesByCategoryEditor } from './HangoutCategoryCustomization';
 
 export function SocialCustomization() {
   const {
@@ -157,6 +157,16 @@ export function SocialCustomization() {
             else deleteRelationshipType(name, { action: 'clear' });
           }}
         />
+      </SettingsAccordionSection>
+
+      <SettingsAccordionSection
+        nested
+        title="Occasions"
+        summary="Purpose of the meetup (Date, Friends, Family, etc.)"
+        open={isNestedOpen('social', 'hangout_occasions')}
+        onToggle={() => toggleNested('social', 'hangout_occasions')}
+      >
+        <HangoutOccasionsEditor />
       </SettingsAccordionSection>
 
       <SettingsAccordionSection

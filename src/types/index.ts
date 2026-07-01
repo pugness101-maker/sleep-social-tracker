@@ -95,21 +95,25 @@ export const DEFAULT_HANGOUT_TYPE = 'Other';
 
 export const DEFAULT_HANGOUT_CATEGORIES = [
   'Social',
-  'Mixed',
   'Food',
-  'Entertainment',
+  'Fun',
   'Fitness',
   'Faith',
-  'School',
-  'Outdoor',
-  'Shopping',
-  'Travel',
-  'Work',
-  'Wellness',
   'Other',
+  'Mixed',
 ] as const;
 
 export const DEFAULT_HANGOUT_CATEGORY = 'Other';
+
+export const DEFAULT_HANGOUT_OCCASION = 'None';
+
+export const DEFAULT_HANGOUT_OCCASIONS = [
+  'None',
+  'Date',
+  'Friends',
+  'Family',
+  'Event',
+] as const;
 
 export interface HangoutSegment {
   id: string;
@@ -174,6 +178,8 @@ export interface Hangout {
   startTime: string;
   endTime: string;
   location: string;
+  /** Purpose of the meetup (Date, Friends, Family, etc.) */
+  occasion: string;
   category: HangoutCategory;
   type: HangoutType;
   notes: string;
@@ -205,6 +211,7 @@ export interface ActiveTimers {
   napStart: string | null;
   hangoutStart: string | null;
   hangoutFriendIds: string[];
+  hangoutOccasion: string;
   hangoutCategory: HangoutCategory;
   hangoutType: HangoutType;
   hangoutLocation: string;
@@ -242,6 +249,7 @@ export interface AppData {
   hangoutTypes: string[];
   hangoutCategories: string[];
   hangoutTypesByCategory: Record<string, string[]>;
+  hangoutOccasions: string[];
   /** User-starred locations for quick pick in autocomplete. */
   favoriteLocations: string[];
 }

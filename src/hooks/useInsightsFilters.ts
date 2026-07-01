@@ -12,25 +12,25 @@ export function useInsightsFilters() {
   const { data } = useApp();
   const catalog = data.hangoutTypesByCategory ?? {};
   const settingsCategories = data.hangoutCategories ?? [];
+  const settingsOccasions = data.hangoutOccasions ?? [];
 
   const [filters, setFiltersState] = useState<InsightsFilters>(() =>
-    sanitizeInsightsFilters(loadInsightsFilters(), settingsCategories, catalog)
+    sanitizeInsightsFilters(loadInsightsFilters(), settingsCategories, catalog, settingsOccasions)
   );
 
   useEffect(() => {
-    setFiltersState((prev) => {
-      const next = sanitizeInsightsFilters(prev, settingsCategories, catalog);
-      return next;
-    });
-  }, [catalog, settingsCategories]);
+    setFiltersState((prev) => sanitizeInsightsFilters(prev, settingsCategories, catalog, settingsOccasions));
+  }, [catalog, settingsCategories, settingsOccasions]);
 
   useEffect(() => {
     saveInsightsFilters(filters);
   }, [filters]);
 
   const setFilter = useCallback(<K extends keyof InsightsFilters>(key: K, value: InsightsFilters[K]) => {
-    setFiltersState((prev) => sanitizeInsightsFilters({ ...prev, [key]: value }, settingsCategories, catalog));
-  }, [catalog, settingsCategories]);
+    setFiltersState((prev) =>
+      sanitizeInsightsFilters({ ...prev, [key]: value }, settingsCategories, catalog, settingsOccasions)
+    );
+  }, [catalog, settingsCategories, settingsOccasions]);
 
   const clearFilters = useCallback(() => {
     setFiltersState({ ...defaultInsightsFilters });
@@ -42,9 +42,9 @@ export function useInsightsFilters() {
         key === 'showSleep' || key === 'showNaps' || key === 'showHangouts' || key === 'showSegments'
           ? { ...prev, [key]: true }
           : { ...prev, [key]: typeof prev[key] === 'boolean' ? true : '' };
-      return sanitizeInsightsFilters(next, settingsCategories, catalog);
+      return sanitizeInsightsFilters(next, settingsCategories, catalog, settingsOccasions);
     });
-  }, [catalog, settingsCategories]);
+  }, [catalog, settingsCategories, settingsOccasions]);
 
   return { filters, setFilter, setFilters: setFiltersState, clearFilters, removeChip };
 }

@@ -9,6 +9,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout, HangoutSegment } from '../../types';
+import { DEFAULT_HANGOUT_OCCASION } from '../../types';
 import { getDefaultHangoutCategoryPair, hangoutMainFieldsForForm, isMixedHangoutCategory } from '../../lib/hangout-categories';
 import { filterHangoutsForTab } from '../../lib/hangout-filters';
 import {
@@ -28,14 +29,17 @@ export function HangoutsTab() {
   const {
     filters,
     setSearch,
+    setOccasion,
     setCategory,
     setType,
     setLocation,
     categoryOptions,
+    occasionOptions,
     typeOptions,
   } = useHangoutFilters({
     hangoutCategories: data.hangoutCategories,
     hangoutTypesByCategory: data.hangoutTypesByCategory ?? {},
+    hangoutOccasions: data.hangoutOccasions ?? [],
   });
 
   const catalog = data.hangoutTypesByCategory ?? {};
@@ -48,6 +52,7 @@ export function HangoutsTab() {
       startTime: toLocalISO(),
       endTime: toLocalISO(),
       location: '',
+      occasion: DEFAULT_HANGOUT_OCCASION,
       category,
       type,
       notes: '',
@@ -67,7 +72,7 @@ export function HangoutsTab() {
 
   const [startForm, setStartForm] = useState(() => {
     const { category, type } = getDefaultHangoutCategoryPair(catalog);
-    return { friendIds: [] as string[], category, type, location: '' };
+    return { friendIds: [] as string[], occasion: DEFAULT_HANGOUT_OCCASION, category, type, location: '' };
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -113,6 +118,7 @@ export function HangoutsTab() {
       startTime: h.startTime,
       endTime: h.endTime,
       location: h.location,
+      occasion: h.occasion || DEFAULT_HANGOUT_OCCASION,
       category: main.category,
       type: main.type,
       notes: h.notes,
@@ -162,9 +168,15 @@ export function HangoutsTab() {
           <SearchBar
             value={filters.search}
             onChange={setSearch}
-            placeholder="Search friends, category, type, location, notes, date…"
+            placeholder="Search friends, occasion, category, type, location, notes, date…"
           />
         </div>
+        <Select
+          label="Occasion"
+          value={filters.occasion}
+          onChange={(e) => setOccasion(e.target.value)}
+          options={[{ value: '', label: 'All Occasions' }, ...occasionOptions.map((o) => ({ value: o, label: o }))]}
+        />
         <Select
           label="Category"
           value={filters.category}
@@ -197,6 +209,7 @@ export function HangoutsTab() {
                 <th className="px-4 py-3">Start</th>
                 <th className="px-4 py-3 hidden md:table-cell">End</th>
                 <th className="px-4 py-3">Duration</th>
+                <th className="px-4 py-3 hidden sm:table-cell">Occasion</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Category</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Type</th>
                 <th className="px-4 py-3">Actions</th>
@@ -213,6 +226,7 @@ export function HangoutsTab() {
                     <td className="px-4 py-3 font-medium whitespace-nowrap">
                       {formatDuration(calcDurationMinutes(h.startTime, h.endTime))}
                     </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">{h.occasion || DEFAULT_HANGOUT_OCCASION}</td>
                     <td className="px-4 py-3 hidden sm:table-cell">{getHangoutTableCategory(h)}</td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className="font-medium">{getHangoutTableType(h)}</span>
@@ -240,9 +254,15 @@ export function HangoutsTab() {
       )}
 
       <Modal open={startModal} onClose={() => setStartModal(false)} title="Start Hangout"
-        footer={<><Button variant="secondary" onClick={() => setStartModal(false)}>Cancel</Button><Button onClick={() => { startHangout(startForm.friendIds, startForm.category, startForm.type, startForm.location); setStartModal(false); }}>Start</Button></>}>
+        footer={<><Button variant="secondary" onClick={() => setStartModal(false)}>Cancel</Button><Button onClick={() => { startHangout(startForm.friendIds, startForm.category, startForm.type, startForm.location, startForm.occasion); setStartModal(false); }}>Start</Button></>}>
         <div className="space-y-4">
           <FriendPicker selected={startForm.friendIds} onChange={(ids) => setStartForm({ ...startForm, friendIds: ids })} />
+          <Select
+            label="Occasion"
+            value={startForm.occasion}
+            onChange={(e) => setStartForm({ ...startForm, occasion: e.target.value })}
+            options={data.hangoutOccasions.map((o) => ({ value: o, label: o }))}
+          />
           <HangoutCategoryTypeSelect
             category={startForm.category}
             type={startForm.type}
@@ -265,20 +285,26 @@ export function HangoutsTab() {
             <Input label="Start Time" type="datetime-local" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
             <Input label="End Time" type="datetime-local" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
           </div>
-          {form.startTime && form.endTime && <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <HangoutCategoryTypeSelect
-              category={form.category}
-              type={form.type}
-              onMainFieldsChange={applyFormMainFields}
-            />
-            <LocationAutocomplete
-              label="Location"
-              value={form.location}
-              onChange={(location) => setForm({ ...form, location })}
-              placeholder="Search locations…"
-            />
-          </div>
+          {form.startTime && form.endTime && (
+            <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>
+          )}
+          <Select
+            label="Occasion"
+            value={form.occasion}
+            onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+            options={data.hangoutOccasions.map((o) => ({ value: o, label: o }))}
+          />
+          <HangoutCategoryTypeSelect
+            category={form.category}
+            type={form.type}
+            onMainFieldsChange={applyFormMainFields}
+          />
+          <LocationAutocomplete
+            label="Location"
+            value={form.location}
+            onChange={(location) => setForm({ ...form, location })}
+            placeholder="Search locations…"
+          />
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <HangoutSegmentEditor
             segments={form.segments}

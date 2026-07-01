@@ -11,7 +11,7 @@ import {
   subMonths,
 } from 'date-fns';
 import type { AppData, Friend, Hangout } from '../types';
-import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
+import { DEFAULT_HANGOUT_OCCASION, DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
 import { generateId, toLocalISO } from './dates';
 import { inferCategoryAndType } from './hangout-categories';
 import { createPreImportBackup } from './import-sections';
@@ -492,6 +492,7 @@ export function applyIcsCalendarImport(
       startTime: item.startTime,
       endTime: item.endTime,
       location: options.importLocation ? item.location : '',
+      occasion: DEFAULT_HANGOUT_OCCASION,
       category,
       type,
       notes: options.importDescription ? item.notes : '',

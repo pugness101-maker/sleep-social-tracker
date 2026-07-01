@@ -13,6 +13,13 @@ import {
   MIXED_HANGOUT_CATEGORY,
 } from './hangout-categories';
 import {
+  DEFAULT_HANGOUT_OCCASION,
+  DEFAULT_HANGOUT_OCCASIONS,
+  mergeOccasionsFromHangouts,
+  migrateHangoutsOccasions,
+  normalizeOccasion,
+} from './hangout-occasions';
+import {
   DEFAULT_HANGOUT_CATEGORIES,
   DEFAULT_FRIEND_TAGS,
   DEFAULT_FRIEND_GROUPS,
@@ -26,7 +33,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 14;
+export const DATA_VERSION = 15;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -48,6 +55,7 @@ export const defaultActiveTimers: ActiveTimers = {
   napStart: null,
   hangoutStart: null,
   hangoutFriendIds: [],
+  hangoutOccasion: DEFAULT_HANGOUT_OCCASION,
   hangoutCategory: 'Social',
   hangoutType: DEFAULT_HANGOUT_TYPES[0],
   hangoutLocation: '',
@@ -68,6 +76,7 @@ export const defaultAppData: AppData = {
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
   hangoutCategories: [...DEFAULT_HANGOUT_CATEGORIES],
   hangoutTypesByCategory: cloneDefaultTypesByCategory(),
+  hangoutOccasions: [...DEFAULT_HANGOUT_OCCASIONS],
   favoriteLocations: [],
 };
 
@@ -225,7 +234,7 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
 }
 
 function migrateHangouts(rawHangouts: Partial<Hangout>[], catalog: Record<string, string[]>): Hangout[] {
-  return rawHangouts.map((h) => {
+  const base = rawHangouts.map((h) => {
     const pair = inferCategoryAndType(h.type ?? 'Other', h.category, catalog);
     const friendIds = h.friendIds ?? [];
     const segments = normalizeHangoutSegments(h.segments, friendIds, pair.category, catalog);
@@ -234,9 +243,11 @@ function migrateHangouts(rawHangouts: Partial<Hangout>[], catalog: Record<string
       friendIds,
       category: pair.category,
       type: pair.type,
+      occasion: normalizeOccasion(h.occasion),
       segments,
     } as Hangout;
   });
+  return migrateHangoutsOccasions(base);
 }
 
 export function normalizeAppData(
@@ -253,6 +264,8 @@ export function normalizeAppData(
   const merged = mergeTypesIntoCatalog(categories, catalogBase, hangouts, ideas);
   hangouts = migrateHangoutCategories(hangouts, merged.catalog);
   ideas = migrateIdeaCategories(ideas, merged.catalog);
+  hangouts = migrateHangoutsOccasions(hangouts);
+  const hangoutOccasions = mergeOccasionsFromHangouts(raw.hangoutOccasions, hangouts);
   const withMigrated = {
     ...raw,
     friends,
@@ -266,6 +279,7 @@ export function normalizeAppData(
   const activeTimers = {
     ...defaultActiveTimers,
     ...raw.activeTimers,
+    hangoutOccasion: normalizeOccasion(raw.activeTimers?.hangoutOccasion),
     hangoutCategory:
       raw.activeTimers?.hangoutCategory ??
       inferCategoryAndType(raw.activeTimers?.hangoutType ?? DEFAULT_HANGOUT_TYPE, undefined, merged.catalog).category,
@@ -301,6 +315,7 @@ export function normalizeAppData(
     hangoutTypes,
     hangoutCategories: merged.categories,
     hangoutTypesByCategory: merged.catalog,
+    hangoutOccasions,
     favoriteLocations: raw.favoriteLocations ?? defaultAppData.favoriteLocations,
   };
 }

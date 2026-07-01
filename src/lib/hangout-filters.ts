@@ -7,6 +7,11 @@ import {
   isMixedHangoutCategory,
 } from './hangout-categories';
 import {
+  getActiveOccasionOptions,
+  hangoutMatchesOccasionFilter,
+  isActiveOccasionInSettings,
+} from './hangout-occasions';
+import {
   getSegmentFriendIds,
   hangoutMatchesCategoryFilter,
   hangoutMatchesTypeFilter,
@@ -19,6 +24,7 @@ const LEGACY_TYPE_FILTER_KEY = 'sleep-social-tracker-hangout-filter-type';
 
 export interface HangoutTabFilters {
   search: string;
+  occasion: string;
   category: string;
   type: string;
   location: string;
@@ -26,6 +32,7 @@ export interface HangoutTabFilters {
 
 export const defaultHangoutTabFilters: HangoutTabFilters = {
   search: '',
+  occasion: '',
   category: '',
   type: '',
   location: '',
@@ -50,6 +57,11 @@ export function loadHangoutTabFilters(): HangoutTabFilters {
 
 export function saveHangoutTabFilters(filters: HangoutTabFilters): void {
   localStorage.setItem(HANGOUT_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+}
+
+/** Occasion filter options from saved Settings only. */
+export function getHangoutOccasionFilterOptions(occasions: string[]): string[] {
+  return getActiveOccasionOptions(occasions);
 }
 
 /** Category filter options from saved Settings only. */
@@ -121,6 +133,7 @@ export function hangoutMatchesSearch(hangout: Hangout, query: string, friends: F
   hangout.friendIds.forEach((id) => tokens.push(lookup(id)));
   if (hangout.category) tokens.push(hangout.category);
   if (hangout.type) tokens.push(hangout.type);
+  if (hangout.occasion) tokens.push(hangout.occasion);
   if (hangout.location) tokens.push(hangout.location);
   if (hangout.notes) tokens.push(hangout.notes);
   if (hangout.startTime) {
@@ -160,6 +173,7 @@ export function filterHangoutsForTab(
 ): Hangout[] {
   return hangouts.filter((h) => {
     if (!hangoutMatchesSearch(h, filters.search, friends)) return false;
+    if (!hangoutMatchesOccasionFilter(h, filters.occasion)) return false;
     if (!hangoutMatchesCategoryTypeFilter(h, filters.category, filters.type)) return false;
     if (!hangoutMatchesLocationFilter(h, filters.location)) return false;
     return true;
@@ -169,9 +183,14 @@ export function filterHangoutsForTab(
 export function sanitizeHangoutTabFilters(
   filters: HangoutTabFilters,
   settingsCategories: string[],
-  catalog: Record<string, string[]>
+  catalog: Record<string, string[]>,
+  occasions: string[] = []
 ): HangoutTabFilters {
-  let { category, type } = filters;
+  let { category, type, occasion } = filters;
+
+  if (occasion && !isActiveOccasionInSettings(occasion, occasions)) {
+    occasion = '';
+  }
 
   if (category && !isActiveCategoryInSettings(category, settingsCategories)) {
     category = '';
@@ -181,5 +200,5 @@ export function sanitizeHangoutTabFilters(
     type = '';
   }
 
-  return { ...filters, category, type };
+  return { ...filters, category, type, occasion };
 }

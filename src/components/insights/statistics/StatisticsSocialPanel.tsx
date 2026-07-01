@@ -80,7 +80,11 @@ export function StatisticsSocialPanel({
           </div>
         ) : (
           <>
-            <div className="grid lg:grid-cols-2 gap-3 mb-3">
+            <div className="grid lg:grid-cols-3 gap-3 mb-3">
+              <div className="text-sm">
+                <span className="opacity-70">Most Common Occasion: </span>
+                <strong>{a.topOccasion ?? '—'}</strong>
+              </div>
               <div className="text-sm">
                 <span className="opacity-70">Most Common Category: </span>
                 <strong>{a.topCategory ?? '—'}</strong>
@@ -90,7 +94,8 @@ export function StatisticsSocialPanel({
                 <strong>{a.topType ?? '—'}</strong>
               </div>
             </div>
-            <div className="grid lg:grid-cols-2 gap-3">
+            <div className="grid lg:grid-cols-3 gap-3">
+              <HorizontalBarList title="Occasion Breakdown" data={a.byOccasion} />
               <HorizontalBarList title="Category Breakdown" data={a.byCategory} />
               <HorizontalBarList title="Type Breakdown" data={a.byType} />
             </div>

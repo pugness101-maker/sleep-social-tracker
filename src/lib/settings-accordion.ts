@@ -14,6 +14,7 @@ export type SocialNestedSectionId =
   | 'friend_groups'
   | 'relationship_statuses'
   | 'relationship_types'
+  | 'hangout_occasions'
   | 'hangout_categories'
   | 'hangout_types_by_category';
 
@@ -61,6 +62,7 @@ const DEFAULT_NESTED_SOCIAL: Record<SocialNestedSectionId, boolean> = {
   friend_groups: false,
   relationship_statuses: false,
   relationship_types: false,
+  hangout_occasions: false,
   hangout_categories: false,
   hangout_types_by_category: false,
 };

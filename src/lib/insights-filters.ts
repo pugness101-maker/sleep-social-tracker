@@ -3,6 +3,7 @@ import {
   isActiveCategoryInSettings,
   isActiveTypeInCatalog,
 } from './hangout-categories';
+import { hangoutMatchesOccasionFilter, isActiveOccasionInSettings } from './hangout-occasions';
 import { friendInHangout, getSegmentFriendIds, hangoutMatchesCategoryFilter, hangoutMatchesTypeFilter } from './hangout-segments';
 import type { AppData, Friend, Hangout } from '../types';
 
@@ -15,6 +16,7 @@ export interface InsightsFilters {
   friendTag: string;
   friendGroup: string;
   relationshipStatus: string;
+  hangoutOccasion: string;
   hangoutCategory: string;
   hangoutType: string;
   segmentType: string;
@@ -31,6 +33,7 @@ export const defaultInsightsFilters: InsightsFilters = {
   friendTag: '',
   friendGroup: '',
   relationshipStatus: '',
+  hangoutOccasion: '',
   hangoutCategory: '',
   hangoutType: '',
   segmentType: '',
@@ -59,9 +62,14 @@ export function saveInsightsFilters(filters: InsightsFilters): void {
 export function sanitizeInsightsFilters(
   filters: InsightsFilters,
   settingsCategories: string[],
-  catalog: Record<string, string[]>
+  catalog: Record<string, string[]>,
+  settingsOccasions: string[] = []
 ): InsightsFilters {
-  let { hangoutCategory, hangoutType, segmentType } = filters;
+  let { hangoutCategory, hangoutType, segmentType, hangoutOccasion } = filters;
+
+  if (hangoutOccasion && !isActiveOccasionInSettings(hangoutOccasion, settingsOccasions)) {
+    hangoutOccasion = '';
+  }
 
   if (hangoutCategory && !isActiveCategoryInSettings(hangoutCategory, settingsCategories)) {
     hangoutCategory = '';
@@ -75,7 +83,7 @@ export function sanitizeInsightsFilters(
     segmentType = '';
   }
 
-  return { ...filters, hangoutCategory, hangoutType, segmentType };
+  return { ...filters, hangoutOccasion, hangoutCategory, hangoutType, segmentType };
 }
 
 export function hasActiveInsightsFilters(filters: InsightsFilters): boolean {
@@ -84,6 +92,7 @@ export function hasActiveInsightsFilters(filters: InsightsFilters): boolean {
     !!filters.friendTag ||
     !!filters.friendGroup ||
     !!filters.relationshipStatus ||
+    !!filters.hangoutOccasion ||
     !!filters.hangoutCategory ||
     !!filters.hangoutType ||
     !!filters.segmentType ||
@@ -113,6 +122,7 @@ export function getInsightsFilterChips(
   if (filters.friendTag) chips.push({ key: 'friendTag', label: `Tag: ${filters.friendTag}` });
   if (filters.friendGroup) chips.push({ key: 'friendGroup', label: `Group: ${filters.friendGroup}` });
   if (filters.relationshipStatus) chips.push({ key: 'relationshipStatus', label: `Status: ${filters.relationshipStatus}` });
+  if (filters.hangoutOccasion) chips.push({ key: 'hangoutOccasion', label: `Occasion: ${filters.hangoutOccasion}` });
   if (filters.hangoutCategory) chips.push({ key: 'hangoutCategory', label: `Category: ${filters.hangoutCategory}` });
   if (filters.hangoutType) chips.push({ key: 'hangoutType', label: `Type: ${filters.hangoutType}` });
   if (filters.segmentType) chips.push({ key: 'segmentType', label: `Segment: ${filters.segmentType}` });
@@ -176,6 +186,8 @@ export function hangoutMatchesInsightsFilters(
     const anyMatch = involvedFriends.some((f) => friendMatchesInsightsFilters(f, filters));
     if (!anyMatch) return false;
   }
+
+  if (filters.hangoutOccasion && !hangoutMatchesOccasionFilter(hangout, filters.hangoutOccasion)) return false;
 
   if (filters.hangoutCategory && !hangoutMatchesCategoryFilter(hangout, filters.hangoutCategory)) return false;
 

@@ -100,8 +100,10 @@ export interface StatisticsBundle {
     activities: {
       byCategory: LabeledValue[];
       byType: LabeledValue[];
+      byOccasion: LabeledValue[];
       topCategory: string | null;
       topType: string | null;
+      topOccasion: string | null;
     };
     people: {
       mostSeen: FriendRankingRow[];
@@ -234,6 +236,17 @@ function countByCategory(hangouts: Hangout[]): LabeledValue[] {
   for (const h of hangouts) {
     const cat = h.category || 'Other';
     counts[cat] = (counts[cat] ?? 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function countByOccasion(hangouts: Hangout[]): LabeledValue[] {
+  const counts: Record<string, number> = {};
+  for (const h of hangouts) {
+    const occ = h.occasion || 'None';
+    counts[occ] = (counts[occ] ?? 0) + 1;
   }
   return Object.entries(counts)
     .map(([label, value]) => ({ label, value }))
@@ -425,6 +438,7 @@ export function buildStatisticsBundle(
 
   const byCategory = countByCategory(hangouts);
   const byType = countByType(hangouts);
+  const byOccasion = countByOccasion(hangouts);
 
   const combined = buildCombinedStats(data, sleepEntries, hangouts);
 
@@ -549,8 +563,10 @@ export function buildStatisticsBundle(
       activities: {
         byCategory,
         byType,
+        byOccasion,
         topCategory: byCategory[0]?.label ?? null,
         topType: byType[0]?.label ?? null,
+        topOccasion: byOccasion[0]?.label ?? null,
       },
       people: {
         mostSeen: ranking.filter((r) => r.hangouts > 0).slice(0, 5),

@@ -36,7 +36,8 @@ export type UsageLogContent =
   | { kind: 'friends'; label: string; entries: FriendUsageEntry[] }
   | { kind: 'relationship_links'; label: string; entries: RelationshipLinkUsageEntry[] }
   | { kind: 'category'; category: string; summary: CategoryUsageSummary }
-  | { kind: 'category_type'; category: string; type: string; summary: CategoryUsageSummary };
+  | { kind: 'category_type'; category: string; type: string; summary: CategoryUsageSummary }
+  | { kind: 'occasion'; occasion: string; summary: CategoryUsageSummary };
 
 function friendNameLookup(friends: Friend[]): (id: string) => string {
   const map = new Map(friends.map((f) => [f.id, f.name]));
@@ -259,6 +260,39 @@ export function getCategoryTypeUsage(
       hangouts: hangoutCount,
       segments: segmentCount,
       ideas: ideaCount,
+      logs: sortLogsNewestFirst(logs),
+    },
+  };
+}
+
+export function getOccasionUsage(
+  data: Pick<AppData, 'friends' | 'hangouts'>,
+  occasion: string
+): UsageLogContent {
+  const lookup = friendNameLookup(data.friends);
+  let hangoutCount = 0;
+  const logs: HangoutLogEntry[] = [];
+
+  for (const h of data.hangouts) {
+    if ((h.occasion || 'None') !== occasion) continue;
+    hangoutCount += 1;
+    logs.push({
+      sortTime: h.startTime,
+      dateLabel: formatDate(h.startTime),
+      type: `${h.category} · ${h.type}`,
+      friendNames: friendNamesForIds(h.friendIds, lookup),
+      location: h.location?.trim() || '—',
+      kind: 'hangout',
+    });
+  }
+
+  return {
+    kind: 'occasion',
+    occasion,
+    summary: {
+      hangouts: hangoutCount,
+      segments: 0,
+      ideas: 0,
       logs: sortLogsNewestFirst(logs),
     },
   };

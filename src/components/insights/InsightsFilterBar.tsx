@@ -73,6 +73,12 @@ export function InsightsFilterBar({
           options={[{ value: '', label: 'All statuses' }, ...optionSelectOptions(data.relationshipStatuses)]}
         />
         <Select
+          label="Occasion"
+          value={filters.hangoutOccasion}
+          onChange={(e) => setFilter('hangoutOccasion', e.target.value)}
+          options={[{ value: '', label: 'All occasions' }, ...optionSelectOptions(data.hangoutOccasions)]}
+        />
+        <Select
           label="Hangout category"
           value={filters.hangoutCategory}
           onChange={(e) => setFilter('hangoutCategory', e.target.value)}

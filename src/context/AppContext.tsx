@@ -60,8 +60,9 @@ import {
   renameFriendEverywhere,
 } from '../lib/data-cleanup';
 import { allTypesFromCatalogExcludingMixed, inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory } from '../lib/hangout-categories';
+import { normalizeOccasion } from '../lib/hangout-occasions';
 import { loadHangoutTabFilters, saveHangoutTabFilters, sanitizeHangoutTabFilters } from '../lib/hangout-filters';
-import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
+import { DEFAULT_HANGOUT_OCCASION, DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 function finalizeHangoutCatalogMutation(next: AppData): AppData {
   const hangoutTypes = allTypesFromCatalogExcludingMixed(next.hangoutTypesByCategory);
@@ -69,7 +70,8 @@ function finalizeHangoutCatalogMutation(next: AppData): AppData {
     sanitizeHangoutTabFilters(
       loadHangoutTabFilters(),
       next.hangoutCategories,
-      next.hangoutTypesByCategory
+      next.hangoutTypesByCategory,
+      next.hangoutOccasions
     )
   );
   return { ...next, hangoutTypes };
@@ -120,7 +122,7 @@ interface AppContextValue {
     typeFilter?: string
   ) => { removedPairs: number };
   // Hangouts
-  startHangout: (friendIds: string[], category?: string, type?: HangoutType, location?: string) => void;
+  startHangout: (friendIds: string[], category?: string, type?: HangoutType, location?: string, occasion?: string) => void;
   endHangout: (notes?: string) => void;
   addHangout: (hangout: Omit<Hangout, 'id' | 'createdAt'>) => void;
   updateHangout: (id: string, hangout: Partial<Hangout>) => void;
@@ -153,6 +155,9 @@ interface AppContextValue {
   addTypeToCategory: (category: string, type: string) => string | null;
   updateTypeInCategory: (category: string, oldName: string, newName: string) => string | null;
   deleteTypeFromCategory: (category: string, name: string, resolution: DeleteTypeResolution) => void;
+  addHangoutOccasion: (name: string) => string | null;
+  updateHangoutOccasion: (oldName: string, newName: string) => string | null;
+  deleteHangoutOccasion: (name: string, resolution: DeleteTypeResolution) => void;
   addRelationshipType: (name: string) => string | null;
   updateRelationshipType: (oldName: string, newName: string) => string | null;
   deleteRelationshipType: (name: string, resolution: DeleteTypeResolution) => void;
@@ -587,7 +592,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const startHangout = useCallback(
-    (friendIds: string[], category?: string, type?: HangoutType, location = '') => {
+    (friendIds: string[], category?: string, type?: HangoutType, location = '', occasion?: string) => {
       patch((prev) => {
         const catalog = prev.hangoutTypesByCategory ?? {};
         const resolvedType = type ?? prev.activeTimers.hangoutType ?? prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE;
@@ -605,6 +610,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             hangoutCategory: main.category,
             hangoutType: main.type,
             hangoutLocation: location,
+            hangoutOccasion: normalizeOccasion(occasion ?? prev.activeTimers.hangoutOccasion),
           },
         };
       });
@@ -614,7 +620,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const endHangout = useCallback((notes = '') => {
     patch((prev) => {
-      const { hangoutStart, hangoutFriendIds, hangoutCategory, hangoutType, hangoutLocation } = prev.activeTimers;
+      const { hangoutStart, hangoutFriendIds, hangoutCategory, hangoutType, hangoutLocation, hangoutOccasion } = prev.activeTimers;
       if (!hangoutStart) return prev;
       const main = normalizeHangoutMainFields(hangoutCategory, hangoutType);
       const entry: Hangout = {
@@ -623,6 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         startTime: hangoutStart,
         endTime: toLocalISO(),
         location: hangoutLocation,
+        occasion: normalizeOccasion(hangoutOccasion),
         category: main.category,
         type: main.type,
         notes,
@@ -647,7 +654,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const main = normalizeHangoutMainFields(hangout.category, hangout.type);
       return {
         ...prev,
-        hangouts: [...prev.hangouts, { ...hangout, ...main, id: generateId(), createdAt: toLocalISO() }],
+        hangouts: [...prev.hangouts, {
+          ...hangout,
+          ...main,
+          occasion: normalizeOccasion(hangout.occasion),
+          id: generateId(),
+          createdAt: toLocalISO(),
+        }],
       };
     });
   }, [patch]);
@@ -659,7 +672,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (h.id !== id) return h;
         const merged = { ...h, ...hangout };
         const main = normalizeHangoutMainFields(merged.category, merged.type);
-        return { ...merged, ...main };
+        return { ...merged, ...main, occasion: normalizeOccasion(merged.occasion) };
       }),
     }));
   }, [patch]);
@@ -743,6 +756,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startTime,
           endTime,
           location: idea.location,
+          occasion: DEFAULT_HANGOUT_OCCASION,
           category: idea.category,
           type: ideaType,
           notes: notesParts.join('\n\n'),
@@ -1122,6 +1136,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [socialCustomizationPatch]);
 
+  const addHangoutOccasion = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.hangoutOccasions);
+    if (error) return error;
+    patch((prev) => ({ ...prev, hangoutOccasions: [...prev.hangoutOccasions, normalized] }));
+    return null;
+  }, [patch, data.hangoutOccasions]);
+
+  const updateHangoutOccasion = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.hangoutOccasions, oldName);
+    if (error) return error;
+    socialCustomizationPatch((prev) => ({
+      ...prev,
+      hangoutOccasions: prev.hangoutOccasions.map((o) => (o === oldName ? normalized : o)),
+      hangouts: prev.hangouts.map((h) =>
+        normalizeOccasion(h.occasion) === oldName ? { ...h, occasion: normalized } : h
+      ),
+      activeTimers:
+        normalizeOccasion(prev.activeTimers.hangoutOccasion) === oldName
+          ? { ...prev.activeTimers, hangoutOccasion: normalized }
+          : prev.activeTimers,
+    }));
+    return null;
+  }, [socialCustomizationPatch, data.hangoutOccasions]);
+
+  const deleteHangoutOccasion = useCallback((name: string, resolution: DeleteTypeResolution) => {
+    socialCustomizationPatch((prev) => {
+      let replacement = DEFAULT_HANGOUT_OCCASION;
+      if (resolution.action === 'other') replacement = resolution.name;
+      else if (resolution.action === 'clear') replacement = DEFAULT_HANGOUT_OCCASION;
+
+      return {
+        ...prev,
+        hangoutOccasions: prev.hangoutOccasions.filter((o) => o !== name),
+        hangouts: prev.hangouts.map((h) =>
+          normalizeOccasion(h.occasion) === name ? { ...h, occasion: replacement } : h
+        ),
+        activeTimers:
+          normalizeOccasion(prev.activeTimers.hangoutOccasion) === name
+            ? { ...prev.activeTimers, hangoutOccasion: replacement }
+            : prev.activeTimers,
+      };
+    });
+  }, [socialCustomizationPatch]);
+
   const addRelationshipType = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
     const error = validateOptionName(normalized, data.relationshipTypes);
@@ -1407,6 +1467,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addTypeToCategory,
     updateTypeInCategory,
     deleteTypeFromCategory,
+    addHangoutOccasion,
+    updateHangoutOccasion,
+    deleteHangoutOccasion,
     addRelationshipType,
     updateRelationshipType,
     deleteRelationshipType,
