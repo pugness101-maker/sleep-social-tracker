@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/FormFields';
-import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
 import { SectionImport } from '../components/settings/SectionImport';
 import { SleepSpreadsheetImport } from '../components/settings/SleepSpreadsheetImport';
@@ -11,13 +9,15 @@ import { BackupRestorePanel } from '../components/settings/BackupRestorePanel';
 import { CleanupTools } from '../components/settings/CleanupTools';
 import { DashboardSettings } from '../components/settings/DashboardSettings';
 import { IcsCalendarImport } from '../components/social/IcsCalendarImport';
+import { SettingsAccordionProvider, useSettingsAccordionContext } from '../components/settings/SettingsAccordionContext';
+import { SettingsAccordionSection } from '../components/settings/SettingsAccordionSection';
 import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
 
-export function SettingsPage() {
+function SettingsPageContent() {
   const { data, updateSettings, exportData, importData, importSections, importSleepSpreadsheet, resetData } = useApp();
+  const { isTopOpen, toggleTop, expandAll, collapseAll } = useSettingsAccordionContext();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
 
@@ -62,9 +62,15 @@ export function SettingsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Settings</h1>
-        <p className="text-sm opacity-70 mt-1">Customize your tracker preferences</p>
+      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Settings</h1>
+          <p className="text-sm opacity-70 mt-1">Customize your tracker preferences</p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button size="sm" variant="secondary" onClick={expandAll}>Expand All</Button>
+          <Button size="sm" variant="secondary" onClick={collapseAll}>Collapse All</Button>
+        </div>
       </div>
 
       {message && (
@@ -76,9 +82,13 @@ export function SettingsPage() {
         </div>
       )}
 
-      <div className="space-y-6">
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Appearance</h2>
+      <div className="space-y-3 md:space-y-4">
+        <SettingsAccordionSection
+          title="Appearance"
+          summary="Theme and display preferences"
+          open={isTopOpen('appearance')}
+          onToggle={() => toggleTop('appearance')}
+        >
           <Select
             label="Theme"
             value={data.settings.theme}
@@ -89,12 +99,16 @@ export function SettingsPage() {
               { value: 'dark', label: 'Dark' },
             ]}
           />
-        </Card>
+        </SettingsAccordionSection>
 
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Sleep & Awake</h2>
-          <div className="space-y-4 text-left">
-            <div className="grid sm:grid-cols-2 gap-4">
+        <SettingsAccordionSection
+          title="Sleep & Awake"
+          summary="Sleep goals, bedtime targets, and awake warnings"
+          open={isTopOpen('sleep_awake')}
+          onToggle={() => toggleTop('sleep_awake')}
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Sleep Goal (hours)"
                 type="number"
@@ -115,7 +129,7 @@ export function SettingsPage() {
               />
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Target Wake-up Time"
                 type="time"
@@ -133,7 +147,7 @@ export function SettingsPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className="flex items-start sm:items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={data.settings.autoCalculateBedtime}
@@ -144,11 +158,11 @@ export function SettingsPage() {
                         : { autoCalculateBedtime: false }
                     )
                   }
-                  className="rounded"
+                  className="rounded mt-0.5 sm:mt-0 shrink-0"
                 />
                 <span className="text-sm">Auto-calculate bedtime from wake-up goal and sleep goal</span>
               </label>
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className="flex items-start sm:items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={data.settings.autoCalculateWakeTime}
@@ -159,7 +173,7 @@ export function SettingsPage() {
                         : { autoCalculateWakeTime: false }
                     )
                   }
-                  className="rounded"
+                  className="rounded mt-0.5 sm:mt-0 shrink-0"
                 />
                 <span className="text-sm">Auto-calculate wake time from bedtime goal and sleep goal</span>
               </label>
@@ -210,38 +224,53 @@ export function SettingsPage() {
               )}
             </div>
           </div>
-        </Card>
+        </SettingsAccordionSection>
 
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Friend Picker</h2>
-          <p className="text-sm opacity-70 mb-4 text-left">
+        <SettingsAccordionSection
+          title="Friend Picker"
+          summary="Sort order when selecting friends for hangouts"
+          open={isTopOpen('friend_picker')}
+          onToggle={() => toggleTop('friend_picker')}
+        >
+          <p className="text-sm opacity-70 mb-4">
             Controls how friends are sorted when selecting them for hangouts and activity segments.
           </p>
-          <label className="flex items-center gap-3 cursor-pointer text-left">
+          <label className="flex items-start sm:items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={data.settings.friendPickerShowSelectedFirst}
               onChange={(e) => updateSettings({ friendPickerShowSelectedFirst: e.target.checked })}
-              className="rounded"
+              className="rounded mt-0.5 sm:mt-0 shrink-0"
             />
             <span className="text-sm">Show selected friends first</span>
           </label>
-        </Card>
+        </SettingsAccordionSection>
 
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Dashboard</h2>
-          <p className="text-sm opacity-70 mb-4 text-left">Choose which widgets appear on your dashboard and their order.</p>
+        <SettingsAccordionSection
+          title="Dashboard"
+          summary="Choose widgets and their order on your dashboard"
+          open={isTopOpen('dashboard')}
+          onToggle={() => toggleTop('dashboard')}
+        >
           <DashboardSettings onMessage={showMsg} />
-        </Card>
+        </SettingsAccordionSection>
 
-        <div>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Social Customization</h2>
+        <SettingsAccordionSection
+          title="Social Customization"
+          summary="Friend tags, groups, statuses, and hangout categories"
+          open={isTopOpen('social_customization')}
+          onToggle={() => toggleTop('social_customization')}
+        >
           <SocialCustomization />
-        </div>
+        </SettingsAccordionSection>
 
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Backup & Restore</h2>
-          <p className="text-sm opacity-70 mb-4 text-left">
+        <SettingsAccordionSection
+          title="Backup & Restore"
+          summary="Export, import, and backup history"
+          open={isTopOpen('backup_restore')}
+          onToggle={() => toggleTop('backup_restore')}
+        >
+          <p className="text-sm opacity-70 mb-4">
             Export your data as JSON for backup, or import a previous backup to restore.
             Supports full backups with <code className="text-xs">version</code>,{' '}
             <code className="text-xs">exportedAt</code>, and a <code className="text-xs">data</code> object.
@@ -263,44 +292,28 @@ export function SettingsPage() {
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           </div>
           <div className="mt-6">
-            <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Backup History</h3>
+            <h3 className="font-medium mb-3" style={{ color: 'var(--text-heading)' }}>Backup History</h3>
             <BackupRestorePanel onMessage={showMsg} />
           </div>
-        </Card>
+        </SettingsAccordionSection>
 
-        <Card>
-          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Data Management</h2>
-          <div className="text-left text-sm opacity-70 mb-4">
-            <p>Sleep entries (Sleep Log): {data.sleepEntries.length}</p>
-            <p>Nap entries (Sleep Log): {data.napEntries.length}</p>
-            <p>Friends: {data.friends.length}</p>
-            <p>Hangouts: {data.hangouts.length}</p>
-            <p>Ideas: {data.ideas.length}</p>
-          </div>
-          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Cleanup Tools</h3>
-          <CleanupTools onMessage={showMsg} />
-          <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-            <p className="text-sm opacity-70 mb-4 text-left">All data is stored locally in your browser. Clearing data cannot be undone.</p>
-            <Button variant="danger" onClick={() => setConfirmReset(true)}>Clear All Data</Button>
-          </div>
-        </Card>
+        <SettingsAccordionSection
+          title="Data Management"
+          summary="Cleanup tools, bulk edits, and clear all data"
+          open={isTopOpen('data_management')}
+          onToggle={() => toggleTop('data_management')}
+        >
+          <CleanupTools onMessage={showMsg} onResetData={resetData} />
+        </SettingsAccordionSection>
       </div>
-
-      <Modal
-        open={confirmReset}
-        onClose={() => setConfirmReset(false)}
-        title="Clear All Data?"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmReset(false)}>Cancel</Button>
-            <Button variant="danger" onClick={() => { resetData(); setConfirmReset(false); showMsg('All data cleared.'); }}>
-              Clear Everything
-            </Button>
-          </>
-        }
-      >
-        <p>This will permanently delete all sleep, nap, friend, hangout, and idea data.</p>
-      </Modal>
     </div>
+  );
+}
+
+export function SettingsPage() {
+  return (
+    <SettingsAccordionProvider>
+      <SettingsPageContent />
+    </SettingsAccordionProvider>
   );
 }

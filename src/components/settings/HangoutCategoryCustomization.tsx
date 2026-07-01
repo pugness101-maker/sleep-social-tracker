@@ -11,59 +11,58 @@ import {
 } from '../../lib/hangout-categories';
 import { getCategoryUsage, getCategoryTypeUsage } from '../../lib/social-customization-usage';
 
-export function HangoutCategoryCustomization() {
-  const {
-    data,
-    addHangoutCategory,
-    updateHangoutCategory,
-    deleteHangoutCategory,
-    addTypeToCategory,
-    updateTypeInCategory,
-    deleteTypeFromCategory,
-  } = useApp();
+export function HangoutCategoriesEditor() {
+  const { data, addHangoutCategory, updateHangoutCategory, deleteHangoutCategory } = useApp();
+  const usageData = { friends: data.friends, hangouts: data.hangouts, ideas: data.ideas };
 
+  return (
+    <CustomOptionListCard
+      bare
+      title="Hangout Categories"
+      description="Top-level hangout classification. Types belong to a category."
+      options={data.hangoutCategories}
+      usageCount={(name) => countHangoutsWithCategory(data.hangouts, name)}
+      getUsageLog={(category) => getCategoryUsage(usageData, category)}
+      defaultFallbackLabel={DEFAULT_HANGOUT_CATEGORY}
+      deleteMode="hangout"
+      deleteResolutionCopy={{
+        defaultOption: 'Move connected hangouts, segments, and ideas to Other',
+        otherOption: 'Choose another category',
+        clearOption: 'Clear category (move to Other)',
+      }}
+      onAdd={addHangoutCategory}
+      onEdit={updateHangoutCategory}
+      onDelete={(name, action, otherName) => {
+        if (action === 'default') deleteHangoutCategory(name, { action: 'default' });
+        else if (action === 'other' && otherName) deleteHangoutCategory(name, { action: 'other', name: otherName });
+        else if (action === 'clear') deleteHangoutCategory(name, { action: 'clear' });
+        else deleteHangoutCategory(name, { action: 'default' });
+      }}
+    />
+  );
+}
+
+export function HangoutTypesByCategoryEditor() {
+  const { data, addTypeToCategory, updateTypeInCategory, deleteTypeFromCategory } = useApp();
   const [selectedCategory, setSelectedCategory] = useState(data.hangoutCategories[0] ?? DEFAULT_HANGOUT_CATEGORY);
   const types = typesForCategory(data.hangoutTypesByCategory, selectedCategory);
   const usageData = { friends: data.friends, hangouts: data.hangouts, ideas: data.ideas };
 
   return (
-    <div className="space-y-4">
-      <CustomOptionListCard
-        title="Hangout Categories"
-        description="Top-level hangout classification. Types belong to a category."
-        options={data.hangoutCategories}
-        usageCount={(name) => countHangoutsWithCategory(data.hangouts, name)}
-        getUsageLog={(category) => getCategoryUsage(usageData, category)}
-        defaultFallbackLabel={DEFAULT_HANGOUT_CATEGORY}
-        deleteMode="hangout"
-        deleteResolutionCopy={{
-          defaultOption: 'Move connected hangouts, segments, and ideas to Other',
-          otherOption: 'Choose another category',
-          clearOption: 'Clear category (move to Other)',
-        }}
-        onAdd={addHangoutCategory}
-        onEdit={updateHangoutCategory}
-        onDelete={(name, action, otherName) => {
-          if (action === 'default') deleteHangoutCategory(name, { action: 'default' });
-          else if (action === 'other' && otherName) deleteHangoutCategory(name, { action: 'other', name: otherName });
-          else if (action === 'clear') deleteHangoutCategory(name, { action: 'clear' });
-          else deleteHangoutCategory(name, { action: 'default' });
-        }}
+    <div className="space-y-3">
+      <Select
+        label="Edit types for category"
+        value={selectedCategory}
+        onChange={(e) => setSelectedCategory(e.target.value)}
+        options={data.hangoutCategories.map((c) => ({ value: c, label: c }))}
       />
-
-      <div className="space-y-2">
-        <Select
-          label="Edit types for category"
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          options={data.hangoutCategories.map((c) => ({ value: c, label: c }))}
-        />
-        {isMixedHangoutCategory(selectedCategory) ? (
-          <p className="text-sm opacity-70 text-left">
-            Mixed is a special category with no types. Use Activity Segments on each hangout to break down activities by category and type.
-          </p>
-        ) : (
-          <CustomOptionListCard
+      {isMixedHangoutCategory(selectedCategory) ? (
+        <p className="text-sm opacity-70 text-left">
+          Mixed is a special category with no types. Use Activity Segments on each hangout to break down activities by category and type.
+        </p>
+      ) : (
+        <CustomOptionListCard
+          bare
           title={`Types in ${selectedCategory}`}
           description="Activity types within the selected category."
           options={types}
@@ -85,8 +84,17 @@ export function HangoutCategoryCustomization() {
             else deleteTypeFromCategory(selectedCategory, name, { action: 'default' });
           }}
         />
-        )}
-      </div>
+      )}
+    </div>
+  );
+}
+
+/** @deprecated Use HangoutCategoriesEditor and HangoutTypesByCategoryEditor in accordions */
+export function HangoutCategoryCustomization() {
+  return (
+    <div className="space-y-4">
+      <HangoutCategoriesEditor />
+      <HangoutTypesByCategoryEditor />
     </div>
   );
 }

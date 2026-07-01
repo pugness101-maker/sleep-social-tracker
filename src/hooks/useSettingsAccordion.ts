@@ -26,25 +26,30 @@ export function useSettingsAccordion() {
     [state.nested]
   );
 
-  const toggleTop = useCallback(
-    (id: TopSettingsSectionId) => {
-      persist({ ...state, top: { ...state.top, [id]: !state.top[id] } });
-    },
-    [persist, state]
-  );
+  const toggleTop = useCallback((id: TopSettingsSectionId) => {
+    setState((prev) => {
+      const next = { ...prev, top: { ...prev.top, [id]: !prev.top[id] } };
+      saveSettingsAccordion(next);
+      return next;
+    });
+  }, []);
 
   const toggleNested = useCallback(
     (group: NestedSettingsGroup, id: SocialNestedSectionId | DataManagementNestedSectionId) => {
-      const groupState = state.nested[group];
-      persist({
-        ...state,
-        nested: {
-          ...state.nested,
-          [group]: { ...groupState, [id]: !groupState[id as keyof typeof groupState] },
-        },
+      setState((prev) => {
+        const groupState = prev.nested[group];
+        const next = {
+          ...prev,
+          nested: {
+            ...prev.nested,
+            [group]: { ...groupState, [id]: !groupState[id as keyof typeof groupState] },
+          },
+        };
+        saveSettingsAccordion(next);
+        return next;
       });
     },
-    [persist, state]
+    []
   );
 
   const expandAll = useCallback(() => {

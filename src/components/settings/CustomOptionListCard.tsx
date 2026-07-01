@@ -22,6 +22,7 @@ interface CustomOptionListCardProps {
   defaultFallbackLabel?: string;
   deleteMode?: 'hangout' | 'tag';
   deleteResolutionCopy?: DeleteResolutionCopy;
+  bare?: boolean;
   onAdd: (name: string) => string | null;
   onEdit: (oldName: string, newName: string) => string | null;
   onDelete: (name: string, resolution: string, otherName?: string) => void;
@@ -40,6 +41,7 @@ export function CustomOptionListCard({
   onEdit,
   onDelete,
   getUsageLog,
+  bare = false,
 }: CustomOptionListCardProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
@@ -120,14 +122,17 @@ export function CustomOptionListCard({
   const tagRemoveLabel = deleteResolutionCopy?.tagRemove ?? 'Remove from friends';
   const tagReplaceLabel = deleteResolutionCopy?.tagReplace ?? 'Replace with another';
 
-  return (
-    <Card>
+  const body = (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div className="text-left">
-          <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{title}</h3>
-          <p className="text-sm opacity-70 mt-1">{description}</p>
-        </div>
-        <Button size="sm" onClick={openAdd}>Add</Button>
+        {!bare && (
+          <div className="text-left flex-1 min-w-0">
+            <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{title}</h3>
+            <p className="text-sm opacity-70 mt-1">{description}</p>
+          </div>
+        )}
+        {bare && <p className="text-sm opacity-70 text-left flex-1">{description}</p>}
+        <Button size="sm" onClick={openAdd} className="shrink-0">Add</Button>
       </div>
 
       {options.length === 0 ? (
@@ -281,6 +286,12 @@ export function CustomOptionListCard({
 
         {error && <p className="text-sm text-danger mt-3 text-left">{error}</p>}
       </Modal>
-    </Card>
+    </>
   );
+
+  if (bare) {
+    return <div className="text-left">{body}</div>;
+  }
+
+  return <Card>{body}</Card>;
 }

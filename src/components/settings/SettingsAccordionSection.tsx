@@ -9,6 +9,25 @@ interface SettingsAccordionSectionProps {
   nested?: boolean;
 }
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`shrink-0 mt-0.5 sm:mt-0 w-4 h-4 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M6 4l4 4-4 4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SettingsAccordionSection({
   title,
   summary,
@@ -26,19 +45,15 @@ export function SettingsAccordionSection({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className={`w-full flex items-start sm:items-center gap-3 text-left transition-colors hover:opacity-90 ${
+        className={`w-full flex items-start sm:items-center gap-3 text-left transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${
           nested ? 'px-3 py-3' : 'px-4 py-4 md:px-5 md:py-4'
         }`}
+        style={{ outlineColor: 'var(--social)' }}
       >
-        <span
-          className={`shrink-0 mt-0.5 sm:mt-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
-          aria-hidden
-        >
-          ›
-        </span>
+        <ChevronIcon open={open} />
         <span className="flex-1 min-w-0">
           <span
-            className={`block font-semibold ${nested ? 'text-sm' : 'text-base'}`}
+            className={`block font-semibold ${nested ? 'text-sm' : 'text-base md:text-lg'}`}
             style={{ color: 'var(--text-heading)' }}
           >
             {title}
