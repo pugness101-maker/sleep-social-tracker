@@ -5,15 +5,18 @@ import {
   getActiveTypeOptions,
   getDefaultTypeForCategory,
   isMixedHangoutCategory,
-  MIXED_HANGOUT_MAIN_TYPE,
+  isMixedHangoutMainType,
+  resolveHangoutMainFields,
 } from '../../lib/hangout-categories';
 import { optionSelectOptions } from '../../lib/social-options';
 
 interface HangoutCategoryTypeSelectProps {
   category: string;
   type: string;
-  onCategoryChange: (category: string) => void;
-  onTypeChange: (type: string) => void;
+  onCategoryChange?: (category: string) => void;
+  onTypeChange?: (type: string) => void;
+  /** Main hangout mode — single atomic update (avoids stale form state). */
+  onMainFieldsChange?: (category: string, type: string) => void;
   categoryLabel?: string;
   typeLabel?: string;
   /** Main hangout: Mixed category hides type. Segments: exclude Mixed from categories. */
@@ -25,6 +28,7 @@ export function HangoutCategoryTypeSelect({
   type,
   onCategoryChange,
   onTypeChange,
+  onMainFieldsChange,
   categoryLabel = 'Category',
   typeLabel = 'Type',
   mode = 'main',
@@ -48,16 +52,34 @@ export function HangoutCategoryTypeSelect({
 
   const isMixedMain = mode === 'main' && isMixedHangoutCategory(category);
 
-  const handleCategoryChange = (nextCategory: string) => {
-    onCategoryChange(nextCategory);
-    if (isMixedHangoutCategory(nextCategory)) {
-      onTypeChange(MIXED_HANGOUT_MAIN_TYPE);
+  const applyMainFields = (nextCategory: string, nextType: string) => {
+    const resolved = resolveHangoutMainFields(nextCategory, nextType, catalog, allCategories);
+    if (onMainFieldsChange) {
+      onMainFieldsChange(resolved.category, resolved.type);
       return;
     }
-    const types = getActiveTypeOptions(catalog, allCategories, nextCategory);
-    if (!types.includes(type)) {
-      onTypeChange(getDefaultTypeForCategory(catalog, nextCategory));
+    onCategoryChange?.(resolved.category);
+    onTypeChange?.(resolved.type);
+  };
+
+  const handleCategoryChange = (nextCategory: string) => {
+    if (mode === 'main') {
+      applyMainFields(nextCategory, type);
+      return;
     }
+    onCategoryChange?.(nextCategory);
+    const types = getActiveTypeOptions(catalog, allCategories, nextCategory);
+    if (!types.includes(type) || isMixedHangoutMainType(type)) {
+      onTypeChange?.(getDefaultTypeForCategory(catalog, nextCategory));
+    }
+  };
+
+  const handleTypeChange = (nextType: string) => {
+    if (mode === 'main') {
+      applyMainFields(category, nextType);
+      return;
+    }
+    onTypeChange?.(nextType);
   };
 
   return (
@@ -68,18 +90,11 @@ export function HangoutCategoryTypeSelect({
         onChange={(e) => handleCategoryChange(e.target.value)}
         options={categoryOptions}
       />
-      {isMixedMain ? (
-        <div className="text-left">
-          <p className="text-sm font-medium mb-1">{typeLabel}</p>
-          <p className="text-sm opacity-70 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
-            Mixed — add Activity Segments for each activity type
-          </p>
-        </div>
-      ) : (
+      {!isMixedMain && (
         <Select
           label={typeLabel}
           value={type}
-          onChange={(e) => onTypeChange(e.target.value)}
+          onChange={(e) => handleTypeChange(e.target.value)}
           options={optionSelectOptions(typeOptions, type)}
         />
       )}

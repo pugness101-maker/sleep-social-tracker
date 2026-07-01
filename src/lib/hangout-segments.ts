@@ -221,7 +221,9 @@ export function getHangoutTableCategory(hangout: Hangout): string {
 }
 
 export function getHangoutTableType(hangout: Hangout): string {
-  if (isMixedHangoutCategory(hangout.category)) return 'Segments';
+  if (isMixedHangoutCategory(hangout.category)) {
+    return hangout.segments?.length ? 'Segments' : 'Mixed';
+  }
   return hangout.type?.trim() || '—';
 }
 

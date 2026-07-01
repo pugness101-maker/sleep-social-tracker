@@ -66,6 +66,10 @@ export function isMixedHangoutCategory(category?: string): boolean {
   return category?.trim().toLowerCase() === MIXED_HANGOUT_CATEGORY.toLowerCase();
 }
 
+export function isMixedHangoutMainType(type?: string): boolean {
+  return type?.trim().toLowerCase() === MIXED_HANGOUT_MAIN_TYPE.toLowerCase();
+}
+
 export function normalizeHangoutMainFields(
   category: string,
   type: string
@@ -74,6 +78,40 @@ export function normalizeHangoutMainFields(
     return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
   }
   return { category, type };
+}
+
+/**
+ * Resolve category/type for hangout forms — handles Mixed and invalid/leaving-Mixed types.
+ */
+export function resolveHangoutMainFields(
+  category: string,
+  type: string,
+  catalog: Record<string, string[]>,
+  settingsCategories: string[]
+): { category: string; type: string } {
+  if (isMixedHangoutCategory(category)) {
+    return { category: MIXED_HANGOUT_CATEGORY, type: MIXED_HANGOUT_MAIN_TYPE };
+  }
+  const activeTypes = getActiveTypeOptions(catalog, settingsCategories, category);
+  if (
+    !type.trim() ||
+    isMixedHangoutMainType(type) ||
+    !activeTypes.some((t) => t.toLowerCase() === type.toLowerCase())
+  ) {
+    return { category, type: getDefaultTypeForCategory(catalog, category) };
+  }
+  const match = activeTypes.find((t) => t.toLowerCase() === type.toLowerCase()) ?? type;
+  return { category, type: match };
+}
+
+/** Normalize stored hangout fields when opening Add/Edit form. */
+export function hangoutMainFieldsForForm(
+  hangout: { category?: string; type?: string },
+  catalog: Record<string, string[]>,
+  settingsCategories: string[]
+): { category: string; type: string } {
+  const inferred = inferCategoryAndType(hangout.type ?? '', hangout.category, catalog);
+  return resolveHangoutMainFields(inferred.category, inferred.type, catalog, settingsCategories);
 }
 
 /** Types selectable in dropdowns — Mixed is a category-only label, not a type option. */

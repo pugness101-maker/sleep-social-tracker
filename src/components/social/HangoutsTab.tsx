@@ -9,7 +9,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout, HangoutSegment } from '../../types';
-import { getDefaultHangoutCategoryPair, isMixedHangoutCategory, normalizeHangoutMainFields } from '../../lib/hangout-categories';
+import { getDefaultHangoutCategoryPair, hangoutMainFieldsForForm, isMixedHangoutCategory } from '../../lib/hangout-categories';
 import { filterHangoutsForTab } from '../../lib/hangout-filters';
 import {
   formatHangoutSegmentTablePreviews,
@@ -38,8 +38,11 @@ export function HangoutsTab() {
     hangoutTypesByCategory: data.hangoutTypesByCategory ?? {},
   });
 
+  const catalog = data.hangoutTypesByCategory ?? {};
+  const settingsCategories = data.hangoutCategories ?? [];
+
   const makeEmptyForm = () => {
-    const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
+    const { category, type } = getDefaultHangoutCategoryPair(catalog);
     return {
       friendIds: [] as string[],
       startTime: toLocalISO(),
@@ -52,10 +55,18 @@ export function HangoutsTab() {
     };
   };
 
+  const applyFormMainFields = (category: string, type: string) => {
+    setForm((prev) => ({ ...prev, category, type }));
+  };
+
+  const applyStartFormMainFields = (category: string, type: string) => {
+    setStartForm((prev) => ({ ...prev, category, type }));
+  };
+
   const [form, setForm] = useState(makeEmptyForm);
 
   const [startForm, setStartForm] = useState(() => {
-    const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
+    const { category, type } = getDefaultHangoutCategoryPair(catalog);
     return { friendIds: [] as string[], category, type, location: '' };
   });
 
@@ -96,13 +107,14 @@ export function HangoutsTab() {
 
   const openEdit = (h: Hangout) => {
     setEditHangout(h);
+    const main = hangoutMainFieldsForForm(h, catalog, settingsCategories);
     setForm({
       friendIds: h.friendIds,
       startTime: h.startTime,
       endTime: h.endTime,
       location: h.location,
-      category: h.category,
-      type: h.type,
+      category: main.category,
+      type: main.type,
       notes: h.notes,
       segments: h.segments ?? [],
     });
@@ -234,11 +246,7 @@ export function HangoutsTab() {
           <HangoutCategoryTypeSelect
             category={startForm.category}
             type={startForm.type}
-            onCategoryChange={(category) => {
-              const main = normalizeHangoutMainFields(category, startForm.type);
-              setStartForm({ ...startForm, category: main.category, type: main.type });
-            }}
-            onTypeChange={(type) => setStartForm({ ...startForm, type })}
+            onMainFieldsChange={applyStartFormMainFields}
           />
           <LocationAutocomplete
             label="Location"
@@ -262,11 +270,7 @@ export function HangoutsTab() {
             <HangoutCategoryTypeSelect
               category={form.category}
               type={form.type}
-              onCategoryChange={(category) => {
-                const main = normalizeHangoutMainFields(category, form.type);
-                setForm({ ...form, category: main.category, type: main.type });
-              }}
-              onTypeChange={(type) => setForm({ ...form, type })}
+              onMainFieldsChange={applyFormMainFields}
             />
             <LocationAutocomplete
               label="Location"

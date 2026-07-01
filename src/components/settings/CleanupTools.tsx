@@ -209,12 +209,14 @@ export function CleanupTools({ onMessage, onResetData }: CleanupToolsProps) {
               <option key={h.id} value={h.id}>{h.startTime.slice(0, 16)} · {h.category} · {h.type}</option>
             ))}
           </select>
-          <HangoutCategoryTypeSelect
-            category={bulkCategory}
-            type={bulkType}
-            onCategoryChange={setBulkCategory}
-            onTypeChange={setBulkType}
-          />
+        <HangoutCategoryTypeSelect
+          category={bulkCategory}
+          type={bulkType}
+          onMainFieldsChange={(category, type) => {
+            setBulkCategory(category);
+            setBulkType(type);
+          }}
+        />
           <Button size="sm" disabled={bulkHangoutIds.length === 0} onClick={() => {
             runCleanupBulkCategoryType(bulkHangoutIds, bulkCategory, bulkType);
             onMessage(`Updated category/type on ${bulkHangoutIds.length} hangout(s).`);

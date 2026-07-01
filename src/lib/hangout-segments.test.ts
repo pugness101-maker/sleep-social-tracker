@@ -8,6 +8,7 @@ import {
   getActivityCountByType,
   getActivityTimeByType,
   getHangoutDisplayType,
+  getHangoutTableType,
   getSegmentEffectiveDurationMinutes,
   normalizeHangoutSegments,
   parseDurationInput,
@@ -114,6 +115,24 @@ describe('Mixed category hangouts', () => {
           segments: [segment({ id: '1', type: 'Food', category: 'Food' })],
         })
       )
+    ).toBe('Mixed');
+  });
+
+  it('table type shows Segments when mixed hangout has segments', () => {
+    expect(
+      getHangoutTableType(
+        hangout({
+          category: MIXED_HANGOUT_CATEGORY,
+          type: 'Mixed',
+          segments: [segment({ id: '1', type: 'Food', category: 'Food' })],
+        })
+      )
+    ).toBe('Segments');
+  });
+
+  it('table type shows Mixed when no segments', () => {
+    expect(
+      getHangoutTableType(hangout({ category: MIXED_HANGOUT_CATEGORY, type: 'Mixed', segments: [] }))
     ).toBe('Mixed');
   });
 
