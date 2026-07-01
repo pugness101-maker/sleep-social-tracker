@@ -26,6 +26,7 @@ import {
   migrateHangoutsOccasions,
   normalizeOccasion,
 } from './hangout-occasions';
+import { normalizeIdeaPlannedFields } from './idea-planned-time';
 import {
   DEFAULT_HANGOUT_CATEGORIES,
   DEFAULT_FRIEND_TAGS,
@@ -244,11 +245,15 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
     const occasion = idea.occasion?.trim()
       ? normalizeOccasion(idea.occasion)
       : undefined;
+    const { plannedDate, plannedStartTime, plannedEndTime } = normalizeIdeaPlannedFields(idea);
     return {
       ...rest,
       type,
       estimatedDurationMinutes,
       occasion,
+      plannedDate,
+      plannedStartTime,
+      plannedEndTime,
     } as HangoutIdea;
   });
 }

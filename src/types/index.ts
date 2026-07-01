@@ -200,6 +200,12 @@ export interface HangoutIdea {
   estimatedCost: CostLevel;
   /** Minutes; null when not specified. */
   estimatedDurationMinutes: number | null;
+  /** yyyy-MM-dd */
+  plannedDate?: string;
+  /** HH:mm (24h) */
+  plannedStartTime?: string;
+  /** HH:mm (24h) */
+  plannedEndTime?: string;
   location: string;
   /** Legacy field — preserved in storage but not shown in UI. */
   priority?: number;

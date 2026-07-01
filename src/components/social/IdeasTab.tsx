@@ -9,6 +9,16 @@ import { formatDuration, toLocalISO } from '../../lib/dates';
 import { getActiveTypeOptions, getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
 import { filterFriendsForPickerPool } from '../../lib/friend-archive';
 import { DEFAULT_HANGOUT_OCCASION } from '../../types';
+import {
+  calcPlannedDurationMinutes,
+  compareIdeasByPlannedDate,
+  formatPlannedDateLabel,
+  formatPlannedTimeRange,
+  matchesIdeaScheduleFilter,
+  plannedTimesToHangoutRange,
+  type IdeaScheduleFilter,
+  type IdeaSortOption,
+} from '../../lib/idea-planned-time';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
@@ -35,11 +45,29 @@ interface IdeaFormState {
   occasion: string;
   estimatedCost: CostLevel;
   durationInput: string;
+  durationManuallySet: boolean;
+  plannedDate: string;
+  plannedStartTime: string;
+  plannedEndTime: string;
   location: string;
   status: IdeaStatus;
   friendIds: string[];
   notes: string;
   links: string;
+}
+
+function applyPlannedTimeDuration(prev: IdeaFormState, patch: Partial<IdeaFormState>): IdeaFormState {
+  const merged = { ...prev, ...patch };
+  if (merged.durationManuallySet) return merged;
+  const mins = calcPlannedDurationMinutes(
+    merged.plannedDate,
+    merged.plannedStartTime,
+    merged.plannedEndTime
+  );
+  if (mins != null) {
+    return { ...merged, durationInput: String(mins) };
+  }
+  return merged;
 }
 
 export function IdeasTab() {
@@ -54,6 +82,10 @@ export function IdeasTab() {
       occasion: '',
       estimatedCost: 'Free',
       durationInput: '',
+      durationManuallySet: false,
+      plannedDate: '',
+      plannedStartTime: '',
+      plannedEndTime: '',
       location: '',
       status: 'Want to Try',
       friendIds: [],
@@ -66,6 +98,8 @@ export function IdeasTab() {
   const [filterType, setFilterType] = useState('');
   const [filterCost, setFilterCost] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [scheduleFilter, setScheduleFilter] = useState<IdeaScheduleFilter>('');
+  const [sortBy, setSortBy] = useState<IdeaSortOption>('newest');
   const [modalOpen, setModalOpen] = useState(false);
   const [convertModal, setConvertModal] = useState<HangoutIdea | null>(null);
   const [editIdea, setEditIdea] = useState<HangoutIdea | null>(null);
@@ -117,12 +151,14 @@ export function IdeasTab() {
     if (filterType) list = list.filter((i) => i.type === filterType);
     if (filterCost) list = list.filter((i) => i.estimatedCost === filterCost);
     if (filterStatus) list = list.filter((i) => i.status === filterStatus);
+    if (scheduleFilter) list = list.filter((i) => matchesIdeaScheduleFilter(i, scheduleFilter));
     list.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      if (sortBy === 'planned_date') return compareIdeasByPlannedDate(a, b);
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     return list;
-  }, [data.ideas, search, filterType, filterCost, filterStatus]);
+  }, [data.ideas, search, filterType, filterCost, filterStatus, scheduleFilter, sortBy]);
 
   const pickRandom = () => {
     const pool = ideas.filter((i) => i.status !== 'Archived' && i.status !== 'Completed');
@@ -150,6 +186,10 @@ export function IdeasTab() {
       estimatedCost: idea.estimatedCost,
       durationInput:
         idea.estimatedDurationMinutes != null ? String(idea.estimatedDurationMinutes) : '',
+      durationManuallySet: idea.estimatedDurationMinutes != null,
+      plannedDate: idea.plannedDate ?? '',
+      plannedStartTime: idea.plannedStartTime ?? '',
+      plannedEndTime: idea.plannedEndTime ?? '',
       location: idea.location,
       status: idea.status,
       friendIds: idea.friendIds,
@@ -161,6 +201,15 @@ export function IdeasTab() {
 
   const openConvert = (idea: HangoutIdea) => {
     setConvertModal(idea);
+    const planned = plannedTimesToHangoutRange(idea);
+    if (planned) {
+      setConvertForm({
+        friendIds: [...idea.friendIds],
+        startTime: planned.startTime,
+        endTime: planned.endTime,
+      });
+      return;
+    }
     const start = toLocalISO();
     let end = start;
     if (idea.estimatedDurationMinutes != null && idea.estimatedDurationMinutes > 0) {
@@ -176,13 +225,25 @@ export function IdeasTab() {
   };
 
   const handleSave = () => {
+    const plannedDate = form.plannedDate.trim() || undefined;
+    const plannedStartTime = plannedDate && form.plannedStartTime.trim() ? form.plannedStartTime.trim() : undefined;
+    const plannedEndTime = plannedDate && form.plannedEndTime.trim() ? form.plannedEndTime.trim() : undefined;
+
+    let estimatedDurationMinutes = parseDurationInput(form.durationInput);
+    if (!form.durationManuallySet && plannedStartTime && plannedEndTime) {
+      estimatedDurationMinutes = calcPlannedDurationMinutes(plannedDate, plannedStartTime, plannedEndTime);
+    }
+
     const payload = {
       title: form.title,
       category: form.category,
       type: form.type,
       occasion: form.occasion.trim() || undefined,
       estimatedCost: form.estimatedCost,
-      estimatedDurationMinutes: parseDurationInput(form.durationInput),
+      estimatedDurationMinutes,
+      plannedDate,
+      plannedStartTime,
+      plannedEndTime,
       location: form.location,
       status: form.status,
       friendIds: form.friendIds,
@@ -229,6 +290,25 @@ export function IdeasTab() {
           onChange={(e) => setFilterStatus(e.target.value)}
           options={[{ value: '', label: 'All Statuses' }, ...statuses.map((s) => ({ value: s, label: s }))]}
         />
+        <Select
+          value={scheduleFilter}
+          onChange={(e) => setScheduleFilter(e.target.value as IdeaScheduleFilter)}
+          options={[
+            { value: '', label: 'All Ideas' },
+            { value: 'unscheduled', label: 'Unscheduled' },
+            { value: 'scheduled', label: 'Scheduled' },
+            { value: 'this_week', label: 'This Week' },
+            { value: 'this_month', label: 'This Month' },
+          ]}
+        />
+        <Select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as IdeaSortOption)}
+          options={[
+            { value: 'newest', label: 'Sort: Newest' },
+            { value: 'planned_date', label: 'Sort: Planned Date' },
+          ]}
+        />
       </div>
 
       {ideas.length === 0 ? (
@@ -242,6 +322,8 @@ export function IdeasTab() {
           {ideas.map((idea) => {
             const durationLabel = formatIdeaDuration(idea.estimatedDurationMinutes);
             const interested = friendNames(idea.friendIds);
+            const plannedDateLabel = formatPlannedDateLabel(idea.plannedDate);
+            const plannedTimeLabel = formatPlannedTimeRange(idea);
             return (
               <Card key={idea.id}>
                 <div className="text-left space-y-2">
@@ -255,6 +337,8 @@ export function IdeasTab() {
                   {idea.occasion && idea.occasion !== DEFAULT_HANGOUT_OCCASION && (
                     <IdeaField label="Occasion" value={idea.occasion} />
                   )}
+                  {plannedDateLabel && <IdeaField label="Planned" value={plannedDateLabel} />}
+                  {plannedTimeLabel && <IdeaField label="Time" value={plannedTimeLabel} />}
                   <IdeaField label="Category" value={idea.category} />
                   <IdeaField label="Type" value={idea.type || '—'} />
                   <IdeaField label="Estimated Cost" value={idea.estimatedCost} />
@@ -339,7 +423,44 @@ export function IdeasTab() {
             min={1}
             placeholder="Leave blank if unknown"
             value={form.durationInput}
-            onChange={(e) => setForm({ ...form, durationInput: e.target.value })}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                durationInput: e.target.value,
+                durationManuallySet: e.target.value.trim() !== '',
+              })
+            }
+          />
+          <Input
+            label="Planned Date (optional)"
+            type="date"
+            value={form.plannedDate}
+            onChange={(e) =>
+              setForm((prev) =>
+                applyPlannedTimeDuration(prev, {
+                  plannedDate: e.target.value,
+                  ...(e.target.value ? {} : { plannedStartTime: '', plannedEndTime: '' }),
+                })
+              )
+            }
+          />
+          <Input
+            label="Planned Start Time (optional)"
+            type="time"
+            value={form.plannedStartTime}
+            disabled={!form.plannedDate}
+            onChange={(e) =>
+              setForm((prev) => applyPlannedTimeDuration(prev, { plannedStartTime: e.target.value }))
+            }
+          />
+          <Input
+            label="Planned End Time (optional)"
+            type="time"
+            value={form.plannedEndTime}
+            disabled={!form.plannedDate}
+            onChange={(e) =>
+              setForm((prev) => applyPlannedTimeDuration(prev, { plannedEndTime: e.target.value }))
+            }
           />
           <LocationAutocomplete
             label="Location"
