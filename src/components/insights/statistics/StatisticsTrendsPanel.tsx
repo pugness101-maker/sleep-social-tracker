@@ -1,10 +1,32 @@
 import type { StatisticsBundle } from '../../../lib/statistics-analytics';
+import { TRENDS_METRICS } from '../../../lib/statistics-compare';
+import { CompareStatGrid, type StatisticsCompareProps } from './CompareStatGrid';
 import { BarChart } from './SimpleCharts';
 import { Card } from '../../ui/Card';
 
-export function StatisticsTrendsPanel({ stats }: { stats: StatisticsBundle }) {
+export function StatisticsTrendsPanel({
+  stats,
+  compare,
+}: {
+  stats: StatisticsBundle;
+  compare?: StatisticsCompareProps | null;
+}) {
   const t = stats.trends;
   const categoryKeys = Object.keys(t.categoryTrend);
+  const inCompare = Boolean(compare);
+
+  if (inCompare && compare) {
+    return (
+      <CompareStatGrid
+        metrics={TRENDS_METRICS}
+        statsA={compare.statsA}
+        statsB={compare.statsB}
+        labelA={compare.labelA}
+        labelB={compare.labelB}
+        columns={2}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

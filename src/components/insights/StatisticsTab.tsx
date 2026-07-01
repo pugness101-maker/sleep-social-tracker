@@ -3,10 +3,12 @@ import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { buildStatisticsBundle } from '../../lib/statistics-analytics';
-import { useStatsDateRange, statsRangeArgs } from '../../hooks/useStatsDateRange';
+import { resolveComparePresetRanges } from '../../lib/stats-compare-mode';
+import { statsRangeArgs } from '../../hooks/useStatsDateRange';
+import { useStatsCompareMode } from '../../hooks/useStatsCompareMode';
 import { useInsightsFilters } from '../../hooks/useInsightsFilters';
 import { useStatisticsAccordion } from '../../hooks/useStatisticsAccordion';
-import { StatsDateRangeFilter } from './StatsDateRangeFilter';
+import { StatisticsCompareFilter } from './StatisticsCompareFilter';
 import { InsightsFilterBar, useFilteredAppData } from './InsightsFilterBar';
 import { StatisticsCollapsibleSection } from './statistics/StatisticsCollapsibleSection';
 import { StatisticsOverviewPanel } from './statistics/StatisticsOverviewPanel';
@@ -18,25 +20,90 @@ import { StatisticsTrendsPanel } from './statistics/StatisticsTrendsPanel';
 export function StatisticsTab() {
   const { data } = useApp();
   const accordion = useStatisticsAccordion();
-  const { range, resolved, setPreset, setCustomDates, clearFilter } = useStatsDateRange();
+  const compareMode = useStatsCompareMode();
   const { filters, setFilter, clearFilters, removeChip } = useInsightsFilters();
-  const { start, end } = statsRangeArgs(resolved);
 
-  const filteredData = useFilteredAppData(data, filters, start, end);
+  const compareResolved = useMemo(() => {
+    if (!compareMode.compareEnabled) return null;
+    return resolveComparePresetRanges(
+      compareMode.compareSettings.comparePreset,
+      compareMode.compareSettings.rangeA,
+      compareMode.compareSettings.rangeB
+    );
+  }, [
+    compareMode.compareEnabled,
+    compareMode.compareSettings.comparePreset,
+    compareMode.compareSettings.rangeA,
+    compareMode.compareSettings.rangeB,
+  ]);
+
+  const boundsA = compareMode.compareEnabled && compareResolved
+    ? statsRangeArgs(compareResolved.a)
+    : compareMode.singleBounds;
+  const boundsB = compareMode.compareEnabled && compareResolved
+    ? statsRangeArgs(compareResolved.b)
+    : { start: undefined, end: undefined };
+
+  const filteredDataA = useMemo(
+    () => useFilteredAppData(data, filters, boundsA.start, boundsA.end),
+    [data, filters, boundsA.start, boundsA.end]
+  );
+
+  const filteredDataB = useMemo(
+    () =>
+      compareMode.compareEnabled
+        ? useFilteredAppData(data, filters, boundsB.start, boundsB.end)
+        : null,
+    [data, filters, compareMode.compareEnabled, boundsB.start, boundsB.end]
+  );
 
   const stats = useMemo(
-    () => buildStatisticsBundle(filteredData, start, end),
-    [filteredData, start, end]
+    () => buildStatisticsBundle(filteredDataA, boundsA.start, boundsA.end),
+    [filteredDataA, boundsA.start, boundsA.end]
   );
+
+  const statsB = useMemo(
+    () =>
+      filteredDataB
+        ? buildStatisticsBundle(filteredDataB, boundsB.start, boundsB.end)
+        : null,
+    [filteredDataB, boundsB.start, boundsB.end]
+  );
+
+  const compare = useMemo(() => {
+    if (!compareMode.compareEnabled || !statsB || !compareMode.compareContext) return null;
+    return {
+      statsA: stats,
+      statsB,
+      labelA: compareMode.compareContext.labelA,
+      labelB: compareMode.compareContext.labelB,
+    };
+  }, [compareMode.compareEnabled, compareMode.compareContext, stats, statsB]);
+
+  const rangeLabel = compareMode.compareEnabled
+    ? undefined
+    : compareMode.singleResolved.isFiltered
+      ? compareMode.singleResolved.label
+      : undefined;
 
   return (
     <div className="space-y-4">
-      <StatsDateRangeFilter
-        range={range}
-        label={resolved.label}
-        onPreset={setPreset}
-        onCustomDates={setCustomDates}
-        onClear={clearFilter}
+      <StatisticsCompareFilter
+        mode={compareMode.compareSettings.mode}
+        onModeChange={compareMode.setMode}
+        comparePreset={compareMode.compareSettings.comparePreset}
+        onComparePreset={compareMode.setComparePreset}
+        rangeA={compareMode.compareSettings.rangeA}
+        rangeB={compareMode.compareSettings.rangeB}
+        onRangeACustom={compareMode.setRangeACustom}
+        onRangeBCustom={compareMode.setRangeBCustom}
+        singleRange={compareMode.singleRange}
+        singleLabel={compareMode.singleResolved.label}
+        onSinglePreset={compareMode.setSinglePreset}
+        onSingleCustom={compareMode.setSingleCustom}
+        onSingleClear={compareMode.clearSingle}
+        labelA={compareResolved?.a.label}
+        labelB={compareResolved?.b.label}
       />
 
       <Card>
@@ -60,7 +127,7 @@ export function StatisticsTab() {
           open={accordion.isTopOpen('overview')}
           onToggle={() => accordion.toggleTop('overview')}
         >
-          <StatisticsOverviewPanel stats={stats} />
+          <StatisticsOverviewPanel stats={stats} compare={compare} />
         </StatisticsCollapsibleSection>
 
         <StatisticsCollapsibleSection
@@ -71,11 +138,12 @@ export function StatisticsTab() {
         >
           <StatisticsSleepPanel
             stats={stats}
-            data={filteredData}
-            rangeStart={start}
-            rangeEnd={end}
-            rangeLabel={resolved.isFiltered ? resolved.label : undefined}
+            data={filteredDataA}
+            rangeStart={boundsA.start}
+            rangeEnd={boundsA.end}
+            rangeLabel={rangeLabel}
             accordion={accordion}
+            compare={compare}
           />
         </StatisticsCollapsibleSection>
 
@@ -85,7 +153,7 @@ export function StatisticsTab() {
           open={accordion.isTopOpen('social')}
           onToggle={() => accordion.toggleTop('social')}
         >
-          <StatisticsSocialPanel stats={stats} accordion={accordion} />
+          <StatisticsSocialPanel stats={stats} accordion={accordion} compare={compare} />
         </StatisticsCollapsibleSection>
 
         <StatisticsCollapsibleSection
@@ -94,7 +162,7 @@ export function StatisticsTab() {
           open={accordion.isTopOpen('combined')}
           onToggle={() => accordion.toggleTop('combined')}
         >
-          <StatisticsCombinedPanel stats={stats} />
+          <StatisticsCombinedPanel stats={stats} compare={compare} />
         </StatisticsCollapsibleSection>
 
         <StatisticsCollapsibleSection
@@ -103,7 +171,7 @@ export function StatisticsTab() {
           open={accordion.isTopOpen('trends')}
           onToggle={() => accordion.toggleTop('trends')}
         >
-          <StatisticsTrendsPanel stats={stats} />
+          <StatisticsTrendsPanel stats={stats} compare={compare} />
         </StatisticsCollapsibleSection>
       </div>
     </div>

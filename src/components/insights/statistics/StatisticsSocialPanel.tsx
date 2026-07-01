@@ -1,7 +1,20 @@
-import { formatDuration } from '../../../lib/dates';
 import type { StatisticsBundle } from '../../../lib/statistics-analytics';
+import {
+  mergeBreakdownCompare,
+  mergeFriendRankingCompare,
+  SOCIAL_CHART_METRICS,
+  SOCIAL_FRIENDS_METRICS,
+  SOCIAL_HANGOUT_METRICS,
+  SOCIAL_LOCATION_METRICS,
+  SOCIAL_PEOPLE_METRICS,
+} from '../../../lib/statistics-compare';
 import { StatisticsCollapsibleSection } from './StatisticsCollapsibleSection';
-import { StatGrid } from './StatGrid';
+import {
+  AdaptiveMetrics,
+  CompareBreakdownTable,
+  CompareStatGrid,
+  type StatisticsCompareProps,
+} from './CompareStatGrid';
 import { BarChart, HorizontalBarList, RankingList } from './SimpleCharts';
 import type { useStatisticsAccordion } from '../../../hooks/useStatisticsAccordion';
 
@@ -10,15 +23,16 @@ type Accordion = ReturnType<typeof useStatisticsAccordion>;
 export function StatisticsSocialPanel({
   stats,
   accordion,
+  compare,
 }: {
   stats: StatisticsBundle;
   accordion: Accordion;
+  compare?: StatisticsCompareProps | null;
 }) {
-  const f = stats.social.friends;
-  const h = stats.social.hangouts;
   const a = stats.social.activities;
   const p = stats.social.people;
   const l = stats.social.locations;
+  const inCompare = Boolean(compare);
 
   return (
     <div className="space-y-3">
@@ -29,17 +43,7 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('friends')}
         nested
       >
-        <StatGrid
-          columns={3}
-          items={[
-            { label: 'Total Friends', value: String(f.total), accent: 'social' },
-            { label: 'Active Friends', value: String(f.active), accent: 'social' },
-            { label: 'Archived Friends', value: String(f.archived), accent: 'social' },
-            { label: 'New Friends', value: String(f.newInRange), accent: 'social' },
-            { label: 'Friends Seen This Month', value: String(f.seenThisMonth), accent: 'social' },
-            { label: 'Friends Not Seen Recently', value: String(f.notSeenRecently), sub: '30+ days', accent: 'social' },
-          ]}
-        />
+        <AdaptiveMetrics metrics={SOCIAL_FRIENDS_METRICS} stats={stats} compare={compare ?? null} columns={3} />
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection
@@ -49,17 +53,7 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('hangouts')}
         nested
       >
-        <StatGrid
-          columns={3}
-          items={[
-            { label: 'Total Hangouts', value: String(h.total), accent: 'social' },
-            { label: 'Hours This Week', value: `${h.hoursThisWeek.toFixed(1)}h`, accent: 'social' },
-            { label: 'Hours This Month', value: `${h.hoursThisMonth.toFixed(1)}h`, accent: 'social' },
-            { label: 'Average Duration', value: formatDuration(h.avgDuration), accent: 'social' },
-            { label: 'Longest Hangout', value: formatDuration(h.longest), accent: 'social' },
-            { label: 'Shortest Hangout', value: formatDuration(h.shortest), accent: 'social' },
-          ]}
-        />
+        <AdaptiveMetrics metrics={SOCIAL_HANGOUT_METRICS} stats={stats} compare={compare ?? null} columns={3} />
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection
@@ -69,17 +63,39 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('activities')}
         nested
       >
-        <StatGrid
-          columns={2}
-          items={[
-            { label: 'Most Common Category', value: a.topCategory ?? '—', accent: 'social' },
-            { label: 'Most Common Type', value: a.topType ?? '—', accent: 'social' },
-          ]}
-        />
-        <div className="grid lg:grid-cols-2 gap-3">
-          <HorizontalBarList title="Category Breakdown" data={a.byCategory} />
-          <HorizontalBarList title="Type Breakdown" data={a.byType} />
-        </div>
+        {inCompare && compare ? (
+          <div className="grid lg:grid-cols-2 gap-3">
+            <CompareBreakdownTable
+              title="Category Breakdown"
+              rows={mergeBreakdownCompare('cat', compare.statsA.social.activities.byCategory, compare.statsB.social.activities.byCategory)}
+              labelA={compare.labelA}
+              labelB={compare.labelB}
+            />
+            <CompareBreakdownTable
+              title="Type Breakdown"
+              rows={mergeBreakdownCompare('type', compare.statsA.social.activities.byType, compare.statsB.social.activities.byType)}
+              labelA={compare.labelA}
+              labelB={compare.labelB}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid lg:grid-cols-2 gap-3 mb-3">
+              <div className="text-sm">
+                <span className="opacity-70">Most Common Category: </span>
+                <strong>{a.topCategory ?? '—'}</strong>
+              </div>
+              <div className="text-sm">
+                <span className="opacity-70">Most Common Type: </span>
+                <strong>{a.topType ?? '—'}</strong>
+              </div>
+            </div>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <HorizontalBarList title="Category Breakdown" data={a.byCategory} />
+              <HorizontalBarList title="Type Breakdown" data={a.byType} />
+            </div>
+          </>
+        )}
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection
@@ -89,50 +105,55 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('people')}
         nested
       >
-        <StatGrid
-          columns={2}
-          items={[
-            { label: 'Group Hangout %', value: `${p.groupHangoutPct.toFixed(0)}%`, accent: 'social' },
-            { label: 'Solo Hangout %', value: `${p.soloHangoutPct.toFixed(0)}%`, accent: 'social' },
-          ]}
-        />
-        <div className="grid lg:grid-cols-2 gap-3">
-          <RankingList
-            title="Most Seen Friends"
-            rows={p.mostSeen.map((r) => ({
-              name: r.name,
-              primary: `${r.hangouts} hangouts`,
-              secondary: `${r.hours.toFixed(1)}h`,
-            }))}
+        <AdaptiveMetrics metrics={SOCIAL_PEOPLE_METRICS} stats={stats} compare={compare ?? null} columns={2} />
+        {inCompare && compare ? (
+          <CompareBreakdownTable
+            title="Friend Activity"
+            rows={mergeFriendRankingCompare(compare.statsA, compare.statsB)}
+            labelA={compare.labelA}
+            labelB={compare.labelB}
           />
-          <RankingList
-            title="Least Seen Friends"
-            rows={p.leastSeen.map((r) => ({
-              name: r.name,
-              primary: `${r.hangouts} hangouts`,
-              secondary: `${r.hours.toFixed(1)}h`,
-            }))}
-          />
-        </div>
-        <RankingList
-          title="Friend Ranking"
-          rows={p.ranking.slice(0, 10).map((r) => ({
-            name: r.name,
-            primary: `${r.hangouts} hangouts`,
-            secondary: `${r.hours.toFixed(1)}h total`,
-          }))}
-        />
-        <RankingList
-          title="Time With Each Friend"
-          rows={[...p.ranking]
-            .sort((a, b) => b.hours - a.hours)
-            .slice(0, 10)
-            .map((r) => ({
-              name: r.name,
-              primary: `${r.hours.toFixed(1)}h`,
-              secondary: `${r.hangouts} hangouts`,
-            }))}
-        />
+        ) : (
+          <>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <RankingList
+                title="Most Seen Friends"
+                rows={p.mostSeen.map((r) => ({
+                  name: r.name,
+                  primary: `${r.hangouts} hangouts`,
+                  secondary: `${r.hours.toFixed(1)}h`,
+                }))}
+              />
+              <RankingList
+                title="Least Seen Friends"
+                rows={p.leastSeen.map((r) => ({
+                  name: r.name,
+                  primary: `${r.hangouts} hangouts`,
+                  secondary: `${r.hours.toFixed(1)}h`,
+                }))}
+              />
+            </div>
+            <RankingList
+              title="Friend Ranking"
+              rows={p.ranking.slice(0, 10).map((r) => ({
+                name: r.name,
+                primary: `${r.hangouts} hangouts`,
+                secondary: `${r.hours.toFixed(1)}h total`,
+              }))}
+            />
+            <RankingList
+              title="Time With Each Friend"
+              rows={[...p.ranking]
+                .sort((x, y) => y.hours - x.hours)
+                .slice(0, 10)
+                .map((r) => ({
+                  name: r.name,
+                  primary: `${r.hours.toFixed(1)}h`,
+                  secondary: `${r.hangouts} hangouts`,
+                }))}
+            />
+          </>
+        )}
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection
@@ -142,23 +163,39 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('locations')}
         nested
       >
-        <StatGrid
-          columns={2}
-          items={[{ label: 'Total Unique Locations', value: String(l.uniqueCount), accent: 'social' }]}
-        />
-        <div className="grid lg:grid-cols-2 gap-3">
-          <HorizontalBarList title="Most Visited Locations" data={l.topLocations} />
-          <HorizontalBarList
-            title="Favorite Restaurants"
-            data={l.favoriteRestaurants}
-            emptyMessage="No food-location hangouts in this range."
-          />
-        </div>
-        <HorizontalBarList
-          title="Favorite Hangout Spots"
-          data={l.favoriteSpots.map((x) => ({ label: x.label, value: x.value }))}
-          formatValue={(v) => `${v.toFixed(1)}h`}
-        />
+        <AdaptiveMetrics metrics={SOCIAL_LOCATION_METRICS} stats={stats} compare={compare ?? null} columns={2} />
+        {inCompare && compare ? (
+          <div className="grid lg:grid-cols-2 gap-3">
+            <CompareBreakdownTable
+              title="Most Visited Locations"
+              rows={mergeBreakdownCompare('loc', compare.statsA.social.locations.topLocations, compare.statsB.social.locations.topLocations)}
+              labelA={compare.labelA}
+              labelB={compare.labelB}
+            />
+            <CompareBreakdownTable
+              title="Favorite Restaurants"
+              rows={mergeBreakdownCompare('rest', compare.statsA.social.locations.favoriteRestaurants, compare.statsB.social.locations.favoriteRestaurants)}
+              labelA={compare.labelA}
+              labelB={compare.labelB}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <HorizontalBarList title="Most Visited Locations" data={l.topLocations} />
+              <HorizontalBarList
+                title="Favorite Restaurants"
+                data={l.favoriteRestaurants}
+                emptyMessage="No food-location hangouts in this range."
+              />
+            </div>
+            <HorizontalBarList
+              title="Favorite Hangout Spots"
+              data={l.favoriteSpots.map((x) => ({ label: x.label, value: x.value }))}
+              formatValue={(v) => `${v.toFixed(1)}h`}
+            />
+          </>
+        )}
       </StatisticsCollapsibleSection>
 
       <StatisticsCollapsibleSection
@@ -168,18 +205,46 @@ export function StatisticsSocialPanel({
         onToggle={() => accordion.toggleSocial('charts')}
         nested
       >
-        <div className="grid lg:grid-cols-2 gap-3">
-          <BarChart title="Hours by Week" data={stats.social.hoursByWeek} valueSuffix="h" colorClass="bg-social/60" />
-          <BarChart title="Hours by Month" data={stats.social.hoursByMonth} valueSuffix="h" colorClass="bg-social/60" />
-        </div>
-        <div className="grid lg:grid-cols-2 gap-3">
-          <HorizontalBarList
-            title="Friend Ranking Graph"
-            data={p.ranking.slice(0, 8).map((r) => ({ label: r.name, value: r.hangouts }))}
-          />
-          <HorizontalBarList title="Activity Pie (by Type)" data={a.byType.slice(0, 8)} />
-        </div>
-        <HorizontalBarList title="Category Bar Chart" data={a.byCategory} />
+        {inCompare && compare ? (
+          <>
+            <CompareStatGrid
+              metrics={SOCIAL_CHART_METRICS}
+              statsA={compare.statsA}
+              statsB={compare.statsB}
+              labelA={compare.labelA}
+              labelB={compare.labelB}
+            />
+            <div className="grid lg:grid-cols-2 gap-3 mt-3">
+              <CompareBreakdownTable
+                title="Activity by Type"
+                rows={mergeBreakdownCompare('chartType', compare.statsA.social.activities.byType, compare.statsB.social.activities.byType)}
+                labelA={compare.labelA}
+                labelB={compare.labelB}
+              />
+              <CompareBreakdownTable
+                title="Activity by Category"
+                rows={mergeBreakdownCompare('chartCat', compare.statsA.social.activities.byCategory, compare.statsB.social.activities.byCategory)}
+                labelA={compare.labelA}
+                labelB={compare.labelB}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <BarChart title="Hours by Week" data={stats.social.hoursByWeek} valueSuffix="h" colorClass="bg-social/60" />
+              <BarChart title="Hours by Month" data={stats.social.hoursByMonth} valueSuffix="h" colorClass="bg-social/60" />
+            </div>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <HorizontalBarList
+                title="Friend Ranking Graph"
+                data={p.ranking.slice(0, 8).map((r) => ({ label: r.name, value: r.hangouts }))}
+              />
+              <HorizontalBarList title="Activity Pie (by Type)" data={a.byType.slice(0, 8)} />
+            </div>
+            <HorizontalBarList title="Category Bar Chart" data={a.byCategory} />
+          </>
+        )}
       </StatisticsCollapsibleSection>
     </div>
   );
