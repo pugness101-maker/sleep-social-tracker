@@ -152,6 +152,10 @@ export interface AppSettings {
   theme: ThemeMode;
   awakeWarningHours: number;
   sleepGoalHours: number;
+  targetWakeUpTime: string;
+  targetBedtime: string;
+  autoCalculateBedtime: boolean;
+  autoCalculateWakeTime: boolean;
   notificationsEnabled: boolean;
   bedtimeReminder: boolean;
   hangoutReminder: boolean;

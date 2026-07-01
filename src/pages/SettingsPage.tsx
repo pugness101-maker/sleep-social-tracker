@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/FormFields';
 import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
+import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
 
 export function SettingsPage() {
@@ -46,6 +47,8 @@ export function SettingsPage() {
     e.target.value = '';
   };
 
+  const schedule = getSleepSchedule(data.settings);
+
   return (
     <div>
       <div className="mb-6">
@@ -74,25 +77,84 @@ export function SettingsPage() {
 
         <Card>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Sleep & Awake</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Input
-              label="Sleep Goal (hours)"
-              type="number"
-              min={1}
-              max={14}
-              step={0.5}
-              value={data.settings.sleepGoalHours}
-              onChange={(e) => updateSettings({ sleepGoalHours: parseFloat(e.target.value) || 8 })}
-            />
-            <Input
-              label="Awake Warning Threshold (hours)"
-              type="number"
-              min={1}
-              max={24}
-              step={0.5}
-              value={data.settings.awakeWarningHours}
-              onChange={(e) => updateSettings({ awakeWarningHours: parseFloat(e.target.value) || 16 })}
-            />
+          <div className="space-y-4 text-left">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Input
+                label="Sleep Goal (hours)"
+                type="number"
+                min={1}
+                max={14}
+                step={0.5}
+                value={data.settings.sleepGoalHours}
+                onChange={(e) => updateSettings({ sleepGoalHours: parseFloat(e.target.value) || 8 })}
+              />
+              <Input
+                label="Awake Warning Threshold (hours)"
+                type="number"
+                min={1}
+                max={24}
+                step={0.5}
+                value={data.settings.awakeWarningHours}
+                onChange={(e) => updateSettings({ awakeWarningHours: parseFloat(e.target.value) || 16 })}
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Input
+                label="Target Wake-up Time"
+                type="time"
+                value={data.settings.targetWakeUpTime}
+                disabled={data.settings.autoCalculateWakeTime}
+                onChange={(e) => updateSettings({ targetWakeUpTime: e.target.value })}
+              />
+              <Input
+                label="Target Bedtime"
+                type="time"
+                value={data.settings.autoCalculateBedtime ? schedule.recommendedBedtime24 : data.settings.targetBedtime}
+                disabled={data.settings.autoCalculateBedtime}
+                onChange={(e) => updateSettings({ targetBedtime: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={data.settings.autoCalculateBedtime}
+                  onChange={(e) => updateSettings({ autoCalculateBedtime: e.target.checked })}
+                  className="rounded"
+                />
+                <span className="text-sm">Auto-calculate bedtime from wake-up goal and sleep goal</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={data.settings.autoCalculateWakeTime}
+                  onChange={(e) => updateSettings({ autoCalculateWakeTime: e.target.checked })}
+                  className="rounded"
+                />
+                <span className="text-sm">Auto-calculate wake time from bedtime goal and sleep goal</span>
+              </label>
+            </div>
+
+            <div
+              className="rounded-lg p-4 text-sm space-y-1"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+            >
+              <p className="font-medium" style={{ color: 'var(--text-heading)' }}>Recommendations</p>
+              <p>
+                Recommended bedtime: <strong>{schedule.recommendedBedtime}</strong>
+                <span className="opacity-60 ml-1">
+                  (wake {schedule.effectiveWakeTime} − {schedule.goalHours}h)
+                </span>
+              </p>
+              <p>
+                Recommended wake time: <strong>{schedule.recommendedWakeTime}</strong>
+                <span className="opacity-60 ml-1">
+                  (bedtime {schedule.effectiveBedtime} + {schedule.goalHours}h)
+                </span>
+              </p>
+            </div>
           </div>
         </Card>
 

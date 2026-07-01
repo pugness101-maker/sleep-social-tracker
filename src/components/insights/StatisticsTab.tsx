@@ -2,6 +2,8 @@ import { useApp } from '../../context/AppContext';
 import { Card, StatCard } from '../ui/Card';
 import { getSleepStats, getNapStats, getSocialStats, getAwakeStats, getMonthlyTrends } from '../../lib/stats';
 import { formatDuration, avgMinutesToTime, weekdayLabel } from '../../lib/dates';
+import { formatSleepGoalDiff, formatGoalProgressPercent } from '../../lib/sleep-goals';
+import { getAverageSleepThisWeek } from '../../lib/stats';
 
 export function StatisticsTab() {
   const { data } = useApp();
@@ -10,6 +12,8 @@ export function StatisticsTab() {
   const social = getSocialStats(data);
   const awake = getAwakeStats(data);
   const trends = getMonthlyTrends(data);
+  const weeklyAvg = getAverageSleepThisWeek(data);
+  const weeklyVsGoal = weeklyAvg ? weeklyAvg - data.settings.sleepGoalHours * 60 : null;
 
   const topFriends = Object.entries(social.friendCounts)
     .sort(([, a], [, b]) => b - a)
@@ -32,6 +36,24 @@ export function StatisticsTab() {
           <StatCard label="Shortest Sleep" value={formatDuration(sleep.shortest)} accent="sleep" />
           <StatCard label="Sleep Consistency" value={`${sleep.consistency.toFixed(0)}%`} accent="sleep" />
           <StatCard label="Sleep Debt" value={formatDuration(sleep.sleepDebt)} sub={`Goal: ${data.settings.sleepGoalHours}h/night`} accent="sleep" />
+          <StatCard
+            label="Goal Progress"
+            value={`${sleep.goalProgress.toFixed(0)}%`}
+            sub={`${sleep.nightsAtGoal} of ${sleep.count} nights at goal`}
+            accent="sleep"
+          />
+          <StatCard
+            label="Avg vs Goal"
+            value={sleep.avg ? formatSleepGoalDiff(sleep.avgVsGoal) : '—'}
+            sub={sleep.avg ? `${formatGoalProgressPercent(sleep.avg, sleep.goalMinutes)} of nightly goal` : 'No sleep data'}
+            accent="sleep"
+          />
+          <StatCard
+            label="Weekly Avg vs Goal"
+            value={weeklyAvg ? formatDuration(weeklyAvg) : '—'}
+            sub={weeklyVsGoal !== null ? formatSleepGoalDiff(weeklyVsGoal) : `Goal: ${data.settings.sleepGoalHours}h`}
+            accent="sleep"
+          />
         </div>
         <Card className="mt-4">
           <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep by Weekday</h3>

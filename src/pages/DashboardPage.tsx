@@ -10,24 +10,29 @@ import {
   getSocialHoursThisWeek,
   getAverageSleepThisWeek,
   getRecentActivity,
+  getLastNightSleepVsGoal,
 } from '../lib/stats';
-import { formatDuration, formatTime, calcDurationMinutes } from '../lib/dates';
-import { formatDurationLive } from '../lib/dates';
-import { formatDateTime } from '../lib/dates';
+import { formatDuration, formatTime, calcDurationMinutes, formatDurationLive, formatDateTime } from '../lib/dates';
+import { getSleepSchedule, formatSleepGoalDiff } from '../lib/sleep-goals';
 
 export function DashboardPage() {
   const { data } = useApp();
   const awakeMs = useAwakeTimer(data);
+  const schedule = getSleepSchedule(data.settings);
 
   const lastSleep = getLastNightSleep(data);
+  const sleepVsGoal = getLastNightSleepVsGoal(data);
   const todayWake = getTodayWakeUp(data);
   const napTotal = getTodayNapTotal(data);
   const todayHangouts = getTodayHangouts(data);
   const socialHours = getSocialHoursThisWeek(data);
   const avgSleep = getAverageSleepThisWeek(data);
   const recent = getRecentActivity(data);
+  const goalMinutes = data.settings.sleepGoalHours * 60;
 
   const isSleeping = !!data.activeTimers.sleepStart;
+
+  const weeklyVsGoal = avgSleep ? avgSleep - goalMinutes : null;
 
   return (
     <div>
@@ -45,23 +50,49 @@ export function DashboardPage() {
           icon="⏱️"
         />
         <StatCard
-          label="Last Night's Sleep"
-          value={lastSleep ? formatDuration(calcDurationMinutes(lastSleep.sleepStart, lastSleep.wakeUp)) : '—'}
-          sub={lastSleep ? formatTime(lastSleep.wakeUp) + ' wake-up' : 'No sleep logged'}
+          label="Sleep Goal"
+          value={`${data.settings.sleepGoalHours}h`}
+          sub="Nightly target"
+          accent="sleep"
+          icon="🎯"
+        />
+        <StatCard
+          label="Recommended Bedtime"
+          value={schedule.recommendedBedtime}
+          sub={`Wake goal ${schedule.effectiveWakeTime}`}
           accent="sleep"
           icon="🌙"
+        />
+        <StatCard
+          label="Recommended Wake Time"
+          value={schedule.recommendedWakeTime}
+          sub={`Bedtime goal ${schedule.effectiveBedtime}`}
+          accent="sleep"
+          icon="☀️"
+        />
+        <StatCard
+          label="Last Night's Sleep"
+          value={lastSleep ? formatDuration(calcDurationMinutes(lastSleep.sleepStart, lastSleep.wakeUp)) : '—'}
+          sub={
+            sleepVsGoal
+              ? formatSleepGoalDiff(sleepVsGoal.diff)
+              : lastSleep
+                ? formatTime(lastSleep.wakeUp) + ' wake-up'
+                : 'No sleep logged'
+          }
+          accent="sleep"
+          icon="😴"
         />
         <StatCard
           label="Today's Wake-up"
           value={todayWake ? formatTime(todayWake) : '—'}
           sub={todayWake ? formatDateTime(todayWake).split(',')[0] : 'Not yet today'}
           accent="sleep"
-          icon="☀️"
         />
         <StatCard
           label="Today's Nap Total"
           value={formatDuration(napTotal)}
-          sub={data.activeTimers.napStart ? 'Nap in progress...' : `${data.napEntries.filter(n => n.napStart.startsWith(new Date().toISOString().slice(0,10))).length} naps`}
+          sub={data.activeTimers.napStart ? 'Nap in progress...' : `${data.napEntries.filter((n) => n.napStart.startsWith(new Date().toISOString().slice(0, 10))).length} naps`}
           accent="nap"
           icon="💤"
         />
@@ -82,7 +113,11 @@ export function DashboardPage() {
         <StatCard
           label="Avg Sleep This Week"
           value={avgSleep ? formatDuration(avgSleep) : '—'}
-          sub={`Goal: ${data.settings.sleepGoalHours}h`}
+          sub={
+            weeklyVsGoal !== null
+              ? formatSleepGoalDiff(weeklyVsGoal)
+              : `Goal: ${data.settings.sleepGoalHours}h`
+          }
           accent="sleep"
           icon="📊"
         />

@@ -67,6 +67,14 @@ export function getSocialHoursThisWeek(data: AppData): number {
   return minutes / 60;
 }
 
+export function getLastNightSleepVsGoal(data: AppData): { actual: number; goal: number; diff: number } | null {
+  const last = getLastNightSleep(data);
+  if (!last) return null;
+  const actual = calcDurationMinutes(last.sleepStart, last.wakeUp);
+  const goal = data.settings.sleepGoalHours * 60;
+  return { actual, goal, diff: actual - goal };
+}
+
 export function getAverageSleepThisWeek(data: AppData): number {
   const { start, end } = getWeekRange();
   const entries = data.sleepEntries.filter((s) => isInRange(s.sleepStart, start, end));
@@ -171,6 +179,10 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
     return debt + Math.max(0, goalMinutes - dur);
   }, 0);
 
+  const nightsAtGoal = durations.filter((d) => d >= goalMinutes).length;
+  const goalProgress = entries.length ? (nightsAtGoal / entries.length) * 100 : 0;
+  const avgVsGoal = avg - goalMinutes;
+
   const consistency = durations.length > 1
     ? 100 - Math.min(100, stdDev(durations) / 60 * 10)
     : 100;
@@ -184,6 +196,10 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
     shortest: durations.length ? Math.min(...durations) : 0,
     consistency,
     sleepDebt,
+    goalProgress,
+    avgVsGoal,
+    goalMinutes,
+    nightsAtGoal,
     weekdayAvgs,
     count: entries.length,
   };
