@@ -13,7 +13,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 8;
+export const DATA_VERSION = 9;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -160,7 +160,7 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
 function migrateHangouts(rawHangouts: Partial<Hangout>[]): Hangout[] {
   return rawHangouts.map((h) => ({
     ...h,
-    segments: normalizeHangoutSegments(h.segments),
+    segments: normalizeHangoutSegments(h.segments, h.friendIds ?? []),
   })) as Hangout[];
 }
 

@@ -107,11 +107,14 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
         <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         <HangoutSegmentEditor
           segments={form.segments}
+          hangoutFriendIds={form.friendIds}
+          friends={data.friends}
           hangoutTypes={data.hangoutTypes}
           hangoutStart={form.startTime}
           hangoutEnd={form.endTime}
           defaultType={form.type}
           onChange={(segments) => setForm({ ...form, segments })}
+          onHangoutFriendsChange={(friendIds) => setForm({ ...form, friendIds })}
         />
       </div>
     </Modal>

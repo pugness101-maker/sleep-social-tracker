@@ -1,4 +1,4 @@
-import { calcDurationMinutes, formatDuration, generateId } from './dates';
+import { calcDurationMinutes, formatDuration, formatTime, generateId } from './dates';
 import type { Hangout, HangoutSegment, HangoutType } from '../types';
 
 export function createHangoutSegment(
@@ -8,6 +8,7 @@ export function createHangoutSegment(
   return {
     id: generateId(),
     type,
+    friendIds: [],
     startTime: '',
     endTime: '',
     durationMinutes: null,
@@ -15,6 +16,19 @@ export function createHangoutSegment(
     notes: '',
     ...partial,
   };
+}
+
+export function getSegmentFriendIds(
+  segment: Pick<HangoutSegment, 'friendIds'>,
+  hangoutFriendIds: string[]
+): string[] {
+  if (segment.friendIds?.length) return segment.friendIds;
+  return [...hangoutFriendIds];
+}
+
+export function friendInHangout(friendId: string, hangout: Hangout): boolean {
+  if (hangout.friendIds.includes(friendId)) return true;
+  return hangout.segments?.some((s) => getSegmentFriendIds(s, hangout.friendIds).includes(friendId)) ?? false;
 }
 
 export function segmentHasSpecificTime(segment: Pick<HangoutSegment, 'startTime' | 'endTime'>): boolean {
@@ -151,47 +165,71 @@ export function hangoutMatchesTypeFilter(hangout: Hangout, filterType: string): 
   return hangout.segments?.some((s) => s.type === filterType) ?? false;
 }
 
-export function formatSegmentSummary(hangout: Hangout): string {
-  if (!hangout.segments?.length) return getHangoutDisplayType(hangout);
-  return hangout.segments.map(formatSegmentLabel).join(' · ');
+export function formatFriendNamesLabel(friendIds: string[], nameLookup: (id: string) => string): string {
+  if (friendIds.length === 0) return '';
+  return friendIds.map(nameLookup).join(' + ');
 }
 
-export function formatSegmentLabel(segment: HangoutSegment): string {
+export function formatSegmentSummary(
+  hangout: Hangout,
+  nameLookup?: (id: string) => string
+): string {
+  if (!hangout.segments?.length) return getHangoutDisplayType(hangout);
+  return hangout.segments
+    .map((s) => formatSegmentLabel(s, hangout.friendIds, nameLookup))
+    .join(' · ');
+}
+
+export function formatSegmentLabel(
+  segment: HangoutSegment,
+  hangoutFriendIds: string[] = [],
+  nameLookup?: (id: string) => string
+): string {
+  const segFriends = getSegmentFriendIds(segment, hangoutFriendIds);
+  const friendsPart =
+    nameLookup && segFriends.length
+      ? ` — ${formatFriendNamesLabel(segFriends, nameLookup)}`
+      : '';
+
   if (segment.startTime?.trim() && segment.endTime?.trim()) {
-    return `${segment.type} ${formatSegmentTimeRange(segment)}`;
+    return `${segment.type}${friendsPart} — ${formatSegmentTimeRange(segment)}`;
   }
   const mins = getSegmentEffectiveDurationMinutes(segment);
-  if (mins > 0) return `${segment.type}, ${formatDuration(mins)}`;
-  return segment.type;
+  if (mins > 0) return `${segment.type}${friendsPart}, ${formatDuration(mins)}`;
+  return `${segment.type}${friendsPart}`;
 }
 
 function formatSegmentTimeRange(segment: HangoutSegment): string {
-  const start = segment.startTime.slice(11, 16);
-  const end = segment.endTime.slice(11, 16);
-  return `${start}–${end}`;
+  return `${formatTime(segment.startTime)}–${formatTime(segment.endTime)}`;
 }
 
 export function newSegmentDefaults(
   hangoutStart: string,
   hangoutEnd: string,
   defaultType: HangoutType,
+  hangoutFriendIds: string[],
   existingSegments: HangoutSegment[]
-): Pick<HangoutSegment, 'startTime' | 'endTime' | 'type'> {
+): Pick<HangoutSegment, 'startTime' | 'endTime' | 'type' | 'friendIds'> {
   const lastEnd = existingSegments.length
     ? existingSegments[existingSegments.length - 1].endTime
     : hangoutStart;
   return {
     type: defaultType,
+    friendIds: [...hangoutFriendIds],
     startTime: lastEnd || hangoutStart,
     endTime: hangoutEnd || lastEnd,
   };
 }
 
-export function normalizeHangoutSegments(segments: HangoutSegment[] | undefined): HangoutSegment[] {
+export function normalizeHangoutSegments(
+  segments: HangoutSegment[] | undefined,
+  hangoutFriendIds: string[] = []
+): HangoutSegment[] {
   return (
     segments?.map((s) => ({
       id: s.id || generateId(),
       type: s.type,
+      friendIds: s.friendIds?.length ? [...s.friendIds] : [...hangoutFriendIds],
       startTime: s.startTime ?? '',
       endTime: s.endTime ?? '',
       durationMinutes:
@@ -204,4 +242,8 @@ export function normalizeHangoutSegments(segments: HangoutSegment[] | undefined)
 
 export function segmentHasCalendarTimes(segment: HangoutSegment): boolean {
   return !!(segment.startTime?.trim() && segment.endTime?.trim());
+}
+
+export function getSegmentSeenTime(segment: HangoutSegment): string {
+  return segment.endTime?.trim() || segment.startTime?.trim() || '';
 }

@@ -178,7 +178,9 @@ export function HangoutsTab() {
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <Badge>{getHangoutDisplayType(h)}</Badge>
                     {h.segments?.length ? (
-                      <p className="text-xs opacity-60 mt-1 max-w-[200px] truncate">{formatSegmentSummary(h)}</p>
+                      <p className="text-xs opacity-60 mt-1 max-w-[240px] truncate">
+                        {formatSegmentSummary(h, (id) => data.friends.find((f) => f.id === id)?.name ?? '?')}
+                      </p>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
@@ -222,11 +224,14 @@ export function HangoutsTab() {
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <HangoutSegmentEditor
             segments={form.segments}
+            hangoutFriendIds={form.friendIds}
+            friends={data.friends}
             hangoutTypes={data.hangoutTypes}
             hangoutStart={form.startTime}
             hangoutEnd={form.endTime}
             defaultType={form.type}
             onChange={(segments) => setForm({ ...form, segments })}
+            onHangoutFriendsChange={(friendIds) => setForm({ ...form, friendIds })}
           />
         </div>
       </Modal>

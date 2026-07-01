@@ -146,7 +146,7 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
             ) : (
               <ul className="space-y-2">
                 {timeline.map((item) => (
-                  <li key={item.hangoutId}>
+                  <li key={item.segmentId ? `${item.hangoutId}-${item.segmentId}` : item.hangoutId}>
                     <button
                       type="button"
                       onClick={() => setEditHangoutId(item.hangoutId)}
@@ -155,11 +155,17 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <p className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>
-                            {formatDate(item.date)} · {item.type}
+                          <p className="font-medium text-sm flex flex-wrap items-center gap-2" style={{ color: 'var(--text-heading)' }}>
+                            <span>{formatDate(item.date)} · {item.type}</span>
+                            {item.kind === 'segment' && (
+                              <span className="text-xs font-normal px-1.5 py-0.5 rounded opacity-70" style={{ background: 'var(--border)' }}>
+                                Segment
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs opacity-70 mt-1">
-                            {formatTime(item.startTime)} – {formatTime(item.endTime)} · {formatDuration(item.durationMinutes)}
+                            {formatTime(item.startTime)} – {formatTime(item.endTime)}
+                            {item.durationMinutes > 0 ? ` · ${formatDuration(item.durationMinutes)}` : ' · Activity only'}
                           </p>
                           {item.location && <p className="text-xs opacity-70 mt-1">📍 {item.location}</p>}
                           {item.otherFriends.length > 0 && (

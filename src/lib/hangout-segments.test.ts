@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Hangout } from '../types';
+import type { Hangout, HangoutSegment } from '../types';
 import {
   aggregateActivityCountByType,
   aggregateActivityTimeByType,
@@ -8,8 +8,22 @@ import {
   getActivityCountByType,
   getActivityTimeByType,
   getSegmentEffectiveDurationMinutes,
+  normalizeHangoutSegments,
   parseDurationInput,
 } from './hangout-segments';
+
+function segment(partial: Partial<HangoutSegment> & Pick<HangoutSegment, 'type'>): HangoutSegment {
+  return {
+    id: '1',
+    friendIds: [],
+    startTime: '',
+    endTime: '',
+    durationMinutes: null,
+    location: '',
+    notes: '',
+    ...partial,
+  };
+}
 
 function hangout(overrides: Partial<Hangout> = {}): Hangout {
   return {
@@ -42,53 +56,56 @@ describe('parseDurationInput', () => {
 describe('getSegmentEffectiveDurationMinutes', () => {
   it('uses start/end when both set', () => {
     expect(
-      getSegmentEffectiveDurationMinutes({
-        id: '1',
-        type: 'Chill',
-        startTime: '2026-01-01T16:45',
-        endTime: '2026-01-01T18:00',
-        durationMinutes: 30,
-        location: '',
-        notes: '',
-      })
+      getSegmentEffectiveDurationMinutes(
+        segment({
+          type: 'Chill',
+          startTime: '2026-01-01T16:45',
+          endTime: '2026-01-01T18:00',
+          durationMinutes: 30,
+        })
+      )
     ).toBe(75);
   });
 
   it('uses manual duration when times are empty', () => {
     expect(
-      getSegmentEffectiveDurationMinutes({
-        id: '1',
-        type: 'Food',
-        startTime: '',
-        endTime: '',
-        durationMinutes: 45,
-        location: '',
-        notes: '',
-      })
+      getSegmentEffectiveDurationMinutes(
+        segment({ type: 'Food', durationMinutes: 45 })
+      )
     ).toBe(45);
   });
 
   it('returns 0 for label-only segments', () => {
     expect(
-      getSegmentEffectiveDurationMinutes({
-        id: '1',
-        type: 'Movie',
-        startTime: '',
-        endTime: '',
-        durationMinutes: null,
-        location: '',
-        notes: '',
-      })
+      getSegmentEffectiveDurationMinutes(segment({ type: 'Movie' }))
     ).toBe(0);
+  });
+});
+
+describe('normalizeHangoutSegments', () => {
+  it('copies main hangout friends when segment friendIds is missing', () => {
+    const result = normalizeHangoutSegments(
+      [{ id: 's1', type: 'Chill', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' } as HangoutSegment],
+      ['f1', 'f2']
+    );
+    expect(result[0].friendIds).toEqual(['f1', 'f2']);
+  });
+
+  it('preserves explicit segment friendIds', () => {
+    const result = normalizeHangoutSegments(
+      [segment({ id: 's1', type: 'Food', friendIds: ['f3'] })],
+      ['f1']
+    );
+    expect(result[0].friendIds).toEqual(['f3']);
   });
 });
 
 describe('activity stats', () => {
   const segmented = hangout({
     segments: [
-      { id: '1', type: 'Chill', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' },
-      { id: '2', type: 'Food', startTime: '', endTime: '', durationMinutes: 45, location: '', notes: '' },
-      { id: '3', type: 'Movie', startTime: '', endTime: '', durationMinutes: 120, location: '', notes: '' },
+      segment({ id: '1', type: 'Chill' }),
+      segment({ id: '2', type: 'Food', durationMinutes: 45 }),
+      segment({ id: '3', type: 'Movie', durationMinutes: 120 }),
     ],
   });
 
@@ -116,43 +133,48 @@ describe('formatSegmentSummary', () => {
     const summary = formatSegmentSummary(
       hangout({
         segments: [
-          { id: '1', type: 'Chill', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' },
-          { id: '2', type: 'Food', startTime: '', endTime: '', durationMinutes: 60, location: '', notes: '' },
-          { id: '3', type: 'Movie', startTime: '', endTime: '', durationMinutes: 120, location: '', notes: '' },
+          segment({ id: '1', type: 'Chill' }),
+          segment({ id: '2', type: 'Food', durationMinutes: 60 }),
+          segment({ id: '3', type: 'Movie', durationMinutes: 120 }),
         ],
       })
     );
     expect(summary).toBe('Chill · Food, 1h · Movie, 2h');
   });
 
-  it('formats timed segments', () => {
+  it('formats timed segments with friend names', () => {
     expect(
-      formatSegmentLabel({
-        id: '1',
-        type: 'Chill',
-        startTime: '2026-01-01T16:45',
-        endTime: '2026-01-01T18:00',
-        durationMinutes: null,
-        location: '',
-        notes: '',
-      })
-    ).toBe('Chill 16:45–18:00');
+      formatSegmentLabel(
+        segment({
+          type: 'Food',
+          friendIds: ['a', 'b'],
+          startTime: '2026-01-01T16:00',
+          endTime: '2026-01-01T17:00',
+        }),
+        [],
+        (id) => (id === 'a' ? 'JuJu' : 'Sophie')
+      )
+    ).toBe('Food — JuJu + Sophie — 4:00 PM–5:00 PM');
+  });
+
+  it('formats timed segments without name lookup', () => {
+    expect(
+      formatSegmentLabel(
+        segment({
+          type: 'Chill',
+          startTime: '2026-01-01T16:45',
+          endTime: '2026-01-01T18:00',
+        })
+      )
+    ).toBe('Chill — 4:45 PM–6:00 PM');
   });
 });
 
 describe('aggregateActivityCountByType', () => {
   it('aggregates across hangouts', () => {
     const result = aggregateActivityCountByType([
-      hangout({
-        segments: [
-          { id: '1', type: 'Chill', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' },
-        ],
-      }),
-      hangout({
-        segments: [
-          { id: '2', type: 'Chill', startTime: '', endTime: '', durationMinutes: 60, location: '', notes: '' },
-        ],
-      }),
+      hangout({ segments: [segment({ id: '1', type: 'Chill' })] }),
+      hangout({ segments: [segment({ id: '2', type: 'Chill', durationMinutes: 60 })] }),
     ]);
     expect(result).toEqual({ Chill: 2 });
   });
@@ -163,8 +185,8 @@ describe('aggregateActivityTimeByType', () => {
     const result = aggregateActivityTimeByType([
       hangout({
         segments: [
-          { id: '1', type: 'Chill', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' },
-          { id: '2', type: 'Food', startTime: '', endTime: '', durationMinutes: 45, location: '', notes: '' },
+          segment({ id: '1', type: 'Chill' }),
+          segment({ id: '2', type: 'Food', durationMinutes: 45 }),
         ],
       }),
     ]);

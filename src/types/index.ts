@@ -83,6 +83,8 @@ export const DEFAULT_HANGOUT_TYPE = 'Other';
 export interface HangoutSegment {
   id: string;
   type: HangoutType;
+  /** Friends involved in this segment; defaults to main hangout friends when empty. */
+  friendIds: string[];
   /** Optional; when both start and end are set, duration is derived from them. */
   startTime: string;
   endTime: string;

@@ -1,25 +1,36 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input, Select, Textarea } from '../ui/FormFields';
+import { Modal } from '../ui/Modal';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import {
   createHangoutSegment,
   formatDurationInput,
   getSegmentEffectiveDurationMinutes,
+  getSegmentFriendIds,
   newSegmentDefaults,
   parseDurationInput,
   segmentHasSpecificTime,
 } from '../../lib/hangout-segments';
 import { hangoutTypeSelectOptions } from '../../lib/social-options';
-import type { HangoutSegment } from '../../types';
+import type { Friend, HangoutSegment } from '../../types';
 
 interface HangoutSegmentEditorProps {
   segments: HangoutSegment[];
+  hangoutFriendIds: string[];
+  friends: Friend[];
   hangoutTypes: string[];
   hangoutStart: string;
   hangoutEnd: string;
   defaultType: string;
   onChange: (segments: HangoutSegment[]) => void;
+  onHangoutFriendsChange: (friendIds: string[]) => void;
+}
+
+interface PendingSegmentFriendAdd {
+  segmentId: string;
+  friendId: string;
+  friendName: string;
 }
 
 function SegmentDurationInput({
@@ -54,14 +65,22 @@ function SegmentDurationInput({
 
 export function HangoutSegmentEditor({
   segments,
+  hangoutFriendIds,
+  friends,
   hangoutTypes,
   hangoutStart,
   hangoutEnd,
   defaultType,
   onChange,
+  onHangoutFriendsChange,
 }: HangoutSegmentEditorProps) {
+  const [pendingAdd, setPendingAdd] = useState<PendingSegmentFriendAdd | null>(null);
+
   const addSegment = () => {
-    onChange([...segments, createHangoutSegment(defaultType)]);
+    onChange([
+      ...segments,
+      createHangoutSegment(defaultType, { friendIds: [...hangoutFriendIds] }),
+    ]);
   };
 
   const updateSegment = (id: string, patch: Partial<HangoutSegment>) => {
@@ -74,7 +93,13 @@ export function HangoutSegmentEditor({
 
   const toggleSpecificTime = (segment: HangoutSegment, enabled: boolean) => {
     if (enabled) {
-      const defaults = newSegmentDefaults(hangoutStart, hangoutEnd, segment.type, segments.filter((s) => s.id !== segment.id));
+      const defaults = newSegmentDefaults(
+        hangoutStart,
+        hangoutEnd,
+        segment.type,
+        getSegmentFriendIds(segment, hangoutFriendIds),
+        segments.filter((s) => s.id !== segment.id)
+      );
       updateSegment(segment.id, {
         startTime: defaults.startTime,
         endTime: defaults.endTime,
@@ -83,6 +108,39 @@ export function HangoutSegmentEditor({
     } else {
       updateSegment(segment.id, { startTime: '', endTime: '' });
     }
+  };
+
+  const applySegmentFriendToggle = (segmentId: string, friendId: string, selected: string[]) => {
+    const next = selected.includes(friendId)
+      ? selected.filter((id) => id !== friendId)
+      : [...selected, friendId];
+    updateSegment(segmentId, { friendIds: next });
+  };
+
+  const toggleSegmentFriend = (segment: HangoutSegment, friendId: string) => {
+    const selected = getSegmentFriendIds(segment, hangoutFriendIds);
+    const adding = !selected.includes(friendId);
+    if (adding && !hangoutFriendIds.includes(friendId)) {
+      const friend = friends.find((f) => f.id === friendId);
+      setPendingAdd({ segmentId: segment.id, friendId, friendName: friend?.name ?? 'This friend' });
+      return;
+    }
+    applySegmentFriendToggle(segment.id, friendId, selected);
+  };
+
+  const confirmPendingAdd = (addToMain: boolean) => {
+    if (!pendingAdd) return;
+    const segment = segments.find((s) => s.id === pendingAdd.segmentId);
+    if (!segment) {
+      setPendingAdd(null);
+      return;
+    }
+    if (addToMain) {
+      onHangoutFriendsChange([...hangoutFriendIds, pendingAdd.friendId]);
+    }
+    const selected = getSegmentFriendIds(segment, hangoutFriendIds);
+    applySegmentFriendToggle(pendingAdd.segmentId, pendingAdd.friendId, selected);
+    setPendingAdd(null);
   };
 
   const timedTotal = segments.reduce((sum, s) => sum + getSegmentEffectiveDurationMinutes(s), 0);
@@ -95,7 +153,7 @@ export function HangoutSegmentEditor({
             Activity Segments
           </p>
           <p className="text-xs opacity-60 mt-0.5">
-            Optional activity labels with optional time or duration. Segment times do not need to match hangout length.
+            Optional breakdown by activity, friends, time, or duration. Segment friends default to the main hangout friends.
           </p>
         </div>
         <Button size="sm" variant="secondary" type="button" onClick={addSegment}>
@@ -110,6 +168,7 @@ export function HangoutSegmentEditor({
           {segments.map((segment, index) => {
             const hasTime = segmentHasSpecificTime(segment);
             const effectiveDuration = getSegmentEffectiveDurationMinutes(segment);
+            const segmentFriends = getSegmentFriendIds(segment, hangoutFriendIds);
 
             return (
               <div
@@ -129,6 +188,28 @@ export function HangoutSegmentEditor({
                   onChange={(e) => updateSegment(segment.id, { type: e.target.value })}
                   options={hangoutTypeSelectOptions(hangoutTypes, segment.type)}
                 />
+                <div>
+                  <span className="block text-sm font-medium mb-2" style={{ color: 'var(--text-heading)' }}>
+                    Friends involved
+                  </span>
+                  {friends.length === 0 ? (
+                    <p className="text-sm opacity-70">Add friends first in the Friends tab.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {friends.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => toggleSegmentFriend(segment, f.id)}
+                          className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${segmentFriends.includes(f.id) ? 'bg-primary text-white border-primary' : ''}`}
+                          style={!segmentFriends.includes(f.id) ? { borderColor: 'var(--border)' } : undefined}
+                        >
+                          {f.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -199,6 +280,28 @@ export function HangoutSegmentEditor({
           )}
         </div>
       )}
+
+      <Modal
+        open={!!pendingAdd}
+        onClose={() => setPendingAdd(null)}
+        title="Add friend to hangout?"
+        footer={
+          pendingAdd ? (
+            <>
+              <Button variant="secondary" onClick={() => confirmPendingAdd(false)}>
+                No, segment only
+              </Button>
+              <Button onClick={() => confirmPendingAdd(true)}>Yes, add to main hangout</Button>
+            </>
+          ) : undefined
+        }
+      >
+        {pendingAdd && (
+          <p className="text-sm text-left">
+            {pendingAdd.friendName} is not in the main hangout. Add them to the overall hangout too, or keep them on this segment only?
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

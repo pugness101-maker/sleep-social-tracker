@@ -6,7 +6,9 @@ import {
   getFriendActivitySummary,
   getFriendDetailedStats,
   getFriendFirstHangout,
+  getFriendHangoutTimeline,
   getFriendLastSeen,
+  getFriendMinutesInHangout,
   getHangoutSeenTime,
   sortFriends,
 } from './friend-activity';
@@ -23,6 +25,19 @@ const friendA: Friend = {
   favoriteActivities: [],
   relationships: [],
   createdAt: '2026-01-01T10:00:00',
+};
+
+const friendSophie: Friend = {
+  id: 'f2',
+  name: 'Sophie',
+  tags: [],
+  relationshipStatus: 'Friend',
+  birthday: '',
+  contactInfo: '',
+  notes: '',
+  favoriteActivities: [],
+  relationships: [],
+  createdAt: '2026-02-01T10:00:00',
 };
 
 const friendC: Friend = {
@@ -58,10 +73,54 @@ const hangouts: Hangout[] = [
     location: 'Park',
     type: 'Chill',
     notes: '',
-    segments: [{ id: 's1', type: 'Food', startTime: '', endTime: '', durationMinutes: null, location: '', notes: '' }],
+    segments: [
+      {
+        id: 's1',
+        type: 'Food',
+        friendIds: ['f1'],
+        startTime: '',
+        endTime: '',
+        durationMinutes: null,
+        location: '',
+        notes: '',
+      },
+    ],
     createdAt: '2026-06-29T14:00',
   },
 ];
+
+const segmentOnlyHangout: Hangout = {
+  id: 'h3',
+  friendIds: ['f1'],
+  startTime: '2026-07-01T08:00',
+  endTime: '2026-07-01T19:00',
+  location: 'Town',
+  type: 'Mixed',
+  notes: '',
+  segments: [
+    {
+      id: 's-food',
+      type: 'Food',
+      friendIds: ['f1', 'f2'],
+      startTime: '2026-07-01T16:00',
+      endTime: '2026-07-01T17:00',
+      durationMinutes: null,
+      location: '',
+      notes: '',
+    },
+    {
+      id: 's-shop',
+      type: 'Shopping',
+      friendIds: ['f1', 'f2'],
+      startTime: '2026-07-01T17:00',
+      endTime: '2026-07-01T18:00',
+      durationMinutes: null,
+      location: '',
+      notes: '',
+    },
+  ],
+  createdAt: '2026-07-01T08:00',
+};
 
 describe('getHangoutSeenTime', () => {
   it('uses endTime when available', () => {
@@ -88,11 +147,41 @@ describe('friend last seen', () => {
   });
 });
 
+describe('segment-only friends', () => {
+  it('includes segment-only friends in hangout participation', () => {
+    const summary = getFriendActivitySummary('f2', [segmentOnlyHangout]);
+    expect(summary.totalHangouts).toBe(1);
+    expect(summary.totalHours).toBe(2);
+  });
+
+  it('credits main hangout friends for full duration', () => {
+    expect(getFriendMinutesInHangout('f1', segmentOnlyHangout)).toBe(660);
+  });
+
+  it('credits segment-only friends for segment duration only', () => {
+    expect(getFriendMinutesInHangout('f2', segmentOnlyHangout)).toBe(120);
+  });
+
+  it('shows segment rows in timeline for segment-only friends', () => {
+    const timeline = getFriendHangoutTimeline('f2', [segmentOnlyHangout], [friendA, friendSophie]);
+    expect(timeline).toHaveLength(2);
+    expect(timeline.every((item) => item.kind === 'segment')).toBe(true);
+    expect(timeline.map((item) => item.type)).toEqual(['Shopping', 'Food']);
+  });
+
+  it('shows full hangout row for main hangout friends', () => {
+    const timeline = getFriendHangoutTimeline('f1', [segmentOnlyHangout], [friendA, friendSophie]);
+    expect(timeline).toHaveLength(1);
+    expect(timeline[0].kind).toBe('hangout');
+    expect(timeline[0].durationMinutes).toBe(660);
+  });
+});
+
 describe('getFriendDetailedStats', () => {
   it('uses segment types for most common type', () => {
     const stats = getFriendDetailedStats('f1', hangouts);
     expect(stats.mostCommonType).toBe('Food');
-    expect(stats.favoriteLocation).toBe('Cafe');
+    expect(stats.favoriteLocation).toBe('Park');
     expect(stats.totalHangouts).toBe(2);
   });
 });

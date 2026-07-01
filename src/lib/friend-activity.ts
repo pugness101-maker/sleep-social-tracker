@@ -9,7 +9,13 @@ import {
   subWeeks,
 } from 'date-fns';
 import { calcDurationMinutes, formatDuration, weekdayLabel } from './dates';
-import { getHangoutDisplayType } from './hangout-segments';
+import {
+  friendInHangout,
+  getHangoutDisplayType,
+  getSegmentEffectiveDurationMinutes,
+  getSegmentFriendIds,
+  getSegmentSeenTime,
+} from './hangout-segments';
 import type { Friend, Hangout } from '../types';
 
 export type FriendSortOption =
@@ -45,6 +51,8 @@ export interface FriendDetailedStats extends FriendActivitySummary {
 
 export interface FriendHangoutTimelineItem {
   hangoutId: string;
+  segmentId?: string;
+  kind: 'hangout' | 'segment';
   date: string;
   type: string;
   startTime: string;
@@ -67,14 +75,41 @@ export function getHangoutSeenTime(hangout: Pick<Hangout, 'startTime' | 'endTime
 }
 
 export function getFriendHangouts(friendId: string, hangouts: Hangout[]): Hangout[] {
-  return hangouts.filter((h) => h.friendIds.includes(friendId));
+  return hangouts.filter((h) => friendInHangout(friendId, h));
+}
+
+export function getFriendMinutesInHangout(friendId: string, hangout: Hangout): number {
+  if (hangout.friendIds.includes(friendId)) {
+    return calcDurationMinutes(hangout.startTime, hangout.endTime);
+  }
+  let total = 0;
+  for (const segment of hangout.segments ?? []) {
+    if (getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) {
+      total += getSegmentEffectiveDurationMinutes(segment);
+    }
+  }
+  return total;
+}
+
+export function getFriendLastSeenInHangout(friendId: string, hangout: Hangout): string | null {
+  if (!friendInHangout(friendId, hangout)) return null;
+  if (hangout.friendIds.includes(friendId)) {
+    return getHangoutSeenTime(hangout);
+  }
+  const segmentTimes = (hangout.segments ?? [])
+    .filter((s) => getSegmentFriendIds(s, hangout.friendIds).includes(friendId))
+    .map((s) => getSegmentSeenTime(s))
+    .filter(Boolean);
+  if (segmentTimes.length === 0) return getHangoutSeenTime(hangout);
+  return segmentTimes.sort((a, b) => parseISO(b).getTime() - parseISO(a).getTime())[0];
 }
 
 export function getFriendLastSeen(friendId: string, hangouts: Hangout[]): string | null {
-  const friendHangouts = getFriendHangouts(friendId, hangouts);
-  if (friendHangouts.length === 0) return null;
-  return friendHangouts
-    .map(getHangoutSeenTime)
+  const involved = getFriendHangouts(friendId, hangouts);
+  if (involved.length === 0) return null;
+  return involved
+    .map((h) => getFriendLastSeenInHangout(friendId, h))
+    .filter((t): t is string => !!t)
     .sort((a, b) => parseISO(b).getTime() - parseISO(a).getTime())[0];
 }
 
@@ -103,13 +138,6 @@ export function formatLastSeenLabel(iso: string | null): { relative: string | nu
   };
 }
 
-function getHangoutActivityTypes(hangout: Hangout): string[] {
-  if (hangout.segments?.length) {
-    return hangout.segments.map((s) => s.type).filter(Boolean);
-  }
-  return hangout.type ? [hangout.type] : [];
-}
-
 function modeValue(counts: Record<string, number>): string | null {
   const entries = Object.entries(counts);
   if (entries.length === 0) return null;
@@ -120,15 +148,18 @@ function weekStartKey(date: Date): string {
   return format(startOfWeek(date, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 }
 
-function getHangoutStreakWeeks(friendHangouts: Hangout[]): number {
+function getHangoutStreakWeeks(friendId: string, friendHangouts: Hangout[]): number {
   if (friendHangouts.length === 0) return 0;
   const weeksWithHangouts = new Set(
-    friendHangouts.map((h) => weekStartKey(parseISO(getHangoutSeenTime(h))))
+    friendHangouts
+      .map((h) => getFriendLastSeenInHangout(friendId, h))
+      .filter((t): t is string => !!t)
+      .map((t) => weekStartKey(parseISO(t)))
   );
-  const mostRecent = friendHangouts
-    .map((h) => parseISO(getHangoutSeenTime(h)))
-    .sort((a, b) => b.getTime() - a.getTime())[0];
-  let cursor = startOfWeek(mostRecent, { weekStartsOn: 0 });
+  const mostRecent = [...weeksWithHangouts]
+    .sort((a, b) => b.localeCompare(a))[0];
+  if (!mostRecent) return 0;
+  let cursor = parseISO(mostRecent);
   let streak = 0;
   while (weeksWithHangouts.has(weekStartKey(cursor))) {
     streak++;
@@ -160,16 +191,28 @@ function nextBirthdaySortKey(birthday: string, now = new Date()): number {
 export function getFriendActivitySummary(friendId: string, hangouts: Hangout[]): FriendActivitySummary {
   const friendHangouts = getFriendHangouts(friendId, hangouts);
   const totalMinutes = friendHangouts.reduce(
-    (sum, h) => sum + calcDurationMinutes(h.startTime, h.endTime),
+    (sum, h) => sum + getFriendMinutesInHangout(friendId, h),
     0
   );
   const lastSeen = getFriendLastSeen(friendId, hangouts);
+  const firstTimes = friendHangouts
+    .filter((h) => h.friendIds.includes(friendId))
+    .map((h) => h.startTime);
+  const segmentFirstTimes = friendHangouts.flatMap((h) =>
+    (h.segments ?? [])
+      .filter((s) => getSegmentFriendIds(s, h.friendIds).includes(friendId))
+      .map((s) => s.startTime?.trim() || h.startTime)
+  );
+  const allFirst = [...firstTimes, ...segmentFirstTimes]
+    .filter(Boolean)
+    .sort((a, b) => parseISO(a).getTime() - parseISO(b).getTime());
+
   return {
     totalHangouts: friendHangouts.length,
     totalHours: totalMinutes / 60,
     avgDuration: friendHangouts.length ? totalMinutes / friendHangouts.length : 0,
     lastSeen,
-    firstHangout: getFriendFirstHangout(friendId, hangouts),
+    firstHangout: allFirst[0] ?? null,
     daysSinceSeen: lastSeen ? daysSinceDate(lastSeen) : null,
   };
 }
@@ -177,7 +220,7 @@ export function getFriendActivitySummary(friendId: string, hangouts: Hangout[]):
 export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): FriendDetailedStats {
   const friendHangouts = getFriendHangouts(friendId, hangouts);
   const summary = getFriendActivitySummary(friendId, hangouts);
-  const durations = friendHangouts.map((h) => calcDurationMinutes(h.startTime, h.endTime));
+  const durations = friendHangouts.map((h) => getFriendMinutesInHangout(friendId, h));
 
   const typeCounts: Record<string, number> = {};
   const locationCounts: Record<string, number> = {};
@@ -185,19 +228,42 @@ export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): F
   const hourCounts: Record<number, number> = {};
 
   for (const hangout of friendHangouts) {
-    for (const type of getHangoutActivityTypes(hangout)) {
-      typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+    if (hangout.friendIds.includes(friendId)) {
+      const type = hangout.type;
+      if (type) typeCounts[type] = (typeCounts[type] ?? 0) + 1;
     }
-    if (hangout.location?.trim()) {
-      locationCounts[hangout.location.trim()] = (locationCounts[hangout.location.trim()] ?? 0) + 1;
+    for (const segment of hangout.segments ?? []) {
+      if (!getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) continue;
+      if (segment.type) typeCounts[segment.type] = (typeCounts[segment.type] ?? 0) + 1;
     }
-    const start = parseISO(hangout.startTime);
-    weekdayCounts[getDay(start)] = (weekdayCounts[getDay(start)] ?? 0) + 1;
-    hourCounts[start.getHours()] = (hourCounts[start.getHours()] ?? 0) + 1;
+    const loc = hangout.location?.trim();
+    if (loc && hangout.friendIds.includes(friendId)) {
+      locationCounts[loc] = (locationCounts[loc] ?? 0) + 1;
+    }
+    for (const segment of hangout.segments ?? []) {
+      if (!getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) continue;
+      const segLoc = segment.location?.trim() || loc;
+      if (segLoc) locationCounts[segLoc] = (locationCounts[segLoc] ?? 0) + 1;
+    }
+    const involvementStart = hangout.friendIds.includes(friendId)
+      ? parseISO(hangout.startTime)
+      : null;
+    if (involvementStart) {
+      weekdayCounts[getDay(involvementStart)] = (weekdayCounts[getDay(involvementStart)] ?? 0) + 1;
+      hourCounts[involvementStart.getHours()] = (hourCounts[involvementStart.getHours()] ?? 0) + 1;
+    }
+    for (const segment of hangout.segments ?? []) {
+      if (!getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) continue;
+      if (hangout.friendIds.includes(friendId)) continue;
+      const segStart = segment.startTime?.trim() ? parseISO(segment.startTime) : parseISO(hangout.startTime);
+      weekdayCounts[getDay(segStart)] = (weekdayCounts[getDay(segStart)] ?? 0) + 1;
+      hourCounts[segStart.getHours()] = (hourCounts[segStart.getHours()] ?? 0) + 1;
+    }
   }
 
   const seenTimes = friendHangouts
-    .map(getHangoutSeenTime)
+    .map((h) => getFriendLastSeenInHangout(friendId, h))
+    .filter((t): t is string => !!t)
     .sort((a, b) => parseISO(a).getTime() - parseISO(b).getTime());
 
   const mostSeenHour = modeValue(
@@ -224,7 +290,7 @@ export function getFriendDetailedStats(friendId: string, hangouts: Hangout[]): F
     mostSeenWeekday: topWeekdayKey != null ? weekdayLabel(Number(topWeekdayKey)) : null,
     mostSeenTimeOfDay: mostSeenHour != null ? formatHourLabel(Number(mostSeenHour)) : null,
     longestGapDays: getLongestGapDays(seenTimes),
-    hangoutStreakWeeks: getHangoutStreakWeeks(friendHangouts),
+    hangoutStreakWeeks: getHangoutStreakWeeks(friendId, friendHangouts),
   };
 }
 
@@ -241,22 +307,50 @@ export function getFriendHangoutTimeline(
   limit = 20
 ): FriendHangoutTimelineItem[] {
   const friendName = (id: string) => friends.find((f) => f.id === id)?.name ?? 'Unknown';
+  const items: FriendHangoutTimelineItem[] = [];
 
-  return getFriendHangouts(friendId, hangouts)
-    .sort((a, b) => parseISO(getHangoutSeenTime(b)).getTime() - parseISO(getHangoutSeenTime(a)).getTime())
-    .slice(0, limit)
-    .map((hangout) => ({
-      hangoutId: hangout.id,
-      date: getHangoutSeenTime(hangout),
-      type: getHangoutDisplayType(hangout),
-      startTime: hangout.startTime,
-      endTime: hangout.endTime,
-      durationMinutes: calcDurationMinutes(hangout.startTime, hangout.endTime),
-      location: hangout.location,
-      otherFriends: hangout.friendIds
-        .filter((id) => id !== friendId)
-        .map((id) => ({ id, name: friendName(id) })),
-    }));
+  for (const hangout of getFriendHangouts(friendId, hangouts)) {
+    if (hangout.friendIds.includes(friendId)) {
+      items.push({
+        hangoutId: hangout.id,
+        kind: 'hangout',
+        date: getHangoutSeenTime(hangout),
+        type: getHangoutDisplayType(hangout),
+        startTime: hangout.startTime,
+        endTime: hangout.endTime,
+        durationMinutes: calcDurationMinutes(hangout.startTime, hangout.endTime),
+        location: hangout.location,
+        otherFriends: hangout.friendIds
+          .filter((id) => id !== friendId)
+          .map((id) => ({ id, name: friendName(id) })),
+      });
+    }
+
+    if (!hangout.friendIds.includes(friendId)) {
+      for (const segment of hangout.segments ?? []) {
+        if (!getSegmentFriendIds(segment, hangout.friendIds).includes(friendId)) continue;
+        const segFriends = getSegmentFriendIds(segment, hangout.friendIds);
+        items.push({
+          hangoutId: hangout.id,
+          segmentId: segment.id,
+          kind: 'segment',
+          date: getSegmentSeenTime(segment) || getHangoutSeenTime(hangout),
+          type: segment.type,
+          startTime: segment.startTime?.trim() || hangout.startTime,
+          endTime: segment.endTime?.trim() || hangout.endTime,
+          durationMinutes: getSegmentEffectiveDurationMinutes(segment),
+          location: segment.location || hangout.location,
+          otherFriends: segFriends
+            .filter((id) => id !== friendId)
+            .map((id) => ({ id, name: friendName(id) })),
+        });
+      }
+    }
+  }
+
+  return items
+    .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
+    .slice(0, limit);
 }
 
 export function getCatchUpFriends(
