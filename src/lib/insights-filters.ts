@@ -2,6 +2,8 @@ import { isInRange } from './dates';
 import { friendInHangout, getSegmentFriendIds, hangoutMatchesTypeFilter } from './hangout-segments';
 import type { AppData, Friend, Hangout } from '../types';
 
+export { collectUniqueLocations } from './location-history';
+
 export const INSIGHTS_FILTERS_STORAGE_KEY = 'sleep-social-tracker-insights-filters';
 
 export interface InsightsFilters {
@@ -195,19 +197,6 @@ export function getFilteredInsightsData(
   }
 
   return { sleepEntries, napEntries, hangouts };
-}
-
-export function collectUniqueLocations(hangouts: Hangout[]): string[] {
-  const locs = new Set<string>();
-  for (const h of hangouts) {
-    const main = h.location?.trim();
-    if (main) locs.add(main);
-    for (const s of h.segments ?? []) {
-      const seg = s.location?.trim() || main;
-      if (seg) locs.add(seg);
-    }
-  }
-  return [...locs].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
 export function collectSegmentTypes(hangouts: Hangout[]): string[] {

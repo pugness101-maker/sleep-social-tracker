@@ -5,13 +5,13 @@ import { Select } from '../ui/FormFields';
 import { Badge } from '../ui/Misc';
 import {
   collectSegmentTypes,
-  collectUniqueLocations,
   filterHangoutsByInsights,
   getInsightsFilterChips,
   hasActiveInsightsFilters,
   type InsightsFilters,
 } from '../../lib/insights-filters';
 import { optionSelectOptions } from '../../lib/social-options';
+import { LocationAutocomplete } from '../social/LocationAutocomplete';
 
 interface InsightsFilterBarProps {
   filters: InsightsFilters;
@@ -35,7 +35,6 @@ export function InsightsFilterBar({
     [data.hangouts, data.friends, filters]
   );
 
-  const locations = useMemo(() => collectUniqueLocations(scopedHangouts), [scopedHangouts]);
   const segmentTypes = useMemo(() => collectSegmentTypes(scopedHangouts), [scopedHangouts]);
   const chips = getInsightsFilterChips(filters, data.friends);
 
@@ -78,11 +77,12 @@ export function InsightsFilterBar({
           onChange={(e) => setFilter('segmentType', e.target.value)}
           options={[{ value: '', label: 'All segment types' }, ...segmentTypes.map((t) => ({ value: t, label: t }))]}
         />
-        <Select
+        <LocationAutocomplete
           label="Location"
           value={filters.location}
-          onChange={(e) => setFilter('location', e.target.value)}
-          options={[{ value: '', label: 'All locations' }, ...locations.map((l) => ({ value: l, label: l }))]}
+          onChange={(location) => setFilter('location', location)}
+          filterMode
+          showFavorites={false}
         />
         <Select
           label="People in hangout"

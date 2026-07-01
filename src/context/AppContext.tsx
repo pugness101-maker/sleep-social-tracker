@@ -95,6 +95,7 @@ interface AppContextValue {
   updateIdea: (id: string, idea: Partial<HangoutIdea>) => void;
   deleteIdea: (id: string) => void;
   toggleFavoriteIdea: (id: string) => void;
+  toggleFavoriteLocation: (location: string) => void;
   archiveIdea: (id: string) => void;
   convertIdeaToHangout: (id: string, friendIds: string[], startTime: string, endTime: string) => void;
   // Social customization
@@ -600,6 +601,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, [patch]);
 
+  const toggleFavoriteLocation = useCallback((location: string) => {
+    const trimmed = location.trim();
+    if (!trimmed) return;
+    patch((prev) => {
+      const key = trimmed.toLowerCase();
+      const favs = prev.favoriteLocations ?? [];
+      const exists = favs.some((f) => f.toLowerCase() === key);
+      return {
+        ...prev,
+        favoriteLocations: exists
+          ? favs.filter((f) => f.toLowerCase() !== key)
+          : [...favs, trimmed],
+      };
+    });
+  }, [patch]);
+
   const archiveIdea = useCallback((id: string) => {
     patch((prev) => ({
       ...prev,
@@ -998,6 +1015,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateIdea,
     deleteIdea,
     toggleFavoriteIdea,
+    toggleFavoriteLocation,
     archiveIdea,
     convertIdeaToHangout,
     addFriendTag,

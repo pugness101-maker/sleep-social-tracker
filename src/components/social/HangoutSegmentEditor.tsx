@@ -15,6 +15,7 @@ import {
 import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import type { Friend, HangoutSegment } from '../../types';
 import { FriendPicker } from './FriendPicker';
+import { LocationAutocomplete } from './LocationAutocomplete';
 
 interface HangoutSegmentEditorProps {
   segments: HangoutSegment[];
@@ -246,10 +247,11 @@ export function HangoutSegmentEditor({
                 {!hasTime && effectiveDuration === 0 && (
                   <p className="text-xs opacity-60">Label only — counted in activity stats, not activity time.</p>
                 )}
-                <Input
+                <LocationAutocomplete
                   label="Location (optional)"
                   value={segment.location}
-                  onChange={(e) => updateSegment(segment.id, { location: e.target.value })}
+                  onChange={(location) => updateSegment(segment.id, { location })}
+                  placeholder="Search locations…"
                 />
                 <Textarea
                   label="Notes (optional)"

@@ -10,9 +10,9 @@ import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from 
 import type { Hangout, HangoutSegment } from '../../types';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
 import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
-import { collectUniqueLocations } from '../../lib/insights-filters';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { FriendPicker } from './FriendPicker';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
@@ -79,8 +79,6 @@ export function HangoutsTab() {
     return list;
   }, [data.hangouts, data.friends, search, filterType, filterLocation]);
 
-  const locationOptions = useMemo(() => collectUniqueLocations(data.hangouts), [data.hangouts]);
-
   const friendNames = (ids: string[]) =>
     ids.map((id) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown').join(', ') || 'No friends';
 
@@ -138,10 +136,15 @@ export function HangoutsTab() {
           { value: '', label: 'All Types' },
           ...data.hangoutTypes.map((t) => ({ value: t, label: t })),
         ]} />
-        <Select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} options={[
-          { value: '', label: 'All Locations' },
-          ...locationOptions.map((l) => ({ value: l, label: l })),
-        ]} />
+        <div className="min-w-[200px] flex-1">
+          <LocationAutocomplete
+            label="Location"
+            value={filterLocation}
+            onChange={setFilterLocation}
+            filterMode
+            showFavorites={false}
+          />
+        </div>
       </div>
 
       {hangouts.length === 0 ? (
@@ -194,7 +197,12 @@ export function HangoutsTab() {
           <FriendPicker selected={startForm.friendIds} onChange={(ids) => setStartForm({ ...startForm, friendIds: ids })} />
           <Select label="Type" value={startForm.type} onChange={(e) => setStartForm({ ...startForm, type: e.target.value })}
             options={hangoutTypeSelectOptions(data.hangoutTypes, startForm.type)} />
-          <Input label="Location" value={startForm.location} onChange={(e) => setStartForm({ ...startForm, location: e.target.value })} />
+          <LocationAutocomplete
+            label="Location"
+            value={startForm.location}
+            onChange={(location) => setStartForm({ ...startForm, location })}
+            placeholder="Search locations…"
+          />
         </div>
       </Modal>
 
@@ -210,7 +218,12 @@ export function HangoutsTab() {
           <div className="grid sm:grid-cols-2 gap-4">
             <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
               options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)} />
-            <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <LocationAutocomplete
+              label="Location"
+              value={form.location}
+              onChange={(location) => setForm({ ...form, location })}
+              placeholder="Search locations…"
+            />
           </div>
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <HangoutSegmentEditor

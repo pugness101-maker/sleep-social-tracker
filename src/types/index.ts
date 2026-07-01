@@ -212,6 +212,8 @@ export interface AppData {
   relationshipStatuses: string[];
   relationshipTypes: string[];
   hangoutTypes: string[];
+  /** User-starred locations for quick pick in autocomplete. */
+  favoriteLocations: string[];
 }
 
 export type ActivityItem = {

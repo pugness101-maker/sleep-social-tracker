@@ -14,7 +14,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 10;
+export const DATA_VERSION = 11;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -52,6 +52,7 @@ export const defaultAppData: AppData = {
   relationshipStatuses: [...DEFAULT_RELATIONSHIP_STATUSES],
   relationshipTypes: [...DEFAULT_RELATIONSHIP_TYPES],
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
+  favoriteLocations: [],
 };
 
 const migratedRelationshipTagSet = new Set<string>(RELATIONSHIP_TAGS_TO_MIGRATE);
@@ -211,6 +212,7 @@ export function normalizeAppData(
       }),
     },
     ...social,
+    favoriteLocations: raw.favoriteLocations ?? defaultAppData.favoriteLocations,
   };
 }
 

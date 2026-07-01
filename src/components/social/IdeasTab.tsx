@@ -7,6 +7,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
 
 const costs: CostLevel[] = ['Free', '$', '$$', '$$$'];
@@ -247,7 +248,12 @@ export function IdeasTab() {
             value={form.estimatedDurationMinutes}
             onChange={(e) => setForm({ ...form, estimatedDurationMinutes: parseInt(e.target.value) || 60 })}
           />
-          <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <LocationAutocomplete
+            label="Location"
+            value={form.location}
+            onChange={(location) => setForm({ ...form, location })}
+            placeholder="Search locations…"
+          />
           <Input
             label="Priority (1-5)"
             type="number"

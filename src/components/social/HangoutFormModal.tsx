@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import { calcDurationMinutes, formatDuration } from '../../lib/dates';
 import { hangoutTypeSelectOptions } from '../../lib/social-options';
 import { HangoutSegmentEditor } from './HangoutSegmentEditor';
@@ -82,7 +83,12 @@ export function HangoutFormModal({ hangoutId, open, onClose }: HangoutFormModalP
             onChange={(e) => setForm({ ...form, type: e.target.value })}
             options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)}
           />
-          <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <LocationAutocomplete
+            label="Location"
+            value={form.location}
+            onChange={(location) => setForm({ ...form, location })}
+            placeholder="Search locations…"
+          />
         </div>
         <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         <HangoutSegmentEditor
