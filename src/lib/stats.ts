@@ -1,5 +1,5 @@
 import type { AppData, Friend, Hangout, SleepEntry } from '../types';
-import { aggregateActivityTimeByType } from './hangout-segments';
+import { aggregateActivityTimeByType, aggregateActivityCountByType } from './hangout-segments';
 import { calcSleepDebtMinutes } from './sleep-goals';
 import {
   calcDurationMinutes,
@@ -325,6 +325,7 @@ export function getSocialStats(data: AppData, rangeStart?: Date, rangeEnd?: Date
   });
 
   const activityTimeByType = aggregateActivityTimeByType(hangouts);
+  const activityCountByType = aggregateActivityCountByType(hangouts);
 
   const lastHangout = hangouts.sort(
     (a, b) => parseISO(b.startTime).getTime() - parseISO(a.startTime).getTime()
@@ -342,6 +343,7 @@ export function getSocialStats(data: AppData, rangeStart?: Date, rangeEnd?: Date
     daysSinceLast,
     byType,
     activityTimeByType,
+    activityCountByType,
   };
 }
 

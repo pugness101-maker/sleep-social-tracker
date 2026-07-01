@@ -83,8 +83,11 @@ export const DEFAULT_HANGOUT_TYPE = 'Other';
 export interface HangoutSegment {
   id: string;
   type: HangoutType;
+  /** Optional; when both start and end are set, duration is derived from them. */
   startTime: string;
   endTime: string;
+  /** Optional manual duration (minutes) when start/end are not set. */
+  durationMinutes: number | null;
   location: string;
   notes: string;
 }
