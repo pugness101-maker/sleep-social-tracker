@@ -8,14 +8,16 @@ import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { TagPicker } from '../ui/TagPicker';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
-import { friendMatchesTagFilter } from '../../lib/social-options';
+import { friendMatchesTagFilter, optionSelectOptions } from '../../lib/social-options';
 import type { Friend } from '../../types';
+import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
 
 export function FriendsTab() {
   const { data, addFriend, updateFriend, deleteFriend } = useApp();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export function FriendsTab() {
   const emptyForm = {
     name: '',
     tags: [] as string[],
+    relationshipStatus: DEFAULT_RELATIONSHIP_STATUS,
     birthday: '',
     contactInfo: '',
     notes: '',
@@ -39,11 +42,15 @@ export function FriendsTab() {
           f.name.toLowerCase().includes(q) ||
           f.notes.toLowerCase().includes(q) ||
           f.contactInfo.toLowerCase().includes(q) ||
+          f.relationshipStatus.toLowerCase().includes(q) ||
           f.tags.some((t) => t.toLowerCase().includes(q))
       );
     }
     if (filterTags.length > 0) {
       list = list.filter((f) => friendMatchesTagFilter(f, filterTags));
+    }
+    if (filterStatus) {
+      list = list.filter((f) => f.relationshipStatus === filterStatus);
     }
     list.sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -53,7 +60,7 @@ export function FriendsTab() {
       return 0;
     });
     return list;
-  }, [data.friends, data.hangouts, search, sortBy, filterTags]);
+  }, [data.friends, data.hangouts, search, sortBy, filterTags, filterStatus]);
 
   const orphanTags = useMemo(() => {
     const known = new Set(data.friendTags);
@@ -73,6 +80,7 @@ export function FriendsTab() {
     setForm({
       name: friend.name,
       tags: [...friend.tags],
+      relationshipStatus: friend.relationshipStatus || DEFAULT_RELATIONSHIP_STATUS,
       birthday: friend.birthday,
       contactInfo: friend.contactInfo,
       notes: friend.notes,
@@ -107,6 +115,14 @@ export function FriendsTab() {
             { value: 'last', label: 'Sort: Last Hangout' },
           ]}
         />
+        <Select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          options={[
+            { value: '', label: 'All Statuses' },
+            ...optionSelectOptions(data.relationshipStatuses),
+          ]}
+        />
         <Button onClick={openAdd}>Add Friend</Button>
       </div>
 
@@ -118,9 +134,14 @@ export function FriendsTab() {
           onChange={setFilterTags}
           orphanTags={orphanTags}
         />
-        {filterTags.length > 0 && (
-          <Button size="sm" variant="ghost" className="mt-2" onClick={() => setFilterTags([])}>
-            Clear tag filters
+        {(filterTags.length > 0 || filterStatus) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-2"
+            onClick={() => { setFilterTags([]); setFilterStatus(''); }}
+          >
+            Clear filters
           </Button>
         )}
       </Card>
@@ -138,7 +159,13 @@ export function FriendsTab() {
               <div className="text-left">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
+                  {friend.relationshipStatus && friend.relationshipStatus !== 'None' && (
+                    <Badge color="#f472b6">{friend.relationshipStatus}</Badge>
+                  )}
                 </div>
+                <p className="text-xs opacity-70 mb-2">
+                  Status: <span className="font-medium">{friend.relationshipStatus || 'None'}</span>
+                </p>
                 {friend.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-1 mb-2">
                     {friend.tags.map((tag) => (
@@ -186,9 +213,15 @@ export function FriendsTab() {
       >
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Select
+            label="Relationship Status"
+            value={form.relationshipStatus}
+            onChange={(e) => setForm({ ...form, relationshipStatus: e.target.value })}
+            options={optionSelectOptions(data.relationshipStatuses, form.relationshipStatus)}
+          />
           <div className="sm:col-span-2">
             <TagPicker
-              label="Tags"
+              label="Friend Tags"
               options={data.friendTags}
               selected={form.tags}
               onChange={(tags) => setForm({ ...form, tags })}

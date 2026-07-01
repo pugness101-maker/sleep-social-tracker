@@ -11,7 +11,33 @@ export const DEFAULT_FRIEND_TAGS = [
   'Coworker',
   'Classmate',
   'Online Friend',
+  'Gym Buddy',
+  'Study Buddy',
 ] as const;
+
+/** Legacy tag values migrated into relationshipStatus */
+export const RELATIONSHIP_TAGS_TO_MIGRATE = [
+  'Talking',
+  'Dating',
+  'Partner',
+  'Ex',
+  'Friends with Benefits',
+  'Situationship',
+  'Crush',
+] as const;
+
+export const DEFAULT_RELATIONSHIP_STATUSES = [
+  'None',
+  'Talking',
+  'Dating',
+  'Partner',
+  'Ex',
+  'Friends with Benefits',
+  'Situationship',
+  'Crush',
+] as const;
+
+export const DEFAULT_RELATIONSHIP_STATUS = 'None';
 
 export const DEFAULT_HANGOUT_TYPES = [
   'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
@@ -41,10 +67,13 @@ export interface NapEntry {
   createdAt: string;
 }
 
+export type RelationshipStatus = string;
+
 export interface Friend {
   id: string;
   name: string;
   tags: FriendTag[];
+  relationshipStatus: RelationshipStatus;
   birthday: string;
   contactInfo: string;
   notes: string;
@@ -106,6 +135,7 @@ export interface AppData {
   activeTimers: ActiveTimers;
   settings: AppSettings;
   friendTags: string[];
+  relationshipStatuses: string[];
   hangoutTypes: string[];
 }
 

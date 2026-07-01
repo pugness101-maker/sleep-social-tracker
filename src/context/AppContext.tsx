@@ -22,7 +22,7 @@ import {
   normalizeOptionName,
   validateOptionName,
 } from '../lib/social-options';
-import { DEFAULT_HANGOUT_TYPE } from '../types';
+import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
 
 export type DeleteTagResolution =
   | { action: 'remove' }
@@ -71,6 +71,9 @@ interface AppContextValue {
   addFriendTag: (name: string) => string | null;
   updateFriendTag: (oldName: string, newName: string) => string | null;
   deleteFriendTag: (name: string, resolution: DeleteTagResolution) => void;
+  addRelationshipStatus: (name: string) => string | null;
+  updateRelationshipStatus: (oldName: string, newName: string) => string | null;
+  deleteRelationshipStatus: (name: string, resolution: DeleteTypeResolution) => void;
   addHangoutType: (name: string) => string | null;
   updateHangoutType: (oldName: string, newName: string) => string | null;
   deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
@@ -373,9 +376,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(name);
     const error = validateOptionName(normalized, data.friendTags);
     if (error) return error;
+    if (data.relationshipStatuses.some((s) => s.toLowerCase() === normalized.toLowerCase())) {
+      return 'Use Relationship Status for this label, not Friend Tags.';
+    }
     patch((prev) => ({ ...prev, friendTags: [...prev.friendTags, normalized] }));
     return null;
-  }, [patch, data.friendTags]);
+  }, [patch, data.friendTags, data.relationshipStatuses]);
 
   const updateFriendTag = useCallback((oldName: string, newName: string): string | null => {
     const normalized = normalizeOptionName(newName);
@@ -410,6 +416,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...prev,
         friendTags: prev.friendTags.filter((t) => t !== name),
         friends,
+      };
+    });
+  }, [patch]);
+
+  const addRelationshipStatus = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.relationshipStatuses);
+    if (error) return error;
+    patch((prev) => ({ ...prev, relationshipStatuses: [...prev.relationshipStatuses, normalized] }));
+    return null;
+  }, [patch, data.relationshipStatuses]);
+
+  const updateRelationshipStatus = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.relationshipStatuses, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      relationshipStatuses: prev.relationshipStatuses.map((s) => (s === oldName ? normalized : s)),
+      friends: prev.friends.map((f) =>
+        f.relationshipStatus === oldName ? { ...f, relationshipStatus: normalized } : f
+      ),
+    }));
+    return null;
+  }, [patch, data.relationshipStatuses]);
+
+  const deleteRelationshipStatus = useCallback((name: string, resolution: DeleteTypeResolution) => {
+    patch((prev) => {
+      let replacement = DEFAULT_RELATIONSHIP_STATUS;
+      if (resolution.action === 'default') {
+        replacement = prev.relationshipStatuses.includes(DEFAULT_RELATIONSHIP_STATUS)
+          ? DEFAULT_RELATIONSHIP_STATUS
+          : prev.relationshipStatuses.find((s) => s !== name) ?? DEFAULT_RELATIONSHIP_STATUS;
+      } else if (resolution.action === 'other') {
+        replacement = resolution.name;
+      } else if (resolution.action === 'clear') {
+        replacement = '';
+      }
+
+      return {
+        ...prev,
+        relationshipStatuses: prev.relationshipStatuses.filter((s) => s !== name),
+        friends: prev.friends.map((f) =>
+          f.relationshipStatus === name ? { ...f, relationshipStatus: replacement } : f
+        ),
       };
     });
   }, [patch]);
@@ -507,6 +558,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFriendTag,
     updateFriendTag,
     deleteFriendTag,
+    addRelationshipStatus,
+    updateRelationshipStatus,
+    deleteRelationshipStatus,
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,

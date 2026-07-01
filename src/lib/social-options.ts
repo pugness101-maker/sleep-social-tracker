@@ -46,10 +46,21 @@ export function getDefaultHangoutType(types: string[]): string {
   return types[0] ?? '';
 }
 
-export function hangoutTypeSelectOptions(types: string[], current?: string) {
-  const options = types.map((t) => ({ value: t, label: t }));
-  if (current && !types.includes(current)) {
-    return [{ value: current, label: current }, ...options];
+export function countFriendsWithRelationshipStatus(
+  friends: { relationshipStatus: string }[],
+  status: string
+): number {
+  return friends.filter((f) => f.relationshipStatus === status).length;
+}
+
+export function optionSelectOptions(options: string[], current?: string) {
+  const opts = options.map((o) => ({ value: o, label: o }));
+  if (current && !options.includes(current)) {
+    return [{ value: current, label: current }, ...opts];
   }
-  return options;
+  return opts;
+}
+
+export function hangoutTypeSelectOptions(types: string[], current?: string) {
+  return optionSelectOptions(types, current);
 }
