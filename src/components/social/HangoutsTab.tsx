@@ -7,12 +7,44 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
-import type { Hangout, HangoutType } from '../../types';
+import type { Hangout } from '../../types';
+import { DEFAULT_HANGOUT_TYPE } from '../../types';
 
-const hangoutTypes: HangoutType[] = ['Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other'];
+function getDefaultHangoutType(types: string[]): string {
+  if (types.includes('Chill')) return 'Chill';
+  if (types.includes(DEFAULT_HANGOUT_TYPE)) return DEFAULT_HANGOUT_TYPE;
+  return types[0] ?? '';
+}
+
+function typeSelectOptions(types: string[], current?: string) {
+  const options = types.map((t) => ({ value: t, label: t }));
+  if (current && current && !types.includes(current)) {
+    return [{ value: current, label: current }, ...options];
+  }
+  return options;
+}
 
 export function HangoutsTab() {
   const { data, startHangout, endHangout, addHangout, updateHangout, deleteHangout, duplicateHangout } = useApp();
+
+  const defaultType = getDefaultHangoutType(data.hangoutTypes);
+
+  const makeEmptyForm = () => ({
+    friendIds: [] as string[],
+    startTime: toLocalISO(),
+    endTime: toLocalISO(),
+    location: '',
+    type: defaultType,
+    notes: '',
+  });
+
+  const [form, setForm] = useState(makeEmptyForm);
+
+  const [startForm, setStartForm] = useState({
+    friendIds: [] as string[],
+    type: defaultType,
+    location: '',
+  });
 
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -24,22 +56,6 @@ export function HangoutsTab() {
 
   const isActive = !!data.activeTimers.hangoutStart;
   const hangoutElapsed = useLiveTimer(isActive, data.activeTimers.hangoutStart);
-
-  const emptyForm = {
-    friendIds: [] as string[],
-    startTime: toLocalISO(),
-    endTime: toLocalISO(),
-    location: '',
-    type: 'Chill' as HangoutType,
-    notes: '',
-  };
-  const [form, setForm] = useState(emptyForm);
-
-  const [startForm, setStartForm] = useState({
-    friendIds: [] as string[],
-    type: 'Chill' as HangoutType,
-    location: '',
-  });
 
   const hangouts = useMemo(() => {
     let list = [...data.hangouts].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
@@ -62,7 +78,7 @@ export function HangoutsTab() {
 
   const openAdd = () => {
     setEditHangout(null);
-    setForm(emptyForm);
+    setForm(makeEmptyForm());
     setModalOpen(true);
   };
 
@@ -126,7 +142,7 @@ export function HangoutsTab() {
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search hangouts..." /></div>
         <Select value={filterType} onChange={(e) => setFilterType(e.target.value)} options={[
           { value: '', label: 'All Types' },
-          ...hangoutTypes.map((t) => ({ value: t, label: t })),
+          ...data.hangoutTypes.map((t) => ({ value: t, label: t })),
         ]} />
       </div>
 
@@ -152,7 +168,7 @@ export function HangoutsTab() {
                   <td className="px-4 py-3">{formatDateTime(h.startTime)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">{formatDateTime(h.endTime)}</td>
                   <td className="px-4 py-3 font-medium">{formatDuration(calcDurationMinutes(h.startTime, h.endTime))}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell"><Badge>{h.type}</Badge></td>
+                  <td className="px-4 py-3 hidden sm:table-cell"><Badge>{h.type || 'Untyped'}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(h)}>Edit</Button>
@@ -171,8 +187,8 @@ export function HangoutsTab() {
         footer={<><Button variant="secondary" onClick={() => setStartModal(false)}>Cancel</Button><Button onClick={() => { startHangout(startForm.friendIds, startForm.type, startForm.location); setStartModal(false); }}>Start</Button></>}>
         <div className="space-y-4">
           <FriendPicker selected={startForm.friendIds} onChange={(ids) => setStartForm({ ...startForm, friendIds: ids })} />
-          <Select label="Type" value={startForm.type} onChange={(e) => setStartForm({ ...startForm, type: e.target.value as HangoutType })}
-            options={hangoutTypes.map((t) => ({ value: t, label: t }))} />
+          <Select label="Type" value={startForm.type} onChange={(e) => setStartForm({ ...startForm, type: e.target.value })}
+            options={typeSelectOptions(data.hangoutTypes, startForm.type)} />
           <Input label="Location" value={startForm.location} onChange={(e) => setStartForm({ ...startForm, location: e.target.value })} />
         </div>
       </Modal>
@@ -187,8 +203,8 @@ export function HangoutsTab() {
           </div>
           {form.startTime && form.endTime && <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>}
           <div className="grid sm:grid-cols-2 gap-4">
-            <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as HangoutType })}
-              options={hangoutTypes.map((t) => ({ value: t, label: t }))} />
+            <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
+              options={typeSelectOptions(data.hangoutTypes, form.type)} />
             <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </div>
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

@@ -18,6 +18,24 @@ import type {
 } from '../types';
 import { loadAppData, saveAppData, clearAllData, importAppData, exportAppData } from '../lib/storage';
 import { generateId, toLocalISO } from '../lib/dates';
+import {
+  normalizeOptionName,
+  validateOptionName,
+} from '../lib/social-options';
+import {
+  DEFAULT_FRIEND_CATEGORY,
+  DEFAULT_HANGOUT_TYPE,
+} from '../types';
+
+export type DeleteCategoryResolution =
+  | { action: 'default' }
+  | { action: 'other'; name: string }
+  | { action: 'clear' };
+
+export type DeleteTypeResolution =
+  | { action: 'default' }
+  | { action: 'other'; name: string }
+  | { action: 'clear' };
 
 interface AppContextValue {
   data: AppData;
@@ -53,6 +71,13 @@ interface AppContextValue {
   toggleFavoriteIdea: (id: string) => void;
   archiveIdea: (id: string) => void;
   convertIdeaToHangout: (id: string, friendIds: string[], startTime: string, endTime: string) => void;
+  // Social customization
+  addFriendCategory: (name: string) => string | null;
+  updateFriendCategory: (oldName: string, newName: string) => string | null;
+  deleteFriendCategory: (name: string, resolution: DeleteCategoryResolution) => void;
+  addHangoutType: (name: string) => string | null;
+  updateHangoutType: (oldName: string, newName: string) => string | null;
+  deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
   // Data
   exportData: () => string;
   importData: (json: string) => void;
@@ -213,14 +238,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patch]);
 
   const startHangout = useCallback(
-    (friendIds: string[], type: HangoutType = 'Chill', location = '') => {
+    (friendIds: string[], type?: HangoutType, location = '') => {
       patch((prev) => ({
         ...prev,
         activeTimers: {
           ...prev.activeTimers,
           hangoutStart: toLocalISO(),
           hangoutFriendIds: friendIds,
-          hangoutType: type,
+          hangoutType: type ?? prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE,
           hangoutLocation: location,
         },
       }));
@@ -321,13 +346,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       patch((prev) => {
         const idea = prev.ideas.find((i) => i.id === id);
         if (!idea) return prev;
+        const fallbackType = prev.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
+          ? DEFAULT_HANGOUT_TYPE
+          : prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE;
         const hangout: Hangout = {
           id: generateId(),
           friendIds,
           startTime,
           endTime,
           location: idea.location,
-          type: 'Other',
+          type: fallbackType,
           notes: idea.notes,
           createdAt: toLocalISO(),
         };
@@ -342,6 +370,94 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [patch]
   );
+
+  const addFriendCategory = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.friendCategories);
+    if (error) return error;
+    patch((prev) => ({ ...prev, friendCategories: [...prev.friendCategories, normalized] }));
+    return null;
+  }, [patch, data.friendCategories]);
+
+  const updateFriendCategory = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.friendCategories, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      friendCategories: prev.friendCategories.map((c) => (c === oldName ? normalized : c)),
+      friends: prev.friends.map((f) => (f.category === oldName ? { ...f, category: normalized } : f)),
+    }));
+    return null;
+  }, [patch, data.friendCategories]);
+
+  const deleteFriendCategory = useCallback((name: string, resolution: DeleteCategoryResolution) => {
+    patch((prev) => {
+      let replacement = '';
+      if (resolution.action === 'default') {
+        replacement = prev.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
+          ? DEFAULT_FRIEND_CATEGORY
+          : prev.friendCategories.find((c) => c !== name) ?? '';
+      } else if (resolution.action === 'other') {
+        replacement = resolution.name;
+      }
+
+      return {
+        ...prev,
+        friendCategories: prev.friendCategories.filter((c) => c !== name),
+        friends: prev.friends.map((f) =>
+          f.category === name ? { ...f, category: replacement } : f
+        ),
+      };
+    });
+  }, [patch]);
+
+  const addHangoutType = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.hangoutTypes);
+    if (error) return error;
+    patch((prev) => ({ ...prev, hangoutTypes: [...prev.hangoutTypes, normalized] }));
+    return null;
+  }, [patch, data.hangoutTypes]);
+
+  const updateHangoutType = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.hangoutTypes, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
+      hangouts: prev.hangouts.map((h) => (h.type === oldName ? { ...h, type: normalized } : h)),
+      activeTimers: prev.activeTimers.hangoutType === oldName
+        ? { ...prev.activeTimers, hangoutType: normalized }
+        : prev.activeTimers,
+    }));
+    return null;
+  }, [patch, data.hangoutTypes]);
+
+  const deleteHangoutType = useCallback((name: string, resolution: DeleteTypeResolution) => {
+    patch((prev) => {
+      let replacement = '';
+      if (resolution.action === 'default') {
+        replacement = prev.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
+          ? DEFAULT_HANGOUT_TYPE
+          : prev.hangoutTypes.find((t) => t !== name) ?? '';
+      } else if (resolution.action === 'other') {
+        replacement = resolution.name;
+      }
+
+      return {
+        ...prev,
+        hangoutTypes: prev.hangoutTypes.filter((t) => t !== name),
+        hangouts: prev.hangouts.map((h) =>
+          h.type === name ? { ...h, type: replacement } : h
+        ),
+        activeTimers: prev.activeTimers.hangoutType === name
+          ? { ...prev.activeTimers, hangoutType: replacement || (prev.hangoutTypes.find((t) => t !== name) ?? '') }
+          : prev.activeTimers,
+      };
+    });
+  }, [patch]);
 
   const exportDataFn = useCallback(() => exportAppData(data), [data]);
 
@@ -382,6 +498,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleFavoriteIdea,
     archiveIdea,
     convertIdeaToHangout,
+    addFriendCategory,
+    updateFriendCategory,
+    deleteFriendCategory,
+    addHangoutType,
+    updateHangoutType,
+    deleteHangoutType,
     exportData: exportDataFn,
     importData: importDataFn,
     resetData,

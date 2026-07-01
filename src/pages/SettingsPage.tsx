@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/FormFields';
 import { Modal } from '../components/ui/Modal';
+import { SocialCustomization } from '../components/settings/SocialCustomization';
 import type { ThemeMode } from '../types';
 
 export function SettingsPage() {
@@ -127,6 +128,11 @@ export function SettingsPage() {
             </label>
           </div>
         </Card>
+
+        <div>
+          <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Social Customization</h2>
+          <SocialCustomization />
+        </div>
 
         <Card>
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Backup & Restore</h2>

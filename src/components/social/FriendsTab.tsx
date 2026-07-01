@@ -7,9 +7,8 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
-import type { Friend, FriendCategory } from '../../types';
-
-const categories: FriendCategory[] = ['Family', 'Friend', 'Good Friend', 'Best Friend'];
+import type { Friend } from '../../types';
+import { DEFAULT_FRIEND_CATEGORY } from '../../types';
 
 export function FriendsTab() {
   const { data, addFriend, updateFriend, deleteFriend } = useApp();
@@ -20,7 +19,11 @@ export function FriendsTab() {
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const emptyForm = { name: '', category: 'Friend' as FriendCategory, birthday: '', contactInfo: '', notes: '', favoriteActivities: '' };
+  const defaultCategory = data.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
+    ? DEFAULT_FRIEND_CATEGORY
+    : data.friendCategories[0] ?? '';
+
+  const emptyForm = { name: '', category: defaultCategory, birthday: '', contactInfo: '', notes: '', favoriteActivities: '' };
   const [form, setForm] = useState(emptyForm);
 
   const friends = useMemo(() => {
@@ -47,7 +50,16 @@ export function FriendsTab() {
 
   const openAdd = () => {
     setEditFriend(null);
-    setForm(emptyForm);
+    setForm({
+      name: '',
+      category: data.friendCategories.includes(DEFAULT_FRIEND_CATEGORY)
+        ? DEFAULT_FRIEND_CATEGORY
+        : data.friendCategories[0] ?? '',
+      birthday: '',
+      contactInfo: '',
+      notes: '',
+      favoriteActivities: '',
+    });
     setModalOpen(true);
   };
 
@@ -86,7 +98,7 @@ export function FriendsTab() {
         ]} />
         <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} options={[
           { value: '', label: 'All Categories' },
-          ...categories.map((c) => ({ value: c, label: c })),
+          ...data.friendCategories.map((c) => ({ value: c, label: c })),
         ]} />
         <Button onClick={openAdd}>Add Friend</Button>
       </div>
@@ -100,7 +112,7 @@ export function FriendsTab() {
               <div className="text-left">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
-                  <Badge>{friend.category}</Badge>
+                  <Badge>{friend.category || 'Uncategorized'}</Badge>
                 </div>
                 {friend.birthday && <p className="text-xs opacity-70 mb-1">🎂 {formatDate(friend.birthday)}</p>}
                 {friend.contactInfo && <p className="text-xs opacity-70 mb-1">📞 {friend.contactInfo}</p>}
@@ -130,8 +142,13 @@ export function FriendsTab() {
         footer={<><Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></>}>
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Select label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as FriendCategory })}
-            options={categories.map((c) => ({ value: c, label: c }))} />
+          <Select label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+            options={[
+              ...(form.category && !data.friendCategories.includes(form.category)
+                ? [{ value: form.category, label: form.category }]
+                : []),
+              ...data.friendCategories.map((c) => ({ value: c, label: c })),
+            ]} />
           <Input label="Birthday" type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
           <Input label="Contact Info" value={form.contactInfo} onChange={(e) => setForm({ ...form, contactInfo: e.target.value })} />
           <div className="sm:col-span-2">

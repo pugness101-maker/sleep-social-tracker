@@ -1,16 +1,15 @@
-export type FriendCategory = 'Family' | 'Friend' | 'Good Friend' | 'Best Friend';
+export type FriendCategory = string;
 
-export type HangoutType =
-  | 'Chill'
-  | 'Food'
-  | 'Study'
-  | 'Gym'
-  | 'Party'
-  | 'Shopping'
-  | 'Travel'
-  | 'Sleepover'
-  | 'Work'
-  | 'Other';
+export type HangoutType = string;
+
+export const DEFAULT_FRIEND_CATEGORIES = ['Family', 'Friend', 'Good Friend', 'Best Friend'] as const;
+
+export const DEFAULT_HANGOUT_TYPES = [
+  'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
+] as const;
+
+export const DEFAULT_FRIEND_CATEGORY = 'Friend';
+export const DEFAULT_HANGOUT_TYPE = 'Other';
 
 export type IdeaCategory =
   | 'Food'
@@ -115,6 +114,8 @@ export interface AppData {
   ideas: HangoutIdea[];
   activeTimers: ActiveTimers;
   settings: AppSettings;
+  friendCategories: string[];
+  hangoutTypes: string[];
 }
 
 export type ActivityItem = {
