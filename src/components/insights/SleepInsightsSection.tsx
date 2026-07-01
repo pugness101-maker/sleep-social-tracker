@@ -17,7 +17,21 @@ interface SleepInsightsSectionProps {
   rangeStart?: Date;
   rangeEnd?: Date;
   rangeLabel?: string;
+  /** When set, only render these blocks. Defaults to all. */
+  sectionsToShow?: Array<
+    'consistency' | 'circadian' | 'heatmap' | 'weekdayTrends' | 'debtCalendar' | 'streaks' | 'bestDays'
+  >;
 }
+
+const ALL_SECTIONS = [
+  'consistency',
+  'circadian',
+  'heatmap',
+  'weekdayTrends',
+  'debtCalendar',
+  'streaks',
+  'bestDays',
+] as const;
 
 function WeekdayTimeChart({
   title,
@@ -288,8 +302,10 @@ function DebtCalendar({ days }: { days: ReturnType<typeof getSleepInsights>['deb
   );
 }
 
-export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }: SleepInsightsSectionProps) {
+export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel, sectionsToShow }: SleepInsightsSectionProps) {
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('duration');
+
+  const show = new Set(sectionsToShow ?? ALL_SECTIONS);
 
   const insights = useMemo(
     () => getSleepInsights(data.sleepEntries, data.settings, rangeStart, rangeEnd),
@@ -299,17 +315,8 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
   const { bestDays } = insights;
 
   return (
-    <div className="mt-8 space-y-6">
-      <div>
-        <h3 className="text-base font-semibold mb-1 text-left" style={{ color: 'var(--text-heading)' }}>
-          Advanced Sleep Insights
-        </h3>
-        <p className="text-sm opacity-70 text-left">
-          Schedule analysis using your {data.settings.sleepGoalHours}h goal and {data.settings.targetWakeUpTime} wake target
-          {rangeLabel ? ` · ${rangeLabel}` : ''}.
-        </p>
-      </div>
-
+    <div className="space-y-6">
+      {show.has('consistency') && (
       <Card>
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Consistency Score</h4>
         <p className="text-xs opacity-60 mb-3 text-left">Based on bedtime and wake-up time variation. Higher = more consistent.</p>
@@ -319,7 +326,9 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           <StatCard label={rangeLabel ?? 'Selected Range'} value={`${insights.consistency.range.overall}%`} sub={`Bed ${insights.consistency.range.bedtime}% · Wake ${insights.consistency.range.wakeUp}% · Dur ${insights.consistency.range.duration}%`} accent="sleep" />
         </div>
       </Card>
+      )}
 
+      {show.has('circadian') && (
       <Card>
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Circadian Rhythm</h4>
         <CircadianGraph
@@ -329,7 +338,9 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           goalMinutes={insights.goalMinutes}
         />
       </Card>
+      )}
 
+      {show.has('heatmap') && (
       <Card>
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Schedule Heatmap</h4>
         <SleepHeatmap
@@ -339,7 +350,9 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           goalMinutes={insights.goalMinutes}
         />
       </Card>
+      )}
 
+      {show.has('weekdayTrends') && (
       <div className="grid lg:grid-cols-2 gap-4">
         <WeekdayTimeChart
           title="Average Bedtime by Weekday"
@@ -352,12 +365,16 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           formatValue={(m) => avgMinutesToTime(m)}
         />
       </div>
+      )}
 
+      {show.has('debtCalendar') && (
       <Card>
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Debt Calendar</h4>
         <DebtCalendar days={insights.debtCalendarDays} />
       </Card>
+      )}
 
+      {show.has('streaks') && (
       <div className="grid sm:grid-cols-2 gap-4">
         <Card>
           <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Goal Streaks</h4>
@@ -376,7 +393,9 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           </div>
         </Card>
       </div>
+      )}
 
+      {show.has('bestDays') && (
       <Card>
         <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Best Sleep Days Analysis</h4>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
@@ -424,6 +443,7 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel }:
           </div>
         </div>
       </Card>
+      )}
     </div>
   );
 }

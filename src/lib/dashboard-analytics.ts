@@ -2,7 +2,8 @@ import { differenceInDays, format, parseISO, startOfDay, startOfMonth, endOfMont
 import { calcDurationMinutes, getWeekRange, isInRange } from './dates';
 import { getFriendActivitySummary, getFriendMinutesInHangout } from './friend-activity';
 import { aggregateActivityCountByType, friendInHangout, getHangoutDisplayType, getSegmentFriendIds } from './hangout-segments';
-import type { AppData, Friend } from '../types';
+import { countActiveFriends } from './friend-archive';
+import type { AppData, Friend, Hangout } from '../types';
 
 export interface TopFriendThisMonth {
   friend: Friend;
@@ -109,6 +110,72 @@ export function getUpcomingBirthdays(data: AppData, limit = 8, includeArchived =
     })
     .sort((a, b) => a.daysAway - b.daysAway)
     .slice(0, limit);
+}
+
+export function getNewFriendsThisMonth(data: AppData, includeArchived = false): number {
+  const now = new Date();
+  const start = startOfMonth(now);
+  const end = endOfMonth(now);
+  const friends = includeArchived ? data.friends : data.friends.filter((f) => !f.isArchived);
+  return friends.filter((f) => {
+    const created = parseISO(f.createdAt);
+    return created >= start && created <= end;
+  }).length;
+}
+
+export interface LastSocialSeen {
+  timestamp: string;
+  friendNames: string;
+  daysAgo: number;
+}
+
+export function getLastSocialHangout(data: AppData): LastSocialSeen | null {
+  if (data.hangouts.length === 0) return null;
+  const latest = [...data.hangouts].sort(
+    (a, b) => parseISO(b.endTime || b.startTime).getTime() - parseISO(a.endTime || a.startTime).getTime()
+  )[0];
+  const timestamp = latest.endTime || latest.startTime;
+  const friendNames =
+    latest.friendIds
+      .map((id) => data.friends.find((f) => f.id === id)?.name)
+      .filter(Boolean)
+      .join(', ') || 'friends';
+  const daysAgo = differenceInDays(startOfDay(new Date()), startOfDay(parseISO(timestamp)));
+  return { timestamp, friendNames, daysAgo };
+}
+
+export function getActiveFriendCount(data: AppData): number {
+  return countActiveFriends(data.friends);
+}
+
+export function getAvgFriendsPerHangout(hangouts: Hangout[]): number {
+  if (hangouts.length === 0) return 0;
+  const total = hangouts.reduce((sum, h) => sum + h.friendIds.length, 0);
+  return total / hangouts.length;
+}
+
+export function getGroupHangoutStats(
+  hangouts: Hangout[],
+  friends: Friend[]
+): { group: string; hangoutCount: number }[] {
+  const counts: Record<string, number> = {};
+  const friendById = new Map(friends.map((f) => [f.id, f]));
+
+  for (const hangout of hangouts) {
+    const groupsInHangout = new Set<string>();
+    for (const fid of hangout.friendIds) {
+      for (const group of friendById.get(fid)?.groups ?? []) {
+        groupsInHangout.add(group);
+      }
+    }
+    for (const group of groupsInHangout) {
+      counts[group] = (counts[group] ?? 0) + 1;
+    }
+  }
+
+  return Object.entries(counts)
+    .map(([group, hangoutCount]) => ({ group, hangoutCount }))
+    .sort((a, b) => b.hangoutCount - a.hangoutCount);
 }
 
 export function getDashboardRecentActivity(data: AppData, limit = 10): RecentActivityItem[] {

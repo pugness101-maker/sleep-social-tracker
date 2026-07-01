@@ -19,7 +19,7 @@ export function InsightsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Insights</h1>
-        <p className="text-sm opacity-70 mt-1">Calendar, statistics, timeline, and location history</p>
+        <p className="text-sm opacity-70 mt-1">Deep analytics, charts, trends, and historical metrics</p>
       </div>
       <div className="mb-6">
         <Tabs tabs={tabs} active={active} onChange={setActive} />

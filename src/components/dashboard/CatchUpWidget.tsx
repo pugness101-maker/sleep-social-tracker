@@ -20,7 +20,7 @@ export function CatchUpWidget({ onOpenFriend }: CatchUpWidgetProps) {
   ).slice(0, 8);
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-0">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4 text-left">
         <div>
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-heading)' }}>

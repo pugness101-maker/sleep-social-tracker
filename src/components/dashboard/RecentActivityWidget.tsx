@@ -6,11 +6,15 @@ import { formatDateTime } from '../../lib/dates';
 import { getDashboardRecentActivity } from '../../lib/dashboard-analytics';
 import { HangoutFormModal } from '../social/HangoutFormModal';
 
-export function RecentActivityWidget() {
+interface RecentActivityWidgetProps {
+  limit?: number;
+}
+
+export function RecentActivityWidget({ limit = 12 }: RecentActivityWidgetProps) {
   const { data } = useApp();
   const navigate = useNavigate();
   const [editHangoutId, setEditHangoutId] = useState<string | null>(null);
-  const recent = getDashboardRecentActivity(data, 12);
+  const recent = getDashboardRecentActivity(data, limit);
 
   const icon = (kind: string) => {
     if (kind === 'sleep') return '😴';

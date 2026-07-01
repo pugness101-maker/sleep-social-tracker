@@ -11,7 +11,7 @@ export function BirthdaysWidget({ onOpenFriend }: BirthdaysWidgetProps) {
   const upcoming = getUpcomingBirthdays(data, 6, data.settings.includeArchivedInDashboard);
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-0">
       <h2 className="text-lg font-semibold mb-1 text-left" style={{ color: 'var(--text-heading)' }}>
         Upcoming Birthdays
       </h2>

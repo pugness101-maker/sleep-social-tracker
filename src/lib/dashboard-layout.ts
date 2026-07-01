@@ -1,52 +1,54 @@
+export type DashboardWidgetGroup =
+  | 'sleep_today'
+  | 'social_today'
+  | 'planning'
+  | 'activity';
+
 export type DashboardWidgetId =
   | 'awake_timer'
-  | 'sleep_goal'
-  | 'recommended_bedtime'
-  | 'recommended_wake'
   | 'last_night_sleep'
   | 'today_sleep_debt'
-  | 'week_sleep_debt'
   | 'sleep_goal_progress'
-  | 'today_wake'
-  | 'today_naps'
-  | 'today_hangouts'
-  | 'avg_sleep_week'
-  | 'this_week_social'
-  | 'top_friends'
+  | 'recommended_bedtime'
+  | 'recommended_wake'
+  | 'total_friends'
+  | 'total_hangouts'
+  | 'hours_this_week'
+  | 'last_seen'
   | 'catch_up'
-  | 'birthdays'
-  | 'recent_activity'
-  | 'location_history'
-  | 'sleep_goal_streak'
-  | 'wake_streak';
+  | 'upcoming_ideas'
+  | 'quick_actions'
+  | 'recent_activity';
 
 export interface DashboardWidgetDef {
   id: DashboardWidgetId;
   label: string;
   kind: 'stat' | 'widget';
+  group: DashboardWidgetGroup;
 }
 
+export const DASHBOARD_WIDGET_GROUPS: { id: DashboardWidgetGroup; label: string }[] = [
+  { id: 'sleep_today', label: 'Sleep Today' },
+  { id: 'social_today', label: 'Social Today' },
+  { id: 'planning', label: 'Planning' },
+  { id: 'activity', label: 'Activity' },
+];
+
 export const DASHBOARD_WIDGETS: DashboardWidgetDef[] = [
-  { id: 'awake_timer', label: 'Current Awake Timer', kind: 'stat' },
-  { id: 'sleep_goal', label: 'Sleep Goal', kind: 'stat' },
-  { id: 'recommended_bedtime', label: 'Recommended Bedtime', kind: 'stat' },
-  { id: 'recommended_wake', label: 'Recommended Wake Time', kind: 'stat' },
-  { id: 'last_night_sleep', label: "Last Night's Sleep", kind: 'stat' },
-  { id: 'today_sleep_debt', label: "Today's Sleep Debt", kind: 'stat' },
-  { id: 'week_sleep_debt', label: "This Week's Sleep Debt", kind: 'stat' },
-  { id: 'sleep_goal_progress', label: 'Sleep Goal Progress', kind: 'stat' },
-  { id: 'today_wake', label: "Today's Wake-up", kind: 'stat' },
-  { id: 'today_naps', label: "Today's Naps", kind: 'stat' },
-  { id: 'today_hangouts', label: "Today's Hangouts", kind: 'stat' },
-  { id: 'avg_sleep_week', label: 'Avg Sleep This Week', kind: 'stat' },
-  { id: 'this_week_social', label: 'This Week Social', kind: 'widget' },
-  { id: 'top_friends', label: 'Top Friends This Month', kind: 'widget' },
-  { id: 'catch_up', label: 'Need to Catch Up', kind: 'widget' },
-  { id: 'birthdays', label: 'Upcoming Birthdays', kind: 'widget' },
-  { id: 'recent_activity', label: 'Recent Activity', kind: 'widget' },
-  { id: 'location_history', label: 'Location History', kind: 'widget' },
-  { id: 'sleep_goal_streak', label: 'Sleep Goal Streak', kind: 'stat' },
-  { id: 'wake_streak', label: 'Wake-up Streak', kind: 'stat' },
+  { id: 'awake_timer', label: 'Current Awake Timer', kind: 'stat', group: 'sleep_today' },
+  { id: 'last_night_sleep', label: "Last Night's Sleep", kind: 'stat', group: 'sleep_today' },
+  { id: 'today_sleep_debt', label: "Today's Sleep Debt", kind: 'stat', group: 'sleep_today' },
+  { id: 'sleep_goal_progress', label: 'Sleep Goal Progress', kind: 'stat', group: 'sleep_today' },
+  { id: 'recommended_bedtime', label: 'Recommended Bedtime', kind: 'stat', group: 'sleep_today' },
+  { id: 'recommended_wake', label: 'Recommended Wake-up', kind: 'stat', group: 'sleep_today' },
+  { id: 'total_friends', label: 'Total Friends', kind: 'stat', group: 'social_today' },
+  { id: 'total_hangouts', label: 'Total Hangouts', kind: 'stat', group: 'social_today' },
+  { id: 'hours_this_week', label: 'Hours This Week', kind: 'stat', group: 'social_today' },
+  { id: 'last_seen', label: 'Last Seen', kind: 'stat', group: 'social_today' },
+  { id: 'catch_up', label: 'Need to Catch Up', kind: 'widget', group: 'social_today' },
+  { id: 'upcoming_ideas', label: 'Upcoming Ideas', kind: 'widget', group: 'planning' },
+  { id: 'quick_actions', label: 'Quick Actions', kind: 'widget', group: 'planning' },
+  { id: 'recent_activity', label: 'Recent Activity Feed', kind: 'widget', group: 'activity' },
 ];
 
 export const DASHBOARD_LAYOUT_KEY = 'sleep-social-tracker-dashboard-layout';
@@ -90,4 +92,11 @@ export function visibleDashboardWidgets(layout: DashboardLayout): DashboardWidge
     .filter((id) => !hiddenSet.has(id))
     .map((id) => DASHBOARD_WIDGETS.find((w) => w.id === id)!)
     .filter(Boolean);
+}
+
+export function visibleWidgetsByGroup(
+  layout: DashboardLayout,
+  group: DashboardWidgetGroup
+): DashboardWidgetDef[] {
+  return visibleDashboardWidgets(layout).filter((w) => w.group === group);
 }
