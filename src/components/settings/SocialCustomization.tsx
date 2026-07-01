@@ -6,6 +6,12 @@ import {
   countFriendsWithRelationshipStatus,
   countFriendLinksWithType,
 } from '../../lib/social-options';
+import {
+  getFriendTagUsage,
+  getFriendGroupUsage,
+  getRelationshipStatusUsage,
+  getRelationshipTypeUsage,
+} from '../../lib/social-customization-usage';
 import { DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
 import { HangoutCategoryCustomization } from './HangoutCategoryCustomization';
 
@@ -26,6 +32,8 @@ export function SocialCustomization() {
     deleteRelationshipType,
   } = useApp();
 
+  const usageData = { friends: data.friends, hangouts: data.hangouts, ideas: data.ideas };
+
   return (
     <div className="space-y-4">
       <CustomOptionListCard
@@ -33,6 +41,7 @@ export function SocialCustomization() {
         description="Customize tags for friends. Friends can have multiple tags. Use Relationship Statuses for dating labels."
         options={data.friendTags}
         usageCount={(name) => countFriendsWithTag(data.friends, name)}
+        getUsageLog={(tag) => getFriendTagUsage(usageData, tag)}
         deleteMode="tag"
         onAdd={addFriendTag}
         onEdit={updateFriendTag}
@@ -48,6 +57,7 @@ export function SocialCustomization() {
         description="Organize friends into groups (separate from tags). Friends can belong to multiple groups."
         options={data.friendGroups}
         usageCount={(name) => countFriendsWithGroup(data.friends, name)}
+        getUsageLog={(group) => getFriendGroupUsage(usageData, group)}
         deleteMode="tag"
         onAdd={addFriendGroup}
         onEdit={updateFriendGroup}
@@ -63,6 +73,7 @@ export function SocialCustomization() {
         description="Customize relationship status options. Each friend has one status."
         options={data.relationshipStatuses}
         usageCount={(name) => countFriendsWithRelationshipStatus(data.friends, name)}
+        getUsageLog={(status) => getRelationshipStatusUsage(usageData, status)}
         defaultFallbackLabel={DEFAULT_RELATIONSHIP_STATUS}
         deleteMode="hangout"
         onAdd={addRelationshipStatus}
@@ -79,6 +90,7 @@ export function SocialCustomization() {
         description="Customize types for linked relationships between friends (Add/Edit Relationship on a friend's profile)."
         options={data.relationshipTypes}
         usageCount={(name) => countFriendLinksWithType(data.friends, name)}
+        getUsageLog={(type) => getRelationshipTypeUsage(data, type)}
         defaultFallbackLabel={DEFAULT_RELATIONSHIP_TYPE}
         deleteMode="hangout"
         onAdd={addRelationshipType}

@@ -3,6 +3,8 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/FormFields';
 import { Modal } from '../ui/Modal';
+import { UsageHistoryPanel } from './UsageHistoryPanel';
+import type { UsageLogContent } from '../../lib/social-customization-usage';
 
 interface CustomOptionListCardProps {
   title: string;
@@ -14,6 +16,7 @@ interface CustomOptionListCardProps {
   onAdd: (name: string) => string | null;
   onEdit: (oldName: string, newName: string) => string | null;
   onDelete: (name: string, resolution: string, otherName?: string) => void;
+  getUsageLog?: (option: string) => UsageLogContent;
 }
 
 export function CustomOptionListCard({
@@ -26,10 +29,12 @@ export function CustomOptionListCard({
   onAdd,
   onEdit,
   onDelete,
+  getUsageLog,
 }: CustomOptionListCardProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [openLogOption, setOpenLogOption] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [error, setError] = useState('');
   const [deleteAction, setDeleteAction] = useState<string>(deleteMode === 'tag' ? 'remove' : 'default');
@@ -108,17 +113,33 @@ export function CustomOptionListCard({
       ) : (
         <ul className="divide-y text-left" style={{ borderColor: 'var(--border)' }}>
           {options.map((option) => (
-            <li key={option} className="flex items-center justify-between gap-3 py-2.5">
-              <div className="min-w-0">
-                <span className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>{option}</span>
-                {usageCount(option) > 0 && (
-                  <span className="text-xs opacity-60 ml-2">({usageCount(option)} in use)</span>
-                )}
+            <li key={option} className="py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>{option}</span>
+                  {usageCount(option) > 0 && (
+                    <span className="text-xs opacity-60 ml-2">({usageCount(option)} in use)</span>
+                  )}
+                </div>
+                <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                  {getUsageLog && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      type="button"
+                      onClick={() => setOpenLogOption((prev) => (prev === option ? null : option))}
+                      aria-expanded={openLogOption === option}
+                    >
+                      {openLogOption === option ? 'Hide Log' : 'History'}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(option)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openDelete(option)}>Delete</Button>
+                </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="sm" variant="ghost" onClick={() => openEdit(option)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => openDelete(option)}>Delete</Button>
-              </div>
+              {openLogOption === option && getUsageLog && (
+                <UsageHistoryPanel key={option} content={getUsageLog(option)} />
+              )}
             </li>
           ))}
         </ul>

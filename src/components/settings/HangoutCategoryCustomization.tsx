@@ -9,6 +9,7 @@ import {
   DEFAULT_HANGOUT_CATEGORY,
   isMixedHangoutCategory,
 } from '../../lib/hangout-categories';
+import { getCategoryUsage, getCategoryTypeUsage } from '../../lib/social-customization-usage';
 
 export function HangoutCategoryCustomization() {
   const {
@@ -23,6 +24,7 @@ export function HangoutCategoryCustomization() {
 
   const [selectedCategory, setSelectedCategory] = useState(data.hangoutCategories[0] ?? DEFAULT_HANGOUT_CATEGORY);
   const types = typesForCategory(data.hangoutTypesByCategory, selectedCategory);
+  const usageData = { friends: data.friends, hangouts: data.hangouts, ideas: data.ideas };
 
   return (
     <div className="space-y-4">
@@ -31,6 +33,7 @@ export function HangoutCategoryCustomization() {
         description="Top-level hangout classification. Types belong to a category."
         options={data.hangoutCategories}
         usageCount={(name) => countHangoutsWithCategory(data.hangouts, name)}
+        getUsageLog={(category) => getCategoryUsage(usageData, category)}
         defaultFallbackLabel={DEFAULT_HANGOUT_CATEGORY}
         deleteMode="hangout"
         onAdd={addHangoutCategory}
@@ -59,6 +62,7 @@ export function HangoutCategoryCustomization() {
           description="Activity types within the selected category."
           options={types}
           usageCount={(name) => countHangoutsWithCategoryType(data.hangouts, selectedCategory, name)}
+          getUsageLog={(type) => getCategoryTypeUsage(usageData, selectedCategory, type)}
           defaultFallbackLabel="Other"
           deleteMode="hangout"
           onAdd={(name) => addTypeToCategory(selectedCategory, name)}
