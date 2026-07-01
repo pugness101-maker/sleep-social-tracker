@@ -36,11 +36,17 @@ export function HangoutCategoryCustomization() {
         getUsageLog={(category) => getCategoryUsage(usageData, category)}
         defaultFallbackLabel={DEFAULT_HANGOUT_CATEGORY}
         deleteMode="hangout"
+        deleteResolutionCopy={{
+          defaultOption: 'Move connected hangouts, segments, and ideas to Other',
+          otherOption: 'Choose another category',
+          clearOption: 'Clear category (move to Other)',
+        }}
         onAdd={addHangoutCategory}
         onEdit={updateHangoutCategory}
         onDelete={(name, action, otherName) => {
           if (action === 'default') deleteHangoutCategory(name, { action: 'default' });
           else if (action === 'other' && otherName) deleteHangoutCategory(name, { action: 'other', name: otherName });
+          else if (action === 'clear') deleteHangoutCategory(name, { action: 'clear' });
           else deleteHangoutCategory(name, { action: 'default' });
         }}
       />
@@ -65,11 +71,17 @@ export function HangoutCategoryCustomization() {
           getUsageLog={(type) => getCategoryTypeUsage(usageData, selectedCategory, type)}
           defaultFallbackLabel="Other"
           deleteMode="hangout"
+          deleteResolutionCopy={{
+            defaultOption: 'Move connected hangouts, segments, and ideas to Other',
+            otherOption: 'Choose another type in this category',
+            clearOption: 'Clear type (set to Other)',
+          }}
           onAdd={(name) => addTypeToCategory(selectedCategory, name)}
           onEdit={(oldName, newName) => updateTypeInCategory(selectedCategory, oldName, newName)}
           onDelete={(name, action, otherName) => {
             if (action === 'default') deleteTypeFromCategory(selectedCategory, name, { action: 'default' });
             else if (action === 'other' && otherName) deleteTypeFromCategory(selectedCategory, name, { action: 'other', name: otherName });
+            else if (action === 'clear') deleteTypeFromCategory(selectedCategory, name, { action: 'clear' });
             else deleteTypeFromCategory(selectedCategory, name, { action: 'default' });
           }}
         />

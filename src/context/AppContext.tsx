@@ -59,8 +59,22 @@ import {
   normalizeImportedFriendNames,
   renameFriendEverywhere,
 } from '../lib/data-cleanup';
-import { inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory } from '../lib/hangout-categories';
+import { allTypesFromCatalogExcludingMixed, inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory } from '../lib/hangout-categories';
+import { loadHangoutTabFilters, saveHangoutTabFilters, sanitizeHangoutTabFilters } from '../lib/hangout-filters';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
+
+function finalizeHangoutCatalogMutation(next: AppData): AppData {
+  const hangoutTypes = allTypesFromCatalogExcludingMixed(next.hangoutTypesByCategory);
+  saveHangoutTabFilters(
+    sanitizeHangoutTabFilters(
+      loadHangoutTabFilters(),
+      next.hangoutCategories,
+      next.hangouts,
+      next.hangoutTypesByCategory
+    )
+  );
+  return { ...next, hangoutTypes };
+}
 
 export type DeleteTagResolution =
   | { action: 'remove' }
@@ -198,6 +212,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const patch = useCallback((fn: (prev: AppData) => AppData) => {
     setData(fn);
   }, []);
+
+  const socialCustomizationPatch = useCallback((mutate: (prev: AppData) => AppData) => {
+    patch((prev) => {
+      addBackupToHistory(prev, 'social_customization_change');
+      return mutate(prev);
+    });
+  }, [patch]);
 
   const updateSettings = useCallback((settings: Partial<AppSettings>) => {
     patch((prev) => {
@@ -736,7 +757,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.friendTags, oldName);
     if (error) return error;
-    patch((prev) => ({
+    socialCustomizationPatch((prev) => ({
       ...prev,
       friendTags: prev.friendTags.map((t) => (t === oldName ? normalized : t)),
       friends: prev.friends.map((f) => ({
@@ -745,10 +766,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })),
     }));
     return null;
-  }, [patch, data.friendTags]);
+  }, [socialCustomizationPatch, data.friendTags]);
 
   const deleteFriendTag = useCallback((name: string, resolution: DeleteTagResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       const friends = prev.friends.map((f) => {
         if (!f.tags.includes(name)) return f;
         if (resolution.action === 'remove') {
@@ -767,7 +788,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         friends,
       };
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const addFriendGroup = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
@@ -781,7 +802,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.friendGroups, oldName);
     if (error) return error;
-    patch((prev) => ({
+    socialCustomizationPatch((prev) => ({
       ...prev,
       friendGroups: prev.friendGroups.map((g) => (g === oldName ? normalized : g)),
       friends: prev.friends.map((f) => ({
@@ -790,10 +811,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })),
     }));
     return null;
-  }, [patch, data.friendGroups]);
+  }, [socialCustomizationPatch, data.friendGroups]);
 
   const deleteFriendGroup = useCallback((name: string, resolution: DeleteTagResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       const friends = prev.friends.map((f) => {
         if (!(f.groups ?? []).includes(name)) return f;
         if (resolution.action === 'remove') {
@@ -811,7 +832,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         friends,
       };
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const addRelationshipStatus = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
@@ -825,7 +846,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.relationshipStatuses, oldName);
     if (error) return error;
-    patch((prev) => ({
+    socialCustomizationPatch((prev) => ({
       ...prev,
       relationshipStatuses: prev.relationshipStatuses.map((s) => (s === oldName ? normalized : s)),
       friends: prev.friends.map((f) =>
@@ -833,10 +854,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ),
     }));
     return null;
-  }, [patch, data.relationshipStatuses]);
+  }, [socialCustomizationPatch, data.relationshipStatuses]);
 
   const deleteRelationshipStatus = useCallback((name: string, resolution: DeleteTypeResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       let replacement = DEFAULT_RELATIONSHIP_STATUS;
       if (resolution.action === 'default') {
         replacement = prev.relationshipStatuses.includes(DEFAULT_RELATIONSHIP_STATUS)
@@ -856,7 +877,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const addHangoutType = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
@@ -870,14 +891,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.hangoutTypes, oldName);
     if (error) return error;
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       const nextCatalog = { ...prev.hangoutTypesByCategory };
       for (const [cat, types] of Object.entries(nextCatalog)) {
         nextCatalog[cat] = types.map((t) => (t === oldName ? normalized : t));
       }
-      return {
+      return finalizeHangoutCatalogMutation({
         ...prev,
-        hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
         hangoutTypesByCategory: nextCatalog,
         hangouts: prev.hangouts.map((h) => ({
           ...h,
@@ -888,13 +908,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeTimers: prev.activeTimers.hangoutType === oldName
           ? { ...prev.activeTimers, hangoutType: normalized }
           : prev.activeTimers,
-      };
+      });
     });
     return null;
-  }, [patch, data.hangoutTypes]);
+  }, [socialCustomizationPatch, data.hangoutTypes]);
 
   const deleteHangoutType = useCallback((name: string, resolution: DeleteTypeResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       let replacement = '';
       if (resolution.action === 'default') {
         replacement = prev.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
@@ -902,11 +922,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : prev.hangoutTypes.find((t) => t !== name) ?? '';
       } else if (resolution.action === 'other') {
         replacement = resolution.name;
+      } else if (resolution.action === 'clear') {
+        replacement = 'Other';
       }
 
-      return {
+      const nextCatalog = { ...prev.hangoutTypesByCategory };
+      for (const [cat, types] of Object.entries(nextCatalog)) {
+        nextCatalog[cat] = types.filter((t) => t !== name);
+      }
+
+      return finalizeHangoutCatalogMutation({
         ...prev,
-        hangoutTypes: prev.hangoutTypes.filter((t) => t !== name),
+        hangoutTypesByCategory: nextCatalog,
         hangouts: prev.hangouts.map((h) => ({
           ...h,
           type: h.type === name ? replacement : h.type,
@@ -918,9 +945,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeTimers: prev.activeTimers.hangoutType === name
           ? { ...prev.activeTimers, hangoutType: replacement || (prev.hangoutTypes.find((t) => t !== name) ?? '') }
           : prev.activeTimers,
-      };
+      });
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const addHangoutCategory = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
@@ -957,13 +984,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.hangoutCategories, oldName);
     if (error) return error;
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       const nextCatalog = { ...prev.hangoutTypesByCategory };
       if (nextCatalog[oldName]) {
         nextCatalog[normalized] = nextCatalog[oldName];
         delete nextCatalog[oldName];
       }
-      return {
+      return finalizeHangoutCatalogMutation({
         ...prev,
         hangoutCategories: prev.hangoutCategories.map((c) => (c === oldName ? normalized : c)),
         hangoutTypesByCategory: nextCatalog,
@@ -976,15 +1003,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeTimers: prev.activeTimers.hangoutCategory === oldName
           ? { ...prev.activeTimers, hangoutCategory: normalized }
           : prev.activeTimers,
-      };
+      });
     });
     return null;
-  }, [patch, data.hangoutCategories]);
+  }, [socialCustomizationPatch, data.hangoutCategories]);
 
   const deleteHangoutCategory = useCallback((name: string, resolution: DeleteTypeResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       let replacement = prev.hangoutCategories.includes('Other') ? 'Other' : prev.hangoutCategories.find((c) => c !== name) ?? 'Other';
       if (resolution.action === 'other') replacement = resolution.name;
+      else if (resolution.action === 'clear') replacement = 'Other';
 
       const mergedTypes = [...(prev.hangoutTypesByCategory[replacement] ?? [])];
       for (const t of prev.hangoutTypesByCategory[name] ?? []) {
@@ -992,7 +1020,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const { [name]: _removed, ...restCatalog } = prev.hangoutTypesByCategory;
 
-      return {
+      return finalizeHangoutCatalogMutation({
         ...prev,
         hangoutCategories: prev.hangoutCategories.filter((c) => c !== name),
         hangoutTypesByCategory: { ...restCatalog, [replacement]: mergedTypes },
@@ -1005,62 +1033,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeTimers: prev.activeTimers.hangoutCategory === name
           ? { ...prev.activeTimers, hangoutCategory: replacement }
           : prev.activeTimers,
-      };
+      });
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const updateTypeInCategory = useCallback((category: string, oldName: string, newName: string): string | null => {
     const normalized = normalizeOptionName(newName);
     const types = data.hangoutTypesByCategory[category] ?? [];
     const error = validateOptionName(normalized, types, oldName);
     if (error) return error;
-    patch((prev) => ({
-      ...prev,
-      hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
-      hangoutTypesByCategory: {
-        ...prev.hangoutTypesByCategory,
-        [category]: (prev.hangoutTypesByCategory[category] ?? []).map((t) => (t === oldName ? normalized : t)),
-      },
-      hangouts: prev.hangouts.map((h) => ({
-        ...h,
-        type: h.category === category && h.type === oldName ? normalized : h.type,
-        segments: h.segments?.map((s) =>
-          s.category === category && s.type === oldName ? { ...s, type: normalized } : s
-        ) ?? [],
-      })),
-      ideas: prev.ideas.map((i) =>
-        i.category === category && i.type === oldName ? { ...i, type: normalized } : i
-      ),
-      activeTimers:
-        prev.activeTimers.hangoutCategory === category && prev.activeTimers.hangoutType === oldName
-          ? { ...prev.activeTimers, hangoutType: normalized }
-          : prev.activeTimers,
-    }));
+    socialCustomizationPatch((prev) =>
+      finalizeHangoutCatalogMutation({
+        ...prev,
+        hangoutTypesByCategory: {
+          ...prev.hangoutTypesByCategory,
+          [category]: (prev.hangoutTypesByCategory[category] ?? []).map((t) => (t === oldName ? normalized : t)),
+        },
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          type: h.category === category && h.type === oldName ? normalized : h.type,
+          segments: h.segments?.map((s) =>
+            s.category === category && s.type === oldName ? { ...s, type: normalized } : s
+          ) ?? [],
+        })),
+        ideas: prev.ideas.map((i) =>
+          i.category === category && i.type === oldName ? { ...i, type: normalized } : i
+        ),
+        activeTimers:
+          prev.activeTimers.hangoutCategory === category && prev.activeTimers.hangoutType === oldName
+            ? { ...prev.activeTimers, hangoutType: normalized }
+            : prev.activeTimers,
+      })
+    );
     return null;
-  }, [patch, data.hangoutTypesByCategory]);
+  }, [socialCustomizationPatch, data.hangoutTypesByCategory]);
 
   const deleteTypeFromCategory = useCallback((category: string, name: string, resolution: DeleteTypeResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       const types = prev.hangoutTypesByCategory[category] ?? [];
       let replacement = types.includes('Other') ? 'Other' : types.find((t) => t !== name) ?? 'Other';
       if (resolution.action === 'other') replacement = resolution.name;
       else if (resolution.action === 'default') {
         replacement = types.includes(DEFAULT_HANGOUT_TYPE) ? DEFAULT_HANGOUT_TYPE : types.find((t) => t !== name) ?? 'Other';
+      } else if (resolution.action === 'clear') {
+        replacement = 'Other';
       }
 
-      const stillUsedElsewhere = Object.entries(prev.hangoutTypesByCategory).some(
-        ([cat, list]) => cat !== category && list.includes(name)
-      );
-
-      return {
+      return finalizeHangoutCatalogMutation({
         ...prev,
         hangoutTypesByCategory: {
           ...prev.hangoutTypesByCategory,
           [category]: types.filter((t) => t !== name),
         },
-        hangoutTypes: stillUsedElsewhere || !prev.hangoutTypes.includes(name)
-          ? prev.hangoutTypes
-          : prev.hangoutTypes.filter((t) => t !== name),
         hangouts: prev.hangouts.map((h) => ({
           ...h,
           type: h.category === category && h.type === name ? replacement : h.type,
@@ -1075,9 +1099,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           prev.activeTimers.hangoutCategory === category && prev.activeTimers.hangoutType === name
             ? { ...prev.activeTimers, hangoutType: replacement }
             : prev.activeTimers,
-      };
+      });
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const addRelationshipType = useCallback((name: string): string | null => {
     const normalized = normalizeOptionName(name);
@@ -1091,16 +1115,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeOptionName(newName);
     const error = validateOptionName(normalized, data.relationshipTypes, oldName);
     if (error) return error;
-    patch((prev) => ({
+    socialCustomizationPatch((prev) => ({
       ...prev,
       relationshipTypes: prev.relationshipTypes.map((t) => (t === oldName ? normalized : t)),
       friends: updateAllFriendLinkTypes(prev.friends, oldName, normalized) as typeof prev.friends,
     }));
     return null;
-  }, [patch, data.relationshipTypes]);
+  }, [socialCustomizationPatch, data.relationshipTypes]);
 
   const deleteRelationshipType = useCallback((name: string, resolution: DeleteTypeResolution) => {
-    patch((prev) => {
+    socialCustomizationPatch((prev) => {
       let replacement = DEFAULT_RELATIONSHIP_TYPE;
       if (resolution.action === 'default') {
         replacement = prev.relationshipTypes.includes(DEFAULT_RELATIONSHIP_TYPE)
@@ -1118,7 +1142,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         friends: replaceFriendLinkType(prev.friends, name, replacement) as typeof prev.friends,
       };
     });
-  }, [patch]);
+  }, [socialCustomizationPatch]);
 
   const exportDataFn = useCallback(() => exportAppData(data), [data]);
 

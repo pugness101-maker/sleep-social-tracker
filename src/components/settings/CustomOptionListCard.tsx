@@ -6,6 +6,14 @@ import { Modal } from '../ui/Modal';
 import { UsageHistoryPanel } from './UsageHistoryPanel';
 import type { UsageLogContent } from '../../lib/social-customization-usage';
 
+export interface DeleteResolutionCopy {
+  defaultOption?: string;
+  otherOption?: string;
+  clearOption?: string;
+  tagRemove?: string;
+  tagReplace?: string;
+}
+
 interface CustomOptionListCardProps {
   title: string;
   description: string;
@@ -13,6 +21,7 @@ interface CustomOptionListCardProps {
   usageCount: (name: string) => number;
   defaultFallbackLabel?: string;
   deleteMode?: 'hangout' | 'tag';
+  deleteResolutionCopy?: DeleteResolutionCopy;
   onAdd: (name: string) => string | null;
   onEdit: (oldName: string, newName: string) => string | null;
   onDelete: (name: string, resolution: string, otherName?: string) => void;
@@ -26,6 +35,7 @@ export function CustomOptionListCard({
   usageCount,
   defaultFallbackLabel = 'Other',
   deleteMode = 'hangout',
+  deleteResolutionCopy,
   onAdd,
   onEdit,
   onDelete,
@@ -87,16 +97,28 @@ export function CustomOptionListCard({
       return;
     }
     if (deleteAction === 'replace' && !deleteOther) {
-      setError('Please choose a replacement tag.');
+      setError('Please choose a replacement.');
       return;
     }
-    onDelete(deleteTarget, deleteAction, deleteAction === 'other' || deleteAction === 'replace' ? deleteOther : undefined);
+    onDelete(
+      deleteTarget,
+      deleteAction,
+      deleteAction === 'other' || deleteAction === 'replace' ? deleteOther : undefined
+    );
     setDeleteTarget(null);
     setError('');
   };
 
   const deleteUsage = deleteTarget ? usageCount(deleteTarget) : 0;
+  const editUsage = editTarget ? usageCount(editTarget) : 0;
   const otherOptions = deleteTarget ? options.filter((o) => o !== deleteTarget) : [];
+
+  const defaultOptionLabel =
+    deleteResolutionCopy?.defaultOption ?? `Move connected records to ${defaultFallbackLabel}`;
+  const otherOptionLabel = deleteResolutionCopy?.otherOption ?? 'Choose another';
+  const clearOptionLabel = deleteResolutionCopy?.clearOption ?? 'Clear (remove value)';
+  const tagRemoveLabel = deleteResolutionCopy?.tagRemove ?? 'Remove from friends';
+  const tagReplaceLabel = deleteResolutionCopy?.tagReplace ?? 'Replace with another';
 
   return (
     <Card>
@@ -183,6 +205,11 @@ export function CustomOptionListCard({
           onChange={(e) => { setNameInput(e.target.value); setError(''); }}
           autoFocus
         />
+        {editUsage > 0 && (
+          <p className="text-sm opacity-70 mt-3 text-left">
+            {editUsage} connected record{editUsage !== 1 ? 's' : ''} will be updated to use the new name.
+          </p>
+        )}
         {error && <p className="text-sm text-danger mt-2 text-left">{error}</p>}
       </Modal>
 
@@ -197,23 +224,26 @@ export function CustomOptionListCard({
           </>
         }
       >
-        <p className="text-left mb-4">
-          Delete <strong>{deleteTarget}</strong>?
-          {deleteUsage > 0 && (
-            <span> {deleteUsage} item{deleteUsage !== 1 ? 's' : ''} currently use this option.</span>
-          )}
-        </p>
+        {deleteUsage > 0 ? (
+          <p className="text-left mb-4">
+            This item is used by <strong>{deleteUsage}</strong> record{deleteUsage !== 1 ? 's' : ''}.
+            What should happen to connected data?
+          </p>
+        ) : (
+          <p className="text-left mb-4">
+            Delete <strong>{deleteTarget}</strong>? This cannot be undone.
+          </p>
+        )}
 
         {deleteUsage > 0 && deleteMode === 'tag' && (
           <div className="space-y-2 text-left">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-heading)' }}>What should happen to friends using this tag?</p>
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input type="radio" name="deleteAction" checked={deleteAction === 'remove'} onChange={() => { setDeleteAction('remove'); setError(''); }} />
-              Remove only that tag
+              {tagRemoveLabel}
             </label>
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input type="radio" name="deleteAction" checked={deleteAction === 'replace'} onChange={() => { setDeleteAction('replace'); setError(''); }} />
-              Replace it with another tag
+              {tagReplaceLabel}
             </label>
             {deleteAction === 'replace' && (
               <Select
@@ -227,14 +257,13 @@ export function CustomOptionListCard({
 
         {deleteUsage > 0 && deleteMode === 'hangout' && (
           <div className="space-y-2 text-left">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-heading)' }}>What should happen to affected items?</p>
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input type="radio" name="deleteAction" checked={deleteAction === 'default'} onChange={() => { setDeleteAction('default'); setError(''); }} />
-              Move to {defaultFallbackLabel}
+              {defaultOptionLabel}
             </label>
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input type="radio" name="deleteAction" checked={deleteAction === 'other'} onChange={() => { setDeleteAction('other'); setError(''); }} />
-              Choose another
+              {otherOptionLabel}
             </label>
             {deleteAction === 'other' && (
               <Select
@@ -245,7 +274,7 @@ export function CustomOptionListCard({
             )}
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input type="radio" name="deleteAction" checked={deleteAction === 'clear'} onChange={() => { setDeleteAction('clear'); setError(''); }} />
-              Clear (remove value)
+              {clearOptionLabel}
             </label>
           </div>
         )}

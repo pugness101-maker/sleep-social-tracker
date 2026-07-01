@@ -10,7 +10,7 @@ export interface BackupMeta {
   id: string;
   savedAt: string;
   version: number;
-  reason: 'manual' | 'import' | 'cleanup' | 'auto';
+  reason: 'manual' | 'import' | 'cleanup' | 'auto' | 'social_customization_change';
   sleepCount: number;
   napCount: number;
   friendCount: number;
@@ -92,6 +92,8 @@ export function formatBackupReason(reason: BackupMeta['reason']): string {
       return 'Pre-cleanup';
     case 'auto':
       return 'Auto';
+    case 'social_customization_change':
+      return 'Social customization';
     default:
       return reason;
   }

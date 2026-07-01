@@ -212,18 +212,12 @@ export function mergeTypesIntoCatalog(
 ): { categories: string[]; catalog: Record<string, string[]> } {
   const nextCategories = [...categories];
   const nextCatalog = { ...catalog };
-  for (const cat of DEFAULT_HANGOUT_CATEGORIES) {
-    if (!nextCategories.includes(cat)) nextCategories.push(cat);
-    if (!nextCatalog[cat]) {
-      nextCatalog[cat] = isMixedHangoutCategory(cat)
-        ? []
-        : [...(DEFAULT_HANGOUT_TYPES_BY_CATEGORY[cat] ?? ['Other'])];
-    }
+  if (nextCategories.some(isMixedHangoutCategory)) {
+    nextCatalog[MIXED_HANGOUT_CATEGORY] = [];
   }
   if (nextCatalog.Social) {
     nextCatalog.Social = nextCatalog.Social.filter((t) => t.toLowerCase() !== MIXED_HANGOUT_MAIN_TYPE.toLowerCase());
   }
-  nextCatalog[MIXED_HANGOUT_CATEGORY] = [];
 
   const ensure = (category: string, type: string) => {
     if (isMixedHangoutCategory(category)) return;

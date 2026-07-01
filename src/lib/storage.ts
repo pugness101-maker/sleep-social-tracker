@@ -3,12 +3,14 @@ import { normalizeHangoutSegments } from './hangout-segments';
 import { normalizeSleepAutoCalcSettings } from './sleep-goals';
 import {
   cloneDefaultTypesByCategory,
+  DEFAULT_HANGOUT_TYPES_BY_CATEGORY,
   inferCategoryAndType,
   mergeTypesIntoCatalog,
   migrateHangoutCategories,
   migrateIdeaCategories,
   allTypesFromCatalogExcludingMixed,
   isMixedHangoutCategory,
+  MIXED_HANGOUT_CATEGORY,
 } from './hangout-categories';
 import {
   DEFAULT_HANGOUT_CATEGORIES,
@@ -143,6 +145,41 @@ function mergeSocialOptions(
   return { friendTags, friendGroups, relationshipStatuses, relationshipTypes, hangoutTypes };
 }
 
+/** Build category catalog from saved settings — defaults only on first install. */
+export function buildHangoutCatalogFromSaved(raw: Partial<AppData>): {
+  categories: string[];
+  catalog: Record<string, string[]>;
+} {
+  if (raw.hangoutCategories == null) {
+    return {
+      categories: [...DEFAULT_HANGOUT_CATEGORIES],
+      catalog: cloneDefaultTypesByCategory(),
+    };
+  }
+
+  const categories = [...raw.hangoutCategories];
+  const catalog: Record<string, string[]> = {};
+
+  if (raw.hangoutTypesByCategory != null) {
+    for (const cat of categories) {
+      catalog[cat] = [...(raw.hangoutTypesByCategory[cat] ?? ['Other'])];
+    }
+    for (const [cat, types] of Object.entries(raw.hangoutTypesByCategory)) {
+      if (!catalog[cat]) catalog[cat] = [...types];
+    }
+  } else {
+    for (const cat of categories) {
+      catalog[cat] = [...(DEFAULT_HANGOUT_TYPES_BY_CATEGORY[cat] ?? ['Other'])];
+    }
+  }
+
+  if (categories.some(isMixedHangoutCategory)) {
+    catalog[MIXED_HANGOUT_CATEGORY] = [];
+  }
+
+  return { categories, catalog };
+}
+
 /** Migrate legacy friend.category → tags, and relationship labels out of tags */
 function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string }>): Friend[] {
   return rawFriends.map((friend) => {
@@ -200,14 +237,7 @@ export function normalizeAppData(
   }
 ): AppData {
   const friends = migrateFriends(raw.friends ?? []);
-  const catalogBase = {
-    ...cloneDefaultTypesByCategory(),
-    ...(raw.hangoutTypesByCategory ?? {}),
-  };
-  const categories = [
-    ...DEFAULT_HANGOUT_CATEGORIES,
-    ...(raw.hangoutCategories ?? []).filter((c) => !DEFAULT_HANGOUT_CATEGORIES.includes(c as typeof DEFAULT_HANGOUT_CATEGORIES[number])),
-  ];
+  const { categories, catalog: catalogBase } = buildHangoutCatalogFromSaved(raw);
   let ideas = migrateIdeas(raw.ideas ?? []);
   let hangouts = migrateHangouts(raw.hangouts ?? [], catalogBase);
   const merged = mergeTypesIntoCatalog(categories, catalogBase, hangouts, ideas);

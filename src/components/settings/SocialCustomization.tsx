@@ -43,6 +43,10 @@ export function SocialCustomization() {
         usageCount={(name) => countFriendsWithTag(data.friends, name)}
         getUsageLog={(tag) => getFriendTagUsage(usageData, tag)}
         deleteMode="tag"
+        deleteResolutionCopy={{
+          tagRemove: 'Remove from friends',
+          tagReplace: 'Replace with another tag',
+        }}
         onAdd={addFriendTag}
         onEdit={updateFriendTag}
         onDelete={(name, action, otherName) => {
@@ -59,6 +63,10 @@ export function SocialCustomization() {
         usageCount={(name) => countFriendsWithGroup(data.friends, name)}
         getUsageLog={(group) => getFriendGroupUsage(usageData, group)}
         deleteMode="tag"
+        deleteResolutionCopy={{
+          tagRemove: 'Remove from friends',
+          tagReplace: 'Replace with another group',
+        }}
         onAdd={addFriendGroup}
         onEdit={updateFriendGroup}
         onDelete={(name, action, otherName) => {
@@ -76,6 +84,11 @@ export function SocialCustomization() {
         getUsageLog={(status) => getRelationshipStatusUsage(usageData, status)}
         defaultFallbackLabel={DEFAULT_RELATIONSHIP_STATUS}
         deleteMode="hangout"
+        deleteResolutionCopy={{
+          defaultOption: 'Move friends to None',
+          otherOption: 'Choose another status',
+          clearOption: 'Clear status (set to empty)',
+        }}
         onAdd={addRelationshipStatus}
         onEdit={updateRelationshipStatus}
         onDelete={(name, action, otherName) => {
@@ -93,6 +106,11 @@ export function SocialCustomization() {
         getUsageLog={(type) => getRelationshipTypeUsage(data, type)}
         defaultFallbackLabel={DEFAULT_RELATIONSHIP_TYPE}
         deleteMode="hangout"
+        deleteResolutionCopy={{
+          defaultOption: 'Move relationships to Other',
+          otherOption: 'Choose another type',
+          clearOption: 'Clear type (remove from links)',
+        }}
         onAdd={addRelationshipType}
         onEdit={updateRelationshipType}
         onDelete={(name, action, otherName) => {
