@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Textarea, Select } from '../ui/FormFields';
+import { SearchableFriendSelect } from './SearchableFriendSelect';
 import { Badge } from '../ui/Misc';
 import { formatDate, formatTime, formatDuration } from '../../lib/dates';
 import { linkTypeOptions } from '../../lib/friend-links';
@@ -57,7 +58,7 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
   const openAddLink = () => {
     setEditLink(null);
     setLinkForm({
-      relatedFriendId: otherFriends[0]?.id ?? '',
+      relatedFriendId: '',
       type: getDefaultRelationshipType(data.relationshipTypes),
       notes: '',
     });
@@ -259,11 +260,11 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
         }
       >
         <div className="space-y-4 text-left">
-          <Select
+          <SearchableFriendSelect
             label="Related Friend"
             value={linkForm.relatedFriendId}
-            onChange={(e) => setLinkForm({ ...linkForm, relatedFriendId: e.target.value })}
-            options={otherFriends.map((f) => ({ value: f.id, label: f.name }))}
+            onChange={(relatedFriendId) => setLinkForm({ ...linkForm, relatedFriendId })}
+            excludeFriendIds={friendId ? [friendId] : []}
           />
           <Select
             label="Relationship Type"

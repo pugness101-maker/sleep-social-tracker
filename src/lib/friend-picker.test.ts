@@ -3,6 +3,7 @@ import type { Friend, Hangout } from '../types';
 import {
   compareFriendNames,
   filterFriendsForPicker,
+  filterFriendsForSelect,
   formatSelectedCount,
   friendMatchesSearch,
   friendMatchesQuickFilter,
@@ -14,7 +15,7 @@ const alice: Friend = {
   id: 'a',
   name: 'Alice',
   tags: ['Best Friend'],
-  groups: [],
+  groups: ['TXST'],
   relationshipStatus: 'Friend',
   birthday: '',
   contactInfo: '',
@@ -76,9 +77,10 @@ const hangouts: Hangout[] = [
 ];
 
 describe('friendMatchesSearch', () => {
-  it('matches name, tags, relationship status, and notes', () => {
+  it('matches name, tags, groups, relationship status, and notes', () => {
     expect(friendMatchesSearch(alice, 'alice')).toBe(true);
     expect(friendMatchesSearch(alice, 'best')).toBe(true);
+    expect(friendMatchesSearch(alice, 'txst')).toBe(true);
     expect(friendMatchesSearch(carol, 'crush')).toBe(true);
     expect(friendMatchesSearch(alice, 'college')).toBe(true);
     expect(friendMatchesSearch(bob, 'alice')).toBe(false);
@@ -141,6 +143,27 @@ describe('filterFriendsForPicker', () => {
       showSelectedFirst: false,
     });
     expect(result.map((f) => f.id)).toEqual(['b']);
+  });
+});
+
+describe('filterFriendsForSelect', () => {
+  it('excludes specified friends and sorts alphabetically when searching', () => {
+    const result = filterFriendsForSelect([alice, bob, carol], {
+      search: '',
+      excludeIds: ['a'],
+      hangouts,
+      prioritizeRecentFavorites: false,
+    });
+    expect(result.map((f) => f.id)).toEqual(['b', 'c']);
+  });
+
+  it('filters by search query', () => {
+    const result = filterFriendsForSelect([alice, bob, carol], {
+      search: 'txst',
+      excludeIds: [],
+      hangouts,
+    });
+    expect(result.map((f) => f.id)).toEqual(['a']);
   });
 });
 

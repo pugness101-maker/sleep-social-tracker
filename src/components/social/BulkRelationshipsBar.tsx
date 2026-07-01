@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { Select } from '../ui/FormFields';
+import { FriendPicker } from './FriendPicker';
 import { optionSelectOptions } from '../../lib/social-options';
 import {
   formatBulkPreviewMessage,
@@ -17,14 +18,14 @@ type BulkAction = 'add' | 'remove';
 
 interface BulkRelationshipsBarProps {
   selectedIds: string[];
-  onClearSelection: () => void;
+  onSelectionChange: (ids: string[]) => void;
   onExitBulkMode: () => void;
   onSuccess: (message: string) => void;
 }
 
 export function BulkRelationshipsBar({
   selectedIds,
-  onClearSelection,
+  onSelectionChange,
   onExitBulkMode,
   onSuccess,
 }: BulkRelationshipsBarProps) {
@@ -92,7 +93,7 @@ export function BulkRelationshipsBar({
     }
 
     setConfirmAction(null);
-    onClearSelection();
+    onSelectionChange([]);
   };
 
   const canAct = selectedIds.length >= 2;
@@ -104,15 +105,17 @@ export function BulkRelationshipsBar({
           <p className="font-medium" style={{ color: 'var(--text-heading)' }}>
             Bulk Relationships
           </p>
-          <span className="text-sm opacity-70">
-            {selectedIds.length} friend{selectedIds.length === 1 ? '' : 's'} selected
-          </span>
-          <Button size="sm" variant="ghost" onClick={onClearSelection} disabled={selectedIds.length === 0}>
-            Clear Selection
-          </Button>
           <Button size="sm" variant="secondary" onClick={onExitBulkMode}>
             Exit Bulk Mode
           </Button>
+        </div>
+
+        <div className="mb-4">
+          <FriendPicker
+            label="Select friends"
+            selected={selectedIds}
+            onChange={onSelectionChange}
+          />
         </div>
 
         {!canAct && (

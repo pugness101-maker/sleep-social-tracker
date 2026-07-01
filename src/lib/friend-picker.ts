@@ -16,6 +16,7 @@ export function friendMatchesSearch(friend: Friend, query: string): boolean {
     friend.relationshipStatus,
     friend.notes,
     ...friend.tags,
+    ...(friend.groups ?? []),
   ]
     .filter(Boolean)
     .join(' ')
@@ -107,6 +108,48 @@ export function filterFriendsForPicker(
   }
 
   return sortFriendsForPicker(list, options.selectedIds, options.showSelectedFirst);
+}
+
+export function sortFriendsWithRecentAndFavoritesFirst(
+  friends: Friend[],
+  hangouts: Hangout[]
+): Friend[] {
+  const sorted = [...friends].sort(compareFriendNames);
+  const recentIds = new Set(
+    sorted.filter((f) => friendHasRecentHangout(f.id, hangouts)).map((f) => f.id)
+  );
+  const favoriteIds = new Set(
+    sorted
+      .filter((f) => f.tags.some((t) => FAVORITE_TAG_PATTERN.test(t.trim())))
+      .map((f) => f.id)
+  );
+
+  const recent = sorted.filter((f) => recentIds.has(f.id));
+  const favoritesOnly = sorted.filter((f) => favoriteIds.has(f.id) && !recentIds.has(f.id));
+  const rest = sorted.filter((f) => !recentIds.has(f.id) && !favoriteIds.has(f.id));
+  return [...recent, ...favoritesOnly, ...rest];
+}
+
+export function filterFriendsForSelect(
+  friends: Friend[],
+  options: {
+    search: string;
+    excludeIds?: string[];
+    hangouts: Hangout[];
+    prioritizeRecentFavorites?: boolean;
+  }
+): Friend[] {
+  const excludeSet = new Set(options.excludeIds ?? []);
+  let list = friends.filter((f) => !excludeSet.has(f.id));
+
+  if (options.search.trim()) {
+    list = list.filter((f) => friendMatchesSearch(f, options.search));
+    return list.sort(compareFriendNames);
+  }
+
+  return options.prioritizeRecentFavorites !== false
+    ? sortFriendsWithRecentAndFavoritesFirst(list, options.hangouts)
+    : list.sort(compareFriendNames);
 }
 
 export function toggleFriendSelection(selected: string[], friendId: string): string[] {

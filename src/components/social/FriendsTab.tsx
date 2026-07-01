@@ -108,12 +108,6 @@ export function FriendsTab() {
     setModalOpen(false);
   };
 
-  const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriendIds((prev) =>
-      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
-    );
-  };
-
   const exitBulkMode = () => {
     setBulkMode(false);
     setSelectedFriendIds([]);
@@ -177,7 +171,7 @@ export function FriendsTab() {
       {bulkMode && (
         <BulkRelationshipsBar
           selectedIds={selectedFriendIds}
-          onClearSelection={() => setSelectedFriendIds([])}
+          onSelectionChange={setSelectedFriendIds}
           onExitBulkMode={exitBulkMode}
           onSuccess={showSuccess}
         />
@@ -213,24 +207,13 @@ export function FriendsTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {friends.map((friend) => {
             const lastSeen = formatLastSeenLabel(friend.lastSeen);
-            const isSelected = selectedFriendIds.includes(friend.id);
+            const isSelected = bulkMode && selectedFriendIds.includes(friend.id);
             return (
             <Card
               key={friend.id}
-              className={bulkMode && isSelected ? 'ring-2 ring-indigo-500' : undefined}
+              className={isSelected ? 'ring-2 ring-indigo-500' : undefined}
             >
               <div className="text-left">
-                {bulkMode && (
-                  <label className="flex items-center gap-2 mb-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleFriendSelection(friend.id)}
-                      className="rounded"
-                    />
-                    <span className="text-sm opacity-70">Select for bulk</span>
-                  </label>
-                )}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
                   {friend.relationshipStatus && friend.relationshipStatus !== 'None' && (
