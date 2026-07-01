@@ -11,6 +11,7 @@ import { formatDate, formatDuration } from '../../lib/dates';
 import { friendMatchesTagFilter, friendMatchesGroupFilter, optionSelectOptions } from '../../lib/social-options';
 import { formatLastSeenLabel, sortFriends, type FriendSortOption } from '../../lib/friend-activity';
 import { FriendDetailModal } from './FriendDetailModal';
+import { BulkRelationshipsBar } from './BulkRelationshipsBar';
 import type { Friend } from '../../types';
 import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
 
@@ -25,6 +26,9 @@ export function FriendsTab() {
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailFriendId, setDetailFriendId] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const emptyForm = {
     name: '',
@@ -104,8 +108,33 @@ export function FriendsTab() {
     setModalOpen(false);
   };
 
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriendIds((prev) =>
+      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
+    );
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setSelectedFriendIds([]);
+  };
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    window.setTimeout(() => setSuccessMessage(''), 5000);
+  };
+
   return (
     <div>
+      {successMessage && (
+        <div
+          className="mb-4 px-4 py-3 rounded-lg text-sm"
+          style={{ background: 'rgba(52, 211, 153, 0.15)', color: 'var(--text-heading)' }}
+          role="status"
+        >
+          {successMessage}
+        </div>
+      )}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="flex-1 min-w-[200px]">
           <SearchBar value={search} onChange={setSearch} placeholder="Search friends..." />
@@ -137,7 +166,22 @@ export function FriendsTab() {
           ]}
         />
         <Button onClick={openAdd}>Add Friend</Button>
+        <Button
+          variant={bulkMode ? 'secondary' : 'ghost'}
+          onClick={() => (bulkMode ? exitBulkMode() : setBulkMode(true))}
+        >
+          Bulk Relationships
+        </Button>
       </div>
+
+      {bulkMode && (
+        <BulkRelationshipsBar
+          selectedIds={selectedFriendIds}
+          onClearSelection={() => setSelectedFriendIds([])}
+          onExitBulkMode={exitBulkMode}
+          onSuccess={showSuccess}
+        />
+      )}
 
       <Card className="mb-4">
         <TagPicker
@@ -169,9 +213,24 @@ export function FriendsTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {friends.map((friend) => {
             const lastSeen = formatLastSeenLabel(friend.lastSeen);
+            const isSelected = selectedFriendIds.includes(friend.id);
             return (
-            <Card key={friend.id}>
+            <Card
+              key={friend.id}
+              className={bulkMode && isSelected ? 'ring-2 ring-indigo-500' : undefined}
+            >
               <div className="text-left">
+                {bulkMode && (
+                  <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleFriendSelection(friend.id)}
+                      className="rounded"
+                    />
+                    <span className="text-sm opacity-70">Select for bulk</span>
+                  </label>
+                )}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
                   {friend.relationshipStatus && friend.relationshipStatus !== 'None' && (

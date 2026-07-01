@@ -38,6 +38,7 @@ import {
   validateOptionName,
 } from '../lib/social-options';
 import { getReciprocalLinkType, removeLinksToFriend, replaceFriendLinkType, updateAllFriendLinkTypes } from '../lib/friend-links';
+import { applyBulkAddRelationships, applyBulkRemoveRelationships } from '../lib/bulk-relationships';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 export type DeleteTagResolution =
@@ -73,6 +74,15 @@ interface AppContextValue {
   addFriendLink: (friendId: string, relatedFriendId: string, type: string, notes?: string) => string | null;
   updateFriendLink: (friendId: string, linkId: string, updates: { relatedFriendId?: string; type?: string; notes?: string }) => string | null;
   deleteFriendLink: (friendId: string, linkId: string) => void;
+  bulkAddFriendRelationships: (
+    friendIds: string[],
+    type: string,
+    reciprocal?: boolean
+  ) => { createdPairs: number; skippedPairs: number };
+  bulkRemoveFriendRelationships: (
+    friendIds: string[],
+    typeFilter?: string
+  ) => { removedPairs: number };
   // Hangouts
   startHangout: (friendIds: string[], type?: HangoutType, location?: string) => void;
   endHangout: (notes?: string) => void;
@@ -460,6 +470,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
     });
   }, [patch]);
+
+  const bulkAddFriendRelationships = useCallback(
+    (friendIds: string[], type: string, reciprocal = true) => {
+      let result = { createdPairs: 0, skippedPairs: 0 };
+      patch((prev) => {
+        const applied = applyBulkAddRelationships(
+          prev.friends,
+          friendIds,
+          type,
+          reciprocal,
+          generateId,
+          toLocalISO
+        );
+        result = { createdPairs: applied.createdPairs, skippedPairs: applied.skippedPairs };
+        return { ...prev, friends: applied.friends };
+      });
+      return result;
+    },
+    [patch]
+  );
+
+  const bulkRemoveFriendRelationships = useCallback(
+    (friendIds: string[], typeFilter?: string) => {
+      let result = { removedPairs: 0 };
+      patch((prev) => {
+        const applied = applyBulkRemoveRelationships(prev.friends, friendIds, typeFilter);
+        result = { removedPairs: applied.removedPairs };
+        return { ...prev, friends: applied.friends };
+      });
+      return result;
+    },
+    [patch]
+  );
 
   const startHangout = useCallback(
     (friendIds: string[], type?: HangoutType, location = '') => {
@@ -943,6 +986,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFriendLink,
     updateFriendLink,
     deleteFriendLink,
+    bulkAddFriendRelationships,
+    bulkRemoveFriendRelationships,
     startHangout,
     endHangout,
     addHangout,
