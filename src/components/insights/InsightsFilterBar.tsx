@@ -4,7 +4,6 @@ import { Button } from '../ui/Button';
 import { Select } from '../ui/FormFields';
 import { Badge } from '../ui/Misc';
 import {
-  filterHangoutsByInsights,
   getInsightsFilterChips,
   hasActiveInsightsFilters,
   type InsightsFilters,
@@ -164,28 +163,4 @@ export function InsightsFilterBar({
       )}
     </div>
   );
-}
-
-export function useFilteredAppData(
-  data: ReturnType<typeof useApp>['data'],
-  filters: InsightsFilters,
-  rangeStart?: Date,
-  rangeEnd?: Date
-) {
-  return useMemo(() => {
-    const hangouts = filterHangoutsByInsights(data.hangouts, filters, data.friends, rangeStart, rangeEnd);
-    let sleepEntries = data.sleepEntries;
-    let napEntries = data.napEntries;
-    if (rangeStart && rangeEnd) {
-      sleepEntries = sleepEntries.filter((s) => {
-        const t = new Date(s.wakeUp);
-        return t >= rangeStart && t <= rangeEnd;
-      });
-      napEntries = napEntries.filter((n) => {
-        const t = new Date(n.napEnd);
-        return t >= rangeStart && t <= rangeEnd;
-      });
-    }
-    return { ...data, hangouts, sleepEntries, napEntries };
-  }, [data, filters, rangeStart, rangeEnd]);
 }

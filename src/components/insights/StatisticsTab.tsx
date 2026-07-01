@@ -3,13 +3,14 @@ import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { buildStatisticsBundle } from '../../lib/statistics-analytics';
+import { getFilteredInsightsData } from '../../lib/insights-filters';
 import { resolveComparePresetRanges } from '../../lib/stats-compare-mode';
 import { statsRangeArgs } from '../../hooks/useStatsDateRange';
 import { useStatsCompareMode } from '../../hooks/useStatsCompareMode';
 import { useInsightsFilters } from '../../hooks/useInsightsFilters';
 import { useStatisticsAccordion } from '../../hooks/useStatisticsAccordion';
 import { StatisticsCompareFilter } from './StatisticsCompareFilter';
-import { InsightsFilterBar, useFilteredAppData } from './InsightsFilterBar';
+import { InsightsFilterBar } from './InsightsFilterBar';
 import { StatisticsCollapsibleSection } from './statistics/StatisticsCollapsibleSection';
 import { StatisticsOverviewPanel } from './statistics/StatisticsOverviewPanel';
 import { StatisticsSleepPanel } from './statistics/StatisticsSleepPanel';
@@ -44,18 +45,16 @@ export function StatisticsTab() {
     ? statsRangeArgs(compareResolved.b)
     : { start: undefined, end: undefined };
 
-  const filteredDataA = useMemo(
-    () => useFilteredAppData(data, filters, boundsA.start, boundsA.end),
-    [data, filters, boundsA.start, boundsA.end]
-  );
+  const filteredDataA = useMemo(() => {
+    const filtered = getFilteredInsightsData(data, filters, boundsA.start, boundsA.end);
+    return { ...data, ...filtered };
+  }, [data, filters, boundsA.start, boundsA.end]);
 
-  const filteredDataB = useMemo(
-    () =>
-      compareMode.compareEnabled
-        ? useFilteredAppData(data, filters, boundsB.start, boundsB.end)
-        : null,
-    [data, filters, compareMode.compareEnabled, boundsB.start, boundsB.end]
-  );
+  const filteredDataB = useMemo(() => {
+    if (!compareMode.compareEnabled) return null;
+    const filtered = getFilteredInsightsData(data, filters, boundsB.start, boundsB.end);
+    return { ...data, ...filtered };
+  }, [data, filters, compareMode.compareEnabled, boundsB.start, boundsB.end]);
 
   const stats = useMemo(
     () => buildStatisticsBundle(filteredDataA, boundsA.start, boundsA.end),

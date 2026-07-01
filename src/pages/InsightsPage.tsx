@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Tabs } from '../components/ui/Tabs';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { CalendarTab } from '../components/insights/CalendarTab';
 import { StatisticsTab } from '../components/insights/StatisticsTab';
 import { TimelineTab } from '../components/insights/TimelineTab';
@@ -14,6 +15,7 @@ const tabs = [
 
 export function InsightsPage() {
   const [active, setActive] = useState('calendar');
+  const [resetKey, setResetKey] = useState(0);
 
   return (
     <div>
@@ -24,10 +26,12 @@ export function InsightsPage() {
       <div className="mb-6">
         <Tabs tabs={tabs} active={active} onChange={setActive} />
       </div>
-      {active === 'calendar' && <CalendarTab />}
-      {active === 'statistics' && <StatisticsTab />}
-      {active === 'timeline' && <TimelineTab />}
-      {active === 'map' && <MapTab />}
+      <ErrorBoundary key={resetKey} onReset={() => setResetKey((k) => k + 1)}>
+        {active === 'calendar' && <CalendarTab />}
+        {active === 'statistics' && <StatisticsTab />}
+        {active === 'timeline' && <TimelineTab />}
+        {active === 'map' && <MapTab />}
+      </ErrorBoundary>
     </div>
   );
 }
