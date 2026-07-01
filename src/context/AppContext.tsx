@@ -346,17 +346,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       patch((prev) => {
         const idea = prev.ideas.find((i) => i.id === id);
         if (!idea) return prev;
-        const fallbackType = prev.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
+        const ideaType = idea.type || (prev.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
           ? DEFAULT_HANGOUT_TYPE
-          : prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE;
+          : prev.hangoutTypes[0] ?? DEFAULT_HANGOUT_TYPE);
+        const resolvedFriends = friendIds.length > 0 ? friendIds : idea.friendIds;
+        const notesParts = [idea.title && `Idea: ${idea.title}`, idea.notes].filter(Boolean);
         const hangout: Hangout = {
           id: generateId(),
-          friendIds,
+          friendIds: resolvedFriends,
           startTime,
           endTime,
           location: idea.location,
-          type: fallbackType,
-          notes: idea.notes,
+          type: ideaType,
+          notes: notesParts.join('\n\n'),
           createdAt: toLocalISO(),
         };
         return {
@@ -428,6 +430,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...prev,
       hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
       hangouts: prev.hangouts.map((h) => (h.type === oldName ? { ...h, type: normalized } : h)),
+      ideas: prev.ideas.map((i) => (i.type === oldName ? { ...i, type: normalized } : i)),
       activeTimers: prev.activeTimers.hangoutType === oldName
         ? { ...prev.activeTimers, hangoutType: normalized }
         : prev.activeTimers,
@@ -451,6 +454,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         hangoutTypes: prev.hangoutTypes.filter((t) => t !== name),
         hangouts: prev.hangouts.map((h) =>
           h.type === name ? { ...h, type: replacement } : h
+        ),
+        ideas: prev.ideas.map((i) =>
+          i.type === name ? { ...i, type: replacement } : i
         ),
         activeTimers: prev.activeTimers.hangoutType === name
           ? { ...prev.activeTimers, hangoutType: replacement || (prev.hangoutTypes.find((t) => t !== name) ?? '') }

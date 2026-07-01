@@ -1,4 +1,4 @@
-import type { AppData, AppSettings, ActiveTimers } from '../types';
+import type { AppData, AppSettings, ActiveTimers, HangoutIdea } from '../types';
 import {
   DEFAULT_FRIEND_CATEGORIES,
   DEFAULT_HANGOUT_TYPES,
@@ -6,7 +6,7 @@ import {
 } from '../types';
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -53,6 +53,12 @@ function mergeSocialOptions(data: Partial<AppData>): Pick<AppData, 'friendCatego
     }
   });
 
+  data.ideas?.forEach((i) => {
+    if (i.type && !hangoutTypes.some((t) => t.toLowerCase() === i.type.toLowerCase())) {
+      hangoutTypes.push(i.type);
+    }
+  });
+
   if (data.activeTimers?.hangoutType && !hangoutTypes.some((t) => t.toLowerCase() === data.activeTimers!.hangoutType.toLowerCase())) {
     hangoutTypes.push(data.activeTimers.hangoutType);
   }
@@ -60,8 +66,19 @@ function mergeSocialOptions(data: Partial<AppData>): Pick<AppData, 'friendCatego
   return { friendCategories, hangoutTypes };
 }
 
-export function normalizeAppData(raw: Partial<AppData>): AppData {
-  const social = mergeSocialOptions(raw);
+/** Migrate legacy idea.category → idea.type */
+function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string }>): HangoutIdea[] {
+  return rawIdeas.map((idea) => {
+    const type = idea.type ?? idea.category ?? DEFAULT_HANGOUT_TYPE;
+    const { category: _removed, ...rest } = idea;
+    return { ...rest, type } as HangoutIdea;
+  });
+}
+
+export function normalizeAppData(raw: Partial<AppData> & { ideas?: Array<Partial<HangoutIdea> & { category?: string }> }): AppData {
+  const ideas = migrateIdeas(raw.ideas ?? []);
+  const withMigratedIdeas = { ...raw, ideas };
+  const social = mergeSocialOptions(withMigratedIdeas);
   const activeTimers = { ...defaultActiveTimers, ...raw.activeTimers };
   if (!social.hangoutTypes.includes(activeTimers.hangoutType) && social.hangoutTypes.length > 0) {
     activeTimers.hangoutType = social.hangoutTypes.includes(DEFAULT_HANGOUT_TYPE)
@@ -71,7 +88,8 @@ export function normalizeAppData(raw: Partial<AppData>): AppData {
 
   return {
     ...defaultAppData,
-    ...raw,
+    ...withMigratedIdeas,
+    ideas,
     activeTimers,
     settings: { ...defaultSettings, ...raw.settings },
     ...social,

@@ -11,23 +11,6 @@ export const DEFAULT_HANGOUT_TYPES = [
 export const DEFAULT_FRIEND_CATEGORY = 'Friend';
 export const DEFAULT_HANGOUT_TYPE = 'Other';
 
-export type IdeaCategory =
-  | 'Food'
-  | 'Coffee'
-  | 'Hiking'
-  | 'Movies'
-  | 'Sports'
-  | 'Shopping'
-  | 'Gaming'
-  | 'Arts & Crafts'
-  | 'Travel'
-  | 'Concerts'
-  | 'Nightlife'
-  | 'Outdoors'
-  | 'Study'
-  | 'Volunteering'
-  | 'Other';
-
 export type CostLevel = 'Free' | '$' | '$$' | '$$$';
 
 export type IdeaStatus = 'Want to Try' | 'Planned' | 'Completed' | 'Archived';
@@ -75,7 +58,7 @@ export interface Hangout {
 export interface HangoutIdea {
   id: string;
   title: string;
-  category: IdeaCategory;
+  type: HangoutType;
   estimatedCost: CostLevel;
   estimatedDurationMinutes: number;
   location: string;

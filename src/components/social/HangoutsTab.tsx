@@ -8,21 +8,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
 import type { Hangout } from '../../types';
-import { DEFAULT_HANGOUT_TYPE } from '../../types';
-
-function getDefaultHangoutType(types: string[]): string {
-  if (types.includes('Chill')) return 'Chill';
-  if (types.includes(DEFAULT_HANGOUT_TYPE)) return DEFAULT_HANGOUT_TYPE;
-  return types[0] ?? '';
-}
-
-function typeSelectOptions(types: string[], current?: string) {
-  const options = types.map((t) => ({ value: t, label: t }));
-  if (current && current && !types.includes(current)) {
-    return [{ value: current, label: current }, ...options];
-  }
-  return options;
-}
+import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
 
 export function HangoutsTab() {
   const { data, startHangout, endHangout, addHangout, updateHangout, deleteHangout, duplicateHangout } = useApp();
@@ -188,7 +174,7 @@ export function HangoutsTab() {
         <div className="space-y-4">
           <FriendPicker selected={startForm.friendIds} onChange={(ids) => setStartForm({ ...startForm, friendIds: ids })} />
           <Select label="Type" value={startForm.type} onChange={(e) => setStartForm({ ...startForm, type: e.target.value })}
-            options={typeSelectOptions(data.hangoutTypes, startForm.type)} />
+            options={hangoutTypeSelectOptions(data.hangoutTypes, startForm.type)} />
           <Input label="Location" value={startForm.location} onChange={(e) => setStartForm({ ...startForm, location: e.target.value })} />
         </div>
       </Modal>
@@ -204,7 +190,7 @@ export function HangoutsTab() {
           {form.startTime && form.endTime && <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.startTime, form.endTime))}</p>}
           <div className="grid sm:grid-cols-2 gap-4">
             <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
-              options={typeSelectOptions(data.hangoutTypes, form.type)} />
+              options={hangoutTypeSelectOptions(data.hangoutTypes, form.type)} />
             <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </div>
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

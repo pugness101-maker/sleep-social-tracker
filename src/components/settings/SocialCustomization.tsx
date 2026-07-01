@@ -1,6 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { CustomOptionListCard } from './CustomOptionListCard';
-import { countFriendsWithCategory, countHangoutsWithType } from '../../lib/social-options';
+import { countFriendsWithCategory, countHangoutsWithType, countIdeasWithType } from '../../lib/social-options';
 import { DEFAULT_FRIEND_CATEGORY, DEFAULT_HANGOUT_TYPE } from '../../types';
 
 export function SocialCustomization() {
@@ -35,7 +35,9 @@ export function SocialCustomization() {
         title="Hangout Types"
         description="Customize types used when logging hangouts and applying filters."
         options={data.hangoutTypes}
-        usageCount={(name) => countHangoutsWithType(data.hangouts, name)}
+        usageCount={(name) =>
+          countHangoutsWithType(data.hangouts, name) + countIdeasWithType(data.ideas, name)
+        }
         defaultFallbackLabel={DEFAULT_HANGOUT_TYPE}
         onAdd={addHangoutType}
         onEdit={updateHangoutType}

@@ -1,3 +1,5 @@
+import { DEFAULT_HANGOUT_TYPE } from '../types';
+
 export function normalizeOptionName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
 }
@@ -23,4 +25,22 @@ export function countFriendsWithCategory(friends: { category: string }[], catego
 
 export function countHangoutsWithType(hangouts: { type: string }[], type: string): number {
   return hangouts.filter((h) => h.type === type).length;
+}
+
+export function countIdeasWithType(ideas: { type: string }[], type: string): number {
+  return ideas.filter((i) => i.type === type).length;
+}
+
+export function getDefaultHangoutType(types: string[]): string {
+  if (types.includes('Chill')) return 'Chill';
+  if (types.includes(DEFAULT_HANGOUT_TYPE)) return DEFAULT_HANGOUT_TYPE;
+  return types[0] ?? '';
+}
+
+export function hangoutTypeSelectOptions(types: string[], current?: string) {
+  const options = types.map((t) => ({ value: t, label: t }));
+  if (current && !types.includes(current)) {
+    return [{ value: current, label: current }, ...options];
+  }
+  return options;
 }
