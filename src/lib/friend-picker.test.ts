@@ -22,6 +22,7 @@ const alice: Friend = {
   notes: 'Met at college',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-01-01',
 };
 
@@ -36,6 +37,7 @@ const bob: Friend = {
   notes: '',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-01-01',
 };
 
@@ -50,6 +52,7 @@ const carol: Friend = {
   notes: '',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-01-01',
 };
 
@@ -164,6 +167,27 @@ describe('filterFriendsForSelect', () => {
       hangouts,
     });
     expect(result.map((f) => f.id)).toEqual(['a']);
+  });
+
+  it('excludes archived friends from select by default', () => {
+    const archived = { ...alice, id: 'z', name: 'Zed', isArchived: true, archivedAt: '2026-06-01' };
+    const result = filterFriendsForSelect([alice, archived], {
+      search: '',
+      hangouts,
+      includeArchived: false,
+    });
+    expect(result.map((f) => f.id)).toEqual(['a']);
+  });
+
+  it('keeps selected archived friend visible in select', () => {
+    const archived = { ...alice, id: 'z', name: 'Zed', isArchived: true, archivedAt: '2026-06-01' };
+    const result = filterFriendsForSelect([alice, archived], {
+      search: '',
+      hangouts,
+      includeArchived: false,
+      selectedId: 'z',
+    });
+    expect(result.map((f) => f.id).sort()).toEqual(['a', 'z']);
   });
 });
 

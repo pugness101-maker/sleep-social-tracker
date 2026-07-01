@@ -162,6 +162,9 @@ export interface Friend {
   notes: string;
   favoriteActivities: string[];
   relationships: FriendLink[];
+  /** Hidden from default lists; hangout history is preserved. */
+  isArchived: boolean;
+  archivedAt?: string;
   createdAt: string;
 }
 
@@ -220,6 +223,8 @@ export interface AppSettings {
   hangoutReminder: boolean;
   /** Friend picker: show selected friends before the rest when sorting. */
   friendPickerShowSelectedFirst: boolean;
+  /** Dashboard widgets: include archived friends in catch-up, top friends, birthdays, etc. */
+  includeArchivedInDashboard: boolean;
 }
 
 export interface AppData {

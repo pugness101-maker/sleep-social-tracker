@@ -10,21 +10,25 @@ import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
 import { friendMatchesTagFilter, friendMatchesGroupFilter, optionSelectOptions } from '../../lib/social-options';
 import { formatLastSeenLabel, sortFriends, type FriendSortOption } from '../../lib/friend-activity';
+import { filterFriendsByArchiveFilter, type FriendArchiveFilter } from '../../lib/friend-archive';
 import { FriendDetailModal } from './FriendDetailModal';
 import { BulkRelationshipsBar } from './BulkRelationshipsBar';
 import type { Friend } from '../../types';
 import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
 
 export function FriendsTab() {
-  const { data, addFriend, updateFriend, deleteFriend } = useApp();
+  const { data, addFriend, updateFriend, deleteFriend, archiveFriend, restoreFriend } = useApp();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<FriendSortOption>('name');
+  const [archiveFilter, setArchiveFilter] = useState<FriendArchiveFilter>('active');
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterGroup, setFilterGroup] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [archiveId, setArchiveId] = useState<string | null>(null);
+  const [restoreId, setRestoreId] = useState<string | null>(null);
   const [detailFriendId, setDetailFriendId] = useState<string | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
@@ -44,7 +48,9 @@ export function FriendsTab() {
   const [form, setForm] = useState(emptyForm);
 
   const friends = useMemo(() => {
-    let list = data.friends.map((f) => enrichFriend(f, data.hangouts));
+    let list = filterFriendsByArchiveFilter(data.friends, archiveFilter).map((f) =>
+      enrichFriend(f, data.hangouts)
+    );
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -67,7 +73,7 @@ export function FriendsTab() {
     }
     list = sortFriends(list, sortBy);
     return list;
-  }, [data.friends, data.hangouts, search, sortBy, filterTags, filterGroup, filterStatus]);
+  }, [data.friends, data.hangouts, search, sortBy, filterTags, filterGroup, filterStatus, archiveFilter]);
 
   const orphanTags = useMemo(() => {
     const known = new Set(data.friendTags);
@@ -147,6 +153,15 @@ export function FriendsTab() {
           ]}
         />
         <Select
+          value={archiveFilter}
+          onChange={(e) => setArchiveFilter(e.target.value as FriendArchiveFilter)}
+          options={[
+            { value: 'active', label: 'Active Friends' },
+            { value: 'archived', label: 'Archived Friends' },
+            { value: 'all', label: 'All Friends' },
+          ]}
+        />
+        <Select
           value={filterGroup}
           onChange={(e) => setFilterGroup(e.target.value)}
           options={[{ value: '', label: 'All Groups' }, ...optionSelectOptions(data.friendGroups)]}
@@ -185,12 +200,17 @@ export function FriendsTab() {
           onChange={setFilterTags}
           orphanTags={orphanTags}
         />
-        {(filterTags.length > 0 || filterGroup || filterStatus) && (
+        {(filterTags.length > 0 || filterGroup || filterStatus || archiveFilter !== 'active') && (
           <Button
             size="sm"
             variant="ghost"
             className="mt-2"
-            onClick={() => { setFilterTags([]); setFilterGroup(''); setFilterStatus(''); }}
+            onClick={() => {
+              setFilterTags([]);
+              setFilterGroup('');
+              setFilterStatus('');
+              setArchiveFilter('active');
+            }}
           >
             Clear filters
           </Button>
@@ -199,9 +219,19 @@ export function FriendsTab() {
 
       {friends.length === 0 ? (
         <EmptyState
-          title="No friends yet"
-          description="Add friends to track hangouts and social time."
-          action={<Button onClick={openAdd}>Add Friend</Button>}
+          title={
+            archiveFilter === 'archived'
+              ? 'No archived friends'
+              : archiveFilter === 'all' && data.friends.length > 0
+                ? 'No friends match your filters'
+                : 'No friends yet'
+          }
+          description={
+            archiveFilter === 'archived'
+              ? 'Archived friends are hidden from default lists but keep their hangout history.'
+              : 'Add friends to track hangouts and social time.'
+          }
+          action={archiveFilter !== 'archived' ? <Button onClick={openAdd}>Add Friend</Button> : undefined}
         />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -216,9 +246,12 @@ export function FriendsTab() {
               <div className="text-left">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>{friend.name}</h3>
-                  {friend.relationshipStatus && friend.relationshipStatus !== 'None' && (
-                    <Badge color="#f472b6">{friend.relationshipStatus}</Badge>
-                  )}
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {friend.isArchived && <Badge color="#94a3b8">Archived</Badge>}
+                    {friend.relationshipStatus && friend.relationshipStatus !== 'None' && (
+                      <Badge color="#f472b6">{friend.relationshipStatus}</Badge>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs opacity-70 mb-2">
                   Status: <span className="font-medium">{friend.relationshipStatus || 'None'}</span>
@@ -261,9 +294,14 @@ export function FriendsTab() {
                     {friend.relationships.length} linked relationship{friend.relationships.length !== 1 ? 's' : ''}
                   </p>
                 )}
-                <div className="flex gap-1 mt-3">
+                <div className="flex flex-wrap gap-1 mt-3">
                   <Button size="sm" variant="ghost" onClick={() => setDetailFriendId(friend.id)}>View</Button>
                   <Button size="sm" variant="ghost" onClick={() => openEdit(friend)}>Edit</Button>
+                  {friend.isArchived ? (
+                    <Button size="sm" variant="ghost" onClick={() => setRestoreId(friend.id)}>Restore</Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => setArchiveId(friend.id)}>Archive</Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => setDeleteId(friend.id)}>Delete</Button>
                 </div>
               </div>
@@ -330,6 +368,28 @@ export function FriendsTab() {
         friendId={detailFriendId}
         onClose={() => setDetailFriendId(null)}
         onEdit={(friend) => openEdit(friend)}
+      />
+
+      <ConfirmModal
+        open={!!archiveId}
+        onClose={() => setArchiveId(null)}
+        onConfirm={() => {
+          if (archiveId) archiveFriend(archiveId);
+          setArchiveId(null);
+        }}
+        title="Archive Friend"
+        message="Archive this friend? They will be hidden from default friend lists, but all past hangout data stays saved."
+      />
+
+      <ConfirmModal
+        open={!!restoreId}
+        onClose={() => setRestoreId(null)}
+        onConfirm={() => {
+          if (restoreId) restoreFriend(restoreId);
+          setRestoreId(null);
+        }}
+        title="Restore Friend"
+        message="Restore this friend to your active friends list?"
       />
 
       <ConfirmModal

@@ -29,7 +29,7 @@ interface FriendDetailModalProps {
 }
 
 export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailModalProps) {
-  const { data, addFriendLink, updateFriendLink, deleteFriendLink } = useApp();
+  const { data, addFriendLink, updateFriendLink, deleteFriendLink, archiveFriend, restoreFriend } = useApp();
   const { filters } = useInsightsFilters();
   const friend = data.friends.find((f) => f.id === friendId);
   const filteredHangouts = useMemo(
@@ -44,6 +44,8 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
   const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [editHangoutId, setEditHangoutId] = useState<string | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
 
   const [linkForm, setLinkForm] = useState({
     relatedFriendId: '',
@@ -51,7 +53,7 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
     notes: '',
   });
 
-  const otherFriends = data.friends.filter((f) => f.id !== friendId);
+  const otherFriends = data.friends.filter((f) => f.id !== friendId && !f.isArchived);
   const friendName = (id: string) => data.friends.find((f) => f.id === id)?.name ?? 'Unknown';
   const lastSeenLabel = formatLastSeenLabel(stats?.lastSeen ?? null);
 
@@ -100,12 +102,22 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
         footer={
           <>
             <Button variant="secondary" onClick={onClose}>Close</Button>
+            {friend.isArchived ? (
+              <Button variant="secondary" onClick={() => setConfirmRestore(true)}>Restore</Button>
+            ) : (
+              <Button variant="secondary" onClick={() => setConfirmArchive(true)}>Archive</Button>
+            )}
             <Button onClick={() => { onEdit(friend); onClose(); }}>Edit Profile</Button>
           </>
         }
       >
         <div className="text-left space-y-5">
           <div>
+            {friend.isArchived && (
+              <div className="mb-2">
+                <Badge color="#94a3b8">Archived</Badge>
+              </div>
+            )}
             <p className="text-sm opacity-70">
               Status: <span className="font-medium">{friend.relationshipStatus || 'None'}</span>
             </p>
@@ -280,6 +292,29 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
           {error && <p className="text-sm text-danger">{error}</p>}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        onConfirm={() => {
+          if (friendId) archiveFriend(friendId);
+          setConfirmArchive(false);
+          onClose();
+        }}
+        title="Archive Friend"
+        message="Archive this friend? They will be hidden from default friend lists, but all past hangout data stays saved."
+      />
+
+      <ConfirmModal
+        open={confirmRestore}
+        onClose={() => setConfirmRestore(false)}
+        onConfirm={() => {
+          if (friendId) restoreFriend(friendId);
+          setConfirmRestore(false);
+        }}
+        title="Restore Friend"
+        message="Restore this friend to your active friends list?"
+      />
 
       <ConfirmModal
         open={!!deleteLinkId}

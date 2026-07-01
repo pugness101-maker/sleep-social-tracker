@@ -8,7 +8,7 @@ interface BirthdaysWidgetProps {
 
 export function BirthdaysWidget({ onOpenFriend }: BirthdaysWidgetProps) {
   const { data } = useApp();
-  const upcoming = getUpcomingBirthdays(data, 6);
+  const upcoming = getUpcomingBirthdays(data, 6, data.settings.includeArchivedInDashboard);
 
   return (
     <Card className="mb-6">

@@ -21,6 +21,7 @@ function friend(id: string, name: string, relationships: Friend['relationships']
     notes: '',
     favoriteActivities: [],
     relationships,
+    isArchived: false,
     createdAt: '2026-01-01',
   };
 }

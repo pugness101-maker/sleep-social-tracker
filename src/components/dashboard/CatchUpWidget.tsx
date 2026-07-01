@@ -10,8 +10,14 @@ interface CatchUpWidgetProps {
 export function CatchUpWidget({ onOpenFriend }: CatchUpWidgetProps) {
   const { data } = useApp();
   const [includeNoHangouts, setIncludeNoHangouts] = useState(false);
+  const includeArchived = data.settings.includeArchivedInDashboard;
 
-  const catchUpFriends = getCatchUpFriends(data.friends, data.hangouts, includeNoHangouts).slice(0, 8);
+  const catchUpFriends = getCatchUpFriends(
+    data.friends,
+    data.hangouts,
+    includeNoHangouts,
+    includeArchived
+  ).slice(0, 8);
 
   return (
     <Card className="mb-6">

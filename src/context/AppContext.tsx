@@ -102,9 +102,11 @@ interface AppContextValue {
   deleteNapEntry: (id: string) => void;
   duplicateNapEntry: (id: string) => void;
   // Friends
-  addFriend: (friend: Omit<Friend, 'id' | 'createdAt'>) => void;
+  addFriend: (friend: Omit<Friend, 'id' | 'createdAt' | 'isArchived' | 'archivedAt'>) => void;
   updateFriend: (id: string, friend: Partial<Friend>) => void;
   deleteFriend: (id: string) => void;
+  archiveFriend: (id: string) => void;
+  restoreFriend: (id: string) => void;
   addFriendLink: (friendId: string, relatedFriendId: string, type: string, notes?: string) => string | null;
   updateFriendLink: (friendId: string, linkId: string, updates: { relatedFriendId?: string; type?: string; notes?: string }) => string | null;
   deleteFriendLink: (friendId: string, linkId: string) => void;
@@ -341,12 +343,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [patch]);
 
-  const addFriend = useCallback((friend: Omit<Friend, 'id' | 'createdAt'>) => {
+  const addFriend = useCallback((friend: Omit<Friend, 'id' | 'createdAt' | 'isArchived' | 'archivedAt'>) => {
     patch((prev) => ({
       ...prev,
       friends: [
         ...prev.friends,
-        { ...friend, groups: friend.groups ?? [], relationships: friend.relationships ?? [], id: generateId(), createdAt: toLocalISO() },
+        { ...friend, isArchived: false, groups: friend.groups ?? [], relationships: friend.relationships ?? [], id: generateId(), createdAt: toLocalISO() },
       ],
     }));
   }, [patch]);
@@ -375,6 +377,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })),
       };
     });
+  }, [patch]);
+
+  const archiveFriend = useCallback((id: string) => {
+    patch((prev) => ({
+      ...prev,
+      friends: prev.friends.map((f) =>
+        f.id === id ? { ...f, isArchived: true, archivedAt: toLocalISO() } : f
+      ),
+    }));
+  }, [patch]);
+
+  const restoreFriend = useCallback((id: string) => {
+    patch((prev) => ({
+      ...prev,
+      friends: prev.friends.map((f) =>
+        f.id === id ? { ...f, isArchived: false, archivedAt: undefined } : f
+      ),
+    }));
   }, [patch]);
 
   const addFriendLink = useCallback(
@@ -1349,6 +1369,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFriend,
     updateFriend,
     deleteFriend,
+    archiveFriend,
+    restoreFriend,
     addFriendLink,
     updateFriendLink,
     deleteFriendLink,

@@ -5,12 +5,13 @@ import { Tabs } from '../components/ui/Tabs';
 import { FriendsTab } from '../components/social/FriendsTab';
 import { HangoutsTab } from '../components/social/HangoutsTab';
 import { IdeasTab } from '../components/social/IdeasTab';
+import { countActiveFriends } from '../lib/friend-archive';
 
 export function SocialPage() {
   const { data } = useApp();
   const [active, setActive] = useState('friends');
 
-  const friendCount = data.friends.length;
+  const friendCount = countActiveFriends(data.friends);
   const hangoutCount = data.hangouts.length;
   const ideaCount = data.ideas.length;
 
@@ -32,7 +33,7 @@ export function SocialPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
         <StatCard
-          label="Total Friends"
+          label="Active Friends"
           value={String(friendCount)}
           accent="social"
           icon="👥"

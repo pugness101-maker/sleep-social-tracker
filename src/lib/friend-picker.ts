@@ -1,3 +1,4 @@
+import { isFriendArchived } from './friend-archive';
 import { daysSinceDate, getFriendLastSeen } from './friend-activity';
 import type { Friend, Hangout } from '../types';
 
@@ -137,10 +138,17 @@ export function filterFriendsForSelect(
     excludeIds?: string[];
     hangouts: Hangout[];
     prioritizeRecentFavorites?: boolean;
+    includeArchived?: boolean;
+    /** Keep selected friend visible even when archived and includeArchived is false. */
+    selectedId?: string;
   }
 ): Friend[] {
   const excludeSet = new Set(options.excludeIds ?? []);
   let list = friends.filter((f) => !excludeSet.has(f.id));
+
+  if (!options.includeArchived) {
+    list = list.filter((f) => !isFriendArchived(f) || f.id === options.selectedId);
+  }
 
   if (options.search.trim()) {
     list = list.filter((f) => friendMatchesSearch(f, options.search));

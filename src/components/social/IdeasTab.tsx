@@ -7,6 +7,7 @@ import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
 import { getActiveTypeOptions, getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
+import { filterFriendsForPickerPool } from '../../lib/friend-archive';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
@@ -60,6 +61,17 @@ export function IdeasTab() {
     startTime: toLocalISO(),
     endTime: toLocalISO(),
   });
+  const [includeArchivedIdeas, setIncludeArchivedIdeas] = useState(false);
+
+  const ideaFormFriends = useMemo(
+    () => filterFriendsForPickerPool(data.friends, includeArchivedIdeas, form.friendIds),
+    [data.friends, includeArchivedIdeas, form.friendIds]
+  );
+
+  const convertFormFriends = useMemo(
+    () => filterFriendsForPickerPool(data.friends, includeArchivedIdeas, convertForm.friendIds),
+    [data.friends, includeArchivedIdeas, convertForm.friendIds]
+  );
 
   const ideas = useMemo(() => {
     let list = [...data.ideas];
@@ -283,11 +295,22 @@ export function IdeasTab() {
             options={statuses.map((s) => ({ value: s, label: s }))}
           />
           <div className="sm:col-span-2">
-            <span className="block text-sm font-medium mb-2 text-left" style={{ color: 'var(--text-heading)' }}>
-              Friends Interested
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className="block text-sm font-medium text-left" style={{ color: 'var(--text-heading)' }}>
+                Friends Interested
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeArchivedIdeas}
+                  onChange={(e) => setIncludeArchivedIdeas(e.target.checked)}
+                  className="rounded"
+                />
+                Include archived friends
+              </label>
+            </div>
             <div className="flex flex-wrap gap-2">
-              {data.friends.map((f) => (
+              {ideaFormFriends.map((f) => (
                 <button
                   key={f.id}
                   type="button"
@@ -343,11 +366,22 @@ export function IdeasTab() {
             <p className="text-sm opacity-70 text-left">📍 {convertModal.location}</p>
           )}
           <div>
-            <span className="block text-sm font-medium mb-2 text-left" style={{ color: 'var(--text-heading)' }}>
-              Friends
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className="block text-sm font-medium text-left" style={{ color: 'var(--text-heading)' }}>
+                Friends
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeArchivedIdeas}
+                  onChange={(e) => setIncludeArchivedIdeas(e.target.checked)}
+                  className="rounded"
+                />
+                Include archived friends
+              </label>
+            </div>
             <div className="flex flex-wrap gap-2">
-              {data.friends.map((f) => (
+              {convertFormFriends.map((f) => (
                 <button
                   key={f.id}
                   type="button"

@@ -7,6 +7,7 @@ import {
   toggleFriendSelection,
   type FriendPickerQuickFilter,
 } from '../../lib/friend-picker';
+import { filterFriendsForPickerPool } from '../../lib/friend-archive';
 
 interface FriendPickerProps {
   selected: string[];
@@ -37,6 +38,7 @@ export function FriendPicker({
   const [quickFilter, setQuickFilter] = useState<FriendPickerQuickFilter>('all');
   const [tagFilter, setTagFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -44,9 +46,12 @@ export function FriendPicker({
   const showSelectedFirst = data.settings.friendPickerShowSelectedFirst;
 
   const poolFriends = useMemo(() => {
-    if (!groupFilter) return data.friends;
-    return data.friends.filter((f) => (f.groups ?? []).includes(groupFilter));
-  }, [data.friends, groupFilter]);
+    let list = filterFriendsForPickerPool(data.friends, includeArchived, selected);
+    if (groupFilter) {
+      list = list.filter((f) => (f.groups ?? []).includes(groupFilter));
+    }
+    return list;
+  }, [data.friends, groupFilter, includeArchived, selected]);
 
   const visibleFriends = useMemo(
     () =>
@@ -154,6 +159,7 @@ export function FriendPicker({
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border bg-primary text-white border-primary"
               >
                 {f.name}
+                {f.isArchived && <span className="opacity-80 text-[10px]">(archived)</span>}
                 <span aria-hidden className="opacity-80">×</span>
               </button>
             ))}
@@ -237,6 +243,15 @@ export function FriendPicker({
                 ))}
               </select>
             )}
+            <label className="flex items-center gap-2 cursor-pointer text-xs whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(e) => setIncludeArchived(e.target.checked)}
+                className="rounded"
+              />
+              Include archived friends
+            </label>
             <label className="flex items-center gap-2 cursor-pointer text-xs whitespace-nowrap ml-auto">
               <input
                 type="checkbox"
@@ -274,6 +289,9 @@ export function FriendPicker({
                     style={!isSelected ? { borderColor: 'var(--border)' } : undefined}
                   >
                     {f.name}
+                    {f.isArchived && !isSelected && (
+                      <span className="ml-1 opacity-60 text-[10px]">(archived)</span>
+                    )}
                   </button>
                 );
               })}

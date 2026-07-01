@@ -26,7 +26,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 13;
+export const DATA_VERSION = 14;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -40,6 +40,7 @@ export const defaultSettings: AppSettings = {
   bedtimeReminder: false,
   hangoutReminder: false,
   friendPickerShowSelectedFirst: true,
+  includeArchivedInDashboard: false,
 };
 
 export const defaultActiveTimers: ActiveTimers = {
@@ -201,7 +202,16 @@ function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string 
     const relationships = friend.relationships ?? [];
 
     const { category: _removed, ...rest } = friend;
-    return { ...rest, tags, groups: friend.groups ?? [], relationshipStatus, relationships } as Friend;
+    const isArchived = friend.isArchived ?? false;
+    return {
+      ...rest,
+      tags,
+      groups: friend.groups ?? [],
+      relationshipStatus,
+      relationships,
+      isArchived,
+      archivedAt: isArchived ? friend.archivedAt : undefined,
+    } as Friend;
   });
 }
 

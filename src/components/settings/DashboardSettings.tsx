@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import {
   DASHBOARD_WIDGETS,
@@ -14,6 +15,7 @@ interface DashboardSettingsProps {
 }
 
 export function DashboardSettings({ onMessage }: DashboardSettingsProps) {
+  const { data, updateSettings } = useApp();
   const [layout, setLayout] = useState<DashboardLayout>(() => loadDashboardLayout());
 
   const persist = (next: DashboardLayout) => {
@@ -44,6 +46,20 @@ export function DashboardSettings({ onMessage }: DashboardSettingsProps) {
 
   return (
     <div className="space-y-3 text-left">
+      <label className="flex items-start gap-3 cursor-pointer text-sm mb-4">
+        <input
+          type="checkbox"
+          checked={data.settings.includeArchivedInDashboard}
+          onChange={(e) => updateSettings({ includeArchivedInDashboard: e.target.checked })}
+          className="rounded mt-0.5 shrink-0"
+        />
+        <span>
+          Include archived friends in dashboard widgets
+          <span className="block text-xs opacity-70 mt-0.5">
+            Affects Need to Catch Up, Top Friends, and Upcoming Birthdays.
+          </span>
+        </span>
+      </label>
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={reset}>Reset to Default</Button>
       </div>

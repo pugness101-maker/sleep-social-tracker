@@ -25,6 +25,7 @@ const friendA: Friend = {
   notes: '',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-01-01T10:00:00',
 };
 
@@ -39,6 +40,7 @@ const friendSophie: Friend = {
   notes: '',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-02-01T10:00:00',
 };
 
@@ -53,6 +55,7 @@ const friendC: Friend = {
   notes: '',
   favoriteActivities: [],
   relationships: [],
+  isArchived: false,
   createdAt: '2026-03-01T10:00:00',
 };
 
@@ -217,6 +220,19 @@ describe('getCatchUpFriends', () => {
   it('includes friends without hangouts when toggled', () => {
     const result = getCatchUpFriends([friendA, friendC], hangouts, true);
     expect(result).toHaveLength(2);
+  });
+
+  it('excludes archived friends by default', () => {
+    const archivedAlice = { ...friendA, isArchived: true, archivedAt: '2026-06-01T12:00:00' };
+    const result = getCatchUpFriends([archivedAlice, friendC], hangouts, false, false);
+    expect(result).toHaveLength(0);
+  });
+
+  it('includes archived friends when toggled', () => {
+    const archivedAlice = { ...friendA, isArchived: true, archivedAt: '2026-06-01T12:00:00' };
+    const result = getCatchUpFriends([archivedAlice], hangouts, false, true);
+    expect(result).toHaveLength(1);
+    expect(result[0].friend.id).toBe('f1');
   });
 });
 

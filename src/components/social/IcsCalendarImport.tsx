@@ -413,32 +413,66 @@ export function IcsCalendarImport({
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {uniqueNames.map((name) => {
                     const resolution = friendResolutions[name] ?? { action: 'create' as const };
+                    const archivedMatch = data.friends.find(
+                      (f) => f.isArchived && f.name.trim().toLowerCase() === name.trim().toLowerCase()
+                    );
+                    const activeFriends = data.friends.filter((f) => !f.isArchived);
+                    const selectValue =
+                      resolution.action === 'match'
+                        ? `match:${resolution.friendId}`
+                        : resolution.action === 'use_archived'
+                          ? `use_archived:${resolution.friendId}`
+                          : resolution.action === 'restore'
+                            ? `restore:${resolution.friendId}`
+                            : resolution.action;
+
+                    const handleResolutionChange = (val: string) => {
+                      if (val === 'create' || val === 'ignore') {
+                        setFriendResolutions({ ...friendResolutions, [name]: { action: val } });
+                      } else if (val.startsWith('match:')) {
+                        setFriendResolutions({
+                          ...friendResolutions,
+                          [name]: { action: 'match', friendId: val.slice(6) },
+                        });
+                      } else if (val.startsWith('use_archived:')) {
+                        setFriendResolutions({
+                          ...friendResolutions,
+                          [name]: { action: 'use_archived', friendId: val.slice(13) },
+                        });
+                      } else if (val.startsWith('restore:')) {
+                        setFriendResolutions({
+                          ...friendResolutions,
+                          [name]: { action: 'restore', friendId: val.slice(8) },
+                        });
+                      }
+                    };
+
+                    const options = archivedMatch
+                      ? [
+                          { value: `use_archived:${archivedMatch.id}`, label: `Use archived: ${archivedMatch.name}` },
+                          { value: `restore:${archivedMatch.id}`, label: `Restore ${archivedMatch.name}` },
+                          { value: 'create', label: 'Create new friend' },
+                          ...activeFriends.map((f) => ({ value: `match:${f.id}`, label: `Match: ${f.name}` })),
+                          { value: 'ignore', label: 'Ignore this person' },
+                        ]
+                      : [
+                          { value: 'create', label: 'Create new friend' },
+                          ...activeFriends.map((f) => ({ value: `match:${f.id}`, label: `Match: ${f.name}` })),
+                          ...data.friends
+                            .filter((f) => f.isArchived)
+                            .map((f) => ({ value: `use_archived:${f.id}`, label: `Use archived: ${f.name}` })),
+                          { value: 'ignore', label: 'Ignore this person' },
+                        ];
+
                     return (
                       <div key={name} className="grid sm:grid-cols-2 gap-2 items-end p-3 rounded-lg" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                        <p className="font-medium text-sm">{name}</p>
-                        <Select
-                          value={
-                            resolution.action === 'match'
-                              ? `match:${resolution.friendId}`
-                              : resolution.action
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'create' || val === 'ignore') {
-                              setFriendResolutions({ ...friendResolutions, [name]: { action: val } });
-                            } else if (val.startsWith('match:')) {
-                              setFriendResolutions({
-                                ...friendResolutions,
-                                [name]: { action: 'match', friendId: val.slice(6) },
-                              });
-                            }
-                          }}
-                          options={[
-                            { value: 'create', label: 'Create new friend' },
-                            ...data.friends.map((f) => ({ value: `match:${f.id}`, label: `Match: ${f.name}` })),
-                            { value: 'ignore', label: 'Ignore this person' },
-                          ]}
-                        />
+                        <div>
+                          <p className="font-medium text-sm">{name}</p>
+                          {archivedMatch && (
+                            <p className="text-xs opacity-70 mt-0.5">Matches archived friend</p>
+                          )}
+                        </div>
+                        <Select value={selectValue} onChange={(e) => handleResolutionChange(e.target.value)} options={options} />
                       </div>
                     );
                   })}

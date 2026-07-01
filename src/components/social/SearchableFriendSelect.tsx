@@ -36,8 +36,10 @@ export function SearchableFriendSelect({
         excludeIds: excludeFriendIds,
         hangouts: data.hangouts,
         prioritizeRecentFavorites: !search.trim(),
+        includeArchived: false,
+        selectedId: value || undefined,
       }),
-    [data.friends, data.hangouts, search, excludeFriendIds]
+    [data.friends, data.hangouts, search, excludeFriendIds, value]
   );
 
   const showRecentSection = !search.trim() && visibleFriends.length > 0;

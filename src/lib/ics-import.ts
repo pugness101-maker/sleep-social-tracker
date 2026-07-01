@@ -32,6 +32,8 @@ export interface ParsedIcsEvent {
 export type FriendResolution =
   | { action: 'create' }
   | { action: 'match'; friendId: string }
+  | { action: 'use_archived'; friendId: string }
+  | { action: 'restore'; friendId: string }
   | { action: 'ignore' };
 
 export interface IcsPreviewItem {
@@ -268,9 +270,35 @@ export function buildDefaultFriendResolutions(
   const resolutions: Record<string, FriendResolution> = {};
   for (const name of names) {
     const existing = findFriendByName(friends, name);
-    resolutions[name] = existing ? { action: 'match', friendId: existing.id } : { action: 'create' };
+    if (existing) {
+      resolutions[name] = existing.isArchived
+        ? { action: 'use_archived', friendId: existing.id }
+        : { action: 'match', friendId: existing.id };
+    } else {
+      resolutions[name] = { action: 'create' };
+    }
   }
   return resolutions;
+}
+
+function friendIdFromResolution(
+  resolution: FriendResolution | undefined,
+  name: string,
+  friendIdByName: Map<string, string>,
+  createMissingFriends: boolean
+): string | null {
+  if (!resolution || resolution.action === 'ignore') return null;
+  if (
+    resolution.action === 'match' ||
+    resolution.action === 'use_archived' ||
+    resolution.action === 'restore'
+  ) {
+    return resolution.friendId;
+  }
+  if (resolution.action === 'create' && createMissingFriends) {
+    return friendIdByName.get(name.trim().toLowerCase()) ?? null;
+  }
+  return null;
 }
 
 function hangoutMatchesDuplicate(
@@ -329,7 +357,13 @@ export function buildIcsPreview(
       .map((name) => {
         const resolution = friendResolutions[name];
         if (!resolution || resolution.action === 'ignore') return null;
-        if (resolution.action === 'match') return resolution.friendId;
+        if (
+          resolution.action === 'match' ||
+          resolution.action === 'use_archived' ||
+          resolution.action === 'restore'
+        ) {
+          return resolution.friendId;
+        }
         return null;
       })
       .filter((id): id is string => !!id);
@@ -401,6 +435,14 @@ export function applyIcsCalendarImport(
   const friendIdByName = new Map<string, string>();
   friends.forEach((f) => friendIdByName.set(f.name.trim().toLowerCase(), f.id));
 
+  for (const resolution of Object.values(friendResolutions)) {
+    if (resolution.action === 'restore') {
+      friends = friends.map((f) =>
+        f.id === resolution.friendId ? { ...f, isArchived: false, archivedAt: undefined } : f
+      );
+    }
+  }
+
   const namesToCreate = new Set<string>();
   for (const item of items) {
     if (!item.import) continue;
@@ -426,6 +468,7 @@ export function applyIcsCalendarImport(
       notes: 'Imported from Google Calendar',
       favoriteActivities: [],
       relationships: [],
+      isArchived: false,
       createdAt: stamp,
     };
     friends.push(friend);
@@ -436,15 +479,9 @@ export function applyIcsCalendarImport(
     if (!item.import) continue;
 
     const friendIds = item.detectedNames
-      .map((name) => {
-        const resolution = friendResolutions[name];
-        if (!resolution || resolution.action === 'ignore') return null;
-        if (resolution.action === 'match') return resolution.friendId;
-        if (resolution.action === 'create' && options.createMissingFriends) {
-          return friendIdByName.get(name.trim().toLowerCase()) ?? null;
-        }
-        return null;
-      })
+      .map((name) =>
+        friendIdFromResolution(friendResolutions[name], name, friendIdByName, options.createMissingFriends)
+      )
       .filter((id): id is string => !!id);
 
     const type = item.type || DEFAULT_HANGOUT_TYPE;

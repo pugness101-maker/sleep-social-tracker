@@ -402,9 +402,11 @@ export function getFriendHangoutTimeline(
 export function getCatchUpFriends(
   friends: Friend[],
   hangouts: Hangout[],
-  includeNoHangouts = false
+  includeNoHangouts = false,
+  includeArchived = false
 ): CatchUpFriend[] {
   const list = friends
+    .filter((friend) => includeArchived || !friend.isArchived)
     .map((friend) => {
       const summary = getFriendActivitySummary(friend.id, hangouts);
       return {

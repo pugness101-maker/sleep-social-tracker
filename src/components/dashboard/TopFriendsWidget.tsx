@@ -8,7 +8,7 @@ interface TopFriendsWidgetProps {
 
 export function TopFriendsWidget({ onOpenFriend }: TopFriendsWidgetProps) {
   const { data } = useApp();
-  const top = getTopFriendsThisMonth(data, 5);
+  const top = getTopFriendsThisMonth(data, 5, data.settings.includeArchivedInDashboard);
 
   return (
     <Card className="mb-6">

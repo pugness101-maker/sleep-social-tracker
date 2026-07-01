@@ -43,14 +43,15 @@ function nextBirthdayDays(birthday: string, now = new Date()): number | null {
   return differenceInDays(next, startOfDay(now));
 }
 
-export function getTopFriendsThisMonth(data: AppData, limit = 5): TopFriendThisMonth[] {
+export function getTopFriendsThisMonth(data: AppData, limit = 5, includeArchived = false): TopFriendThisMonth[] {
   const now = new Date();
   const start = startOfMonth(now);
   const end = endOfMonth(now);
 
   const monthHangouts = data.hangouts.filter((h) => isInRange(h.startTime, start, end));
+  const friends = includeArchived ? data.friends : data.friends.filter((f) => !f.isArchived);
 
-  return data.friends
+  return friends
     .map((friend) => {
       const involved = monthHangouts.filter((h) => friendInHangout(friend.id, h));
       const totalMinutes = involved.reduce(
@@ -88,8 +89,9 @@ export function getThisWeekSocial(data: AppData): ThisWeekSocialSummary {
   };
 }
 
-export function getUpcomingBirthdays(data: AppData, limit = 8): UpcomingBirthday[] {
-  return data.friends
+export function getUpcomingBirthdays(data: AppData, limit = 8, includeArchived = false): UpcomingBirthday[] {
+  const friends = includeArchived ? data.friends : data.friends.filter((f) => !f.isArchived);
+  return friends
     .filter((f) => f.birthday)
     .map((friend) => {
       const daysAway = nextBirthdayDays(friend.birthday)!;
