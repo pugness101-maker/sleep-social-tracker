@@ -75,10 +75,19 @@ export interface FriendLink {
 }
 
 export const DEFAULT_HANGOUT_TYPES = [
-  'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
+  'Chill', 'Mixed', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
 ] as const;
 
 export const DEFAULT_HANGOUT_TYPE = 'Other';
+
+export interface HangoutSegment {
+  id: string;
+  type: HangoutType;
+  startTime: string;
+  endTime: string;
+  location: string;
+  notes: string;
+}
 
 export type CostLevel = 'Free' | '$' | '$$' | '$$$';
 
@@ -125,6 +134,7 @@ export interface Hangout {
   location: string;
   type: HangoutType;
   notes: string;
+  segments: HangoutSegment[];
   createdAt: string;
   source?: string;
   sourceCalendarUid?: string;

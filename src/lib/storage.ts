@@ -1,4 +1,5 @@
-import type { AppData, AppSettings, ActiveTimers, HangoutIdea, Friend } from '../types';
+import type { AppData, AppSettings, ActiveTimers, HangoutIdea, Friend, Hangout } from '../types';
+import { normalizeHangoutSegments } from './hangout-segments';
 import {
   DEFAULT_FRIEND_TAGS,
   DEFAULT_HANGOUT_TYPES,
@@ -11,7 +12,7 @@ import {
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 7;
+export const DATA_VERSION = 8;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -92,6 +93,11 @@ function mergeSocialOptions(
     if (h.type && !hangoutTypes.some((t) => t.toLowerCase() === h.type.toLowerCase())) {
       hangoutTypes.push(h.type);
     }
+    h.segments?.forEach((seg) => {
+      if (seg.type && !hangoutTypes.some((t) => t.toLowerCase() === seg.type.toLowerCase())) {
+        hangoutTypes.push(seg.type);
+      }
+    });
   });
 
   data.ideas?.forEach((i) => {
@@ -105,6 +111,12 @@ function mergeSocialOptions(
     !hangoutTypes.some((t) => t.toLowerCase() === data.activeTimers!.hangoutType.toLowerCase())
   ) {
     hangoutTypes.push(data.activeTimers.hangoutType);
+  }
+
+  if (!hangoutTypes.some((t) => t.toLowerCase() === 'mixed')) {
+    const chillIndex = hangoutTypes.findIndex((t) => t.toLowerCase() === 'chill');
+    if (chillIndex >= 0) hangoutTypes.splice(chillIndex + 1, 0, 'Mixed');
+    else hangoutTypes.unshift('Mixed');
   }
 
   return { friendTags, relationshipStatuses, relationshipTypes, hangoutTypes };
@@ -144,6 +156,13 @@ function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string
   });
 }
 
+function migrateHangouts(rawHangouts: Partial<Hangout>[]): Hangout[] {
+  return rawHangouts.map((h) => ({
+    ...h,
+    segments: normalizeHangoutSegments(h.segments),
+  })) as Hangout[];
+}
+
 export function normalizeAppData(
   raw: Partial<AppData> & {
     friendCategories?: string[];
@@ -153,7 +172,8 @@ export function normalizeAppData(
 ): AppData {
   const friends = migrateFriends(raw.friends ?? []);
   const ideas = migrateIdeas(raw.ideas ?? []);
-  const withMigrated = { ...raw, friends, ideas };
+  const hangouts = migrateHangouts(raw.hangouts ?? []);
+  const withMigrated = { ...raw, friends, ideas, hangouts };
   const social = mergeSocialOptions(withMigrated);
   const activeTimers = { ...defaultActiveTimers, ...raw.activeTimers };
   if (!social.hangoutTypes.includes(activeTimers.hangoutType) && social.hangoutTypes.length > 0) {
@@ -167,6 +187,7 @@ export function normalizeAppData(
     ...withMigrated,
     friends,
     ideas,
+    hangouts,
     activeTimers,
     settings: { ...defaultSettings, ...raw.settings },
     ...social,

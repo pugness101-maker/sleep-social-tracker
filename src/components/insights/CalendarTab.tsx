@@ -16,6 +16,7 @@ import {
 } from '../../lib/dates';
 import { addDays, subDays } from 'date-fns';
 import type { AppData } from '../../types';
+import { getHangoutDisplayType } from '../../lib/hangout-segments';
 
 type CalView = 'day' | 'week' | 'month' | 'timeline';
 
@@ -55,14 +56,27 @@ function buildEvents(data: AppData): CalEvent[] {
 
   data.hangouts.forEach((h) => {
     const names = h.friendIds.map((id) => data.friends.find((f) => f.id === id)?.name ?? '?').join(', ');
-    events.push({
-      id: h.id,
-      type: 'hangout',
-      label: `${h.type}: ${names || 'Hangout'}`,
-      start: parseISO(h.startTime),
-      end: parseISO(h.endTime),
-      color: '#34d399',
-    });
+    if (h.segments?.length) {
+      h.segments.forEach((seg) => {
+        events.push({
+          id: `${h.id}-${seg.id}`,
+          type: 'hangout',
+          label: `${seg.type}: ${names || 'Hangout'}`,
+          start: parseISO(seg.startTime),
+          end: parseISO(seg.endTime),
+          color: '#34d399',
+        });
+      });
+    } else {
+      events.push({
+        id: h.id,
+        type: 'hangout',
+        label: `${getHangoutDisplayType(h)}: ${names || 'Hangout'}`,
+        start: parseISO(h.startTime),
+        end: parseISO(h.endTime),
+        color: '#34d399',
+      });
+    }
   });
 
   return events.sort((a, b) => a.start.getTime() - b.start.getTime());

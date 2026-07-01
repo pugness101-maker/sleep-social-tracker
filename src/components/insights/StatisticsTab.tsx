@@ -172,7 +172,7 @@ export function StatisticsTab() {
           <StatCard label="Days Since Last Hangout" value={social.daysSinceLast !== null ? String(social.daysSinceLast) : '—'} accent="social" />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4 mt-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           <Card>
             <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Most-Seen Friends</h3>
             {topFriends.length === 0 ? (
@@ -183,6 +183,21 @@ export function StatisticsTab() {
                   <li key={f.name} className="flex justify-between text-sm">
                     <span>{f.name}</span>
                     <span className="font-medium">{f.count} hangouts</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card>
+            <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Activity Time by Type</h3>
+            {Object.keys(social.activityTimeByType).length === 0 ? (
+              <p className="text-sm opacity-70 text-left">No hangout data yet.</p>
+            ) : (
+              <ul className="space-y-2 text-left">
+                {Object.entries(social.activityTimeByType).sort(([, a], [, b]) => b - a).map(([type, minutes]) => (
+                  <li key={type} className="flex justify-between text-sm">
+                    <span>{type}</span>
+                    <span className="font-medium">{formatDuration(minutes)}</span>
                   </li>
                 ))}
               </ul>

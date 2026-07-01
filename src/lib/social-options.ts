@@ -32,8 +32,13 @@ export function toggleTag(tags: string[], tag: string): string[] {
   return tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
 }
 
-export function countHangoutsWithType(hangouts: { type: string }[], type: string): number {
-  return hangouts.filter((h) => h.type === type).length;
+export function countHangoutsWithType(hangouts: { type: string; segments?: { type: string }[] }[], type: string): number {
+  let count = 0;
+  for (const h of hangouts) {
+    if (h.type === type) count += 1;
+    else if (h.segments?.some((s) => s.type === type)) count += 1;
+  }
+  return count;
 }
 
 export function countIdeasWithType(ideas: { type: string }[], type: string): number {

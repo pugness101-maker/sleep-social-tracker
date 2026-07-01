@@ -7,8 +7,10 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, toLocalISO } from '../../lib/dates';
-import type { Hangout } from '../../types';
+import type { Hangout, HangoutSegment } from '../../types';
 import { getDefaultHangoutType, hangoutTypeSelectOptions } from '../../lib/social-options';
+import { getHangoutDisplayType, hangoutMatchesTypeFilter, formatSegmentSummary } from '../../lib/hangout-segments';
+import { HangoutSegmentEditor } from './HangoutSegmentEditor';
 import { IcsCalendarImport } from './IcsCalendarImport';
 
 export function HangoutsTab() {
@@ -23,6 +25,7 @@ export function HangoutsTab() {
     location: '',
     type: defaultType,
     notes: '',
+    segments: [] as HangoutSegment[],
   });
 
   const [form, setForm] = useState(makeEmptyForm);
@@ -58,10 +61,10 @@ export function HangoutsTab() {
       const q = search.toLowerCase();
       list = list.filter((h) => {
         const names = h.friendIds.map((id) => data.friends.find((f) => f.id === id)?.name ?? '').join(' ');
-        return names.toLowerCase().includes(q) || h.location.toLowerCase().includes(q) || h.notes.toLowerCase().includes(q) || h.type.toLowerCase().includes(q);
+        return names.toLowerCase().includes(q) || h.location.toLowerCase().includes(q) || h.notes.toLowerCase().includes(q) || h.type.toLowerCase().includes(q) || h.segments?.some((s) => s.type.toLowerCase().includes(q) || s.notes.toLowerCase().includes(q) || s.location.toLowerCase().includes(q));
       });
     }
-    if (filterType) list = list.filter((h) => h.type === filterType);
+    if (filterType) list = list.filter((h) => hangoutMatchesTypeFilter(h, filterType));
     return list;
   }, [data.hangouts, data.friends, search, filterType]);
 
@@ -79,7 +82,7 @@ export function HangoutsTab() {
 
   const openEdit = (h: Hangout) => {
     setEditHangout(h);
-    setForm({ friendIds: h.friendIds, startTime: h.startTime, endTime: h.endTime, location: h.location, type: h.type, notes: h.notes });
+    setForm({ friendIds: h.friendIds, startTime: h.startTime, endTime: h.endTime, location: h.location, type: h.type, notes: h.notes, segments: h.segments ?? [] });
     setModalOpen(true);
   };
 
@@ -172,7 +175,12 @@ export function HangoutsTab() {
                   <td className="px-4 py-3">{formatDateTime(h.startTime)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">{formatDateTime(h.endTime)}</td>
                   <td className="px-4 py-3 font-medium">{formatDuration(calcDurationMinutes(h.startTime, h.endTime))}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell"><Badge>{h.type || 'Untyped'}</Badge></td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <Badge>{getHangoutDisplayType(h)}</Badge>
+                    {h.segments?.length ? (
+                      <p className="text-xs opacity-60 mt-1 max-w-[200px] truncate">{formatSegmentSummary(h)}</p>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(h)}>Edit</Button>
@@ -212,6 +220,14 @@ export function HangoutsTab() {
             <Input label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </div>
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <HangoutSegmentEditor
+            segments={form.segments}
+            hangoutTypes={data.hangoutTypes}
+            hangoutStart={form.startTime}
+            hangoutEnd={form.endTime}
+            defaultType={form.type}
+            onChange={(segments) => setForm({ ...form, segments })}
+          />
         </div>
       </Modal>
 

@@ -453,6 +453,7 @@ export function applyIcsCalendarImport(
       location: options.importLocation ? item.location : '',
       type: item.type || DEFAULT_HANGOUT_TYPE,
       notes: options.importDescription ? item.notes : '',
+      segments: [],
       createdAt: stamp,
       source: 'google_calendar_ics',
       sourceCalendarUid: item.uid,

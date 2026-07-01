@@ -474,6 +474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         location: hangoutLocation,
         type: hangoutType,
         notes,
+        segments: [],
         createdAt: toLocalISO(),
       };
       return {
@@ -568,6 +569,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           location: idea.location,
           type: ideaType,
           notes: notesParts.join('\n\n'),
+          segments: [],
           createdAt: toLocalISO(),
         };
         return {
@@ -690,7 +692,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     patch((prev) => ({
       ...prev,
       hangoutTypes: prev.hangoutTypes.map((t) => (t === oldName ? normalized : t)),
-      hangouts: prev.hangouts.map((h) => (h.type === oldName ? { ...h, type: normalized } : h)),
+      hangouts: prev.hangouts.map((h) => ({
+        ...h,
+        type: h.type === oldName ? normalized : h.type,
+        segments: h.segments?.map((s) => (s.type === oldName ? { ...s, type: normalized } : s)) ?? [],
+      })),
       ideas: prev.ideas.map((i) => (i.type === oldName ? { ...i, type: normalized } : i)),
       activeTimers: prev.activeTimers.hangoutType === oldName
         ? { ...prev.activeTimers, hangoutType: normalized }
@@ -713,9 +719,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return {
         ...prev,
         hangoutTypes: prev.hangoutTypes.filter((t) => t !== name),
-        hangouts: prev.hangouts.map((h) =>
-          h.type === name ? { ...h, type: replacement } : h
-        ),
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          type: h.type === name ? replacement : h.type,
+          segments: h.segments?.map((s) => (s.type === name ? { ...s, type: replacement } : s)) ?? [],
+        })),
         ideas: prev.ideas.map((i) =>
           i.type === name ? { ...i, type: replacement } : i
         ),
