@@ -6,7 +6,7 @@ import {
   startOfWeek,
   subDays,
 } from 'date-fns';
-import { calcDurationMinutes, getDay, isInRange, parseISO } from './dates';
+import { calcDurationMinutes, formatTime, getDay, isInRange, parseISO } from './dates';
 import {
   calcSleepDebtMinutes,
   formatSleepDebt,
@@ -29,11 +29,14 @@ export interface CircadianPoint {
 export interface HeatmapDay {
   date: Date;
   dateKey: string;
+  dateLabel: string;
   dayOfMonth: number;
   durationMinutes: number | null;
   debtMinutes: number | null;
   metGoal: boolean | null;
   hasData: boolean;
+  bedtimeLabel: string | null;
+  wakeLabel: string | null;
 }
 
 export interface DebtCalendarDay {
@@ -245,11 +248,14 @@ function buildHeatmapDays(
       return {
         date,
         dateKey,
+        dateLabel: format(date, 'MMM d'),
         dayOfMonth: date.getDate(),
         durationMinutes: null,
         debtMinutes: null,
         metGoal: null,
         hasData: false,
+        bedtimeLabel: null,
+        wakeLabel: null,
       };
     }
     const duration = calcDurationMinutes(entry.sleepStart, entry.wakeUp);
@@ -257,11 +263,14 @@ function buildHeatmapDays(
     return {
       date,
       dateKey,
+      dateLabel: format(date, 'MMM d'),
       dayOfMonth: date.getDate(),
       durationMinutes: duration,
       debtMinutes: debt,
       metGoal: debt <= 0,
       hasData: true,
+      bedtimeLabel: formatTime(entry.sleepStart),
+      wakeLabel: formatTime(entry.wakeUp),
     };
   });
 }
@@ -436,6 +445,21 @@ export function getSleepInsights(
   };
 }
 
+export function sleepCalendarCellStyle(day: HeatmapDay): { background: string; borderColor: string } {
+  if (!day.hasData) {
+    return { background: 'var(--bg)', borderColor: 'var(--border)' };
+  }
+  const debt = day.debtMinutes ?? 0;
+  if (debt <= 0) {
+    return { background: 'rgba(52, 211, 153, 0.14)', borderColor: 'rgba(52, 211, 153, 0.35)' };
+  }
+  if (debt < 60) {
+    return { background: 'rgba(234, 179, 8, 0.14)', borderColor: 'rgba(234, 179, 8, 0.35)' };
+  }
+  return { background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.35)' };
+}
+
+/** @deprecated use sleepCalendarCellStyle */
 export function heatmapCellColor(day: HeatmapDay, mode: HeatmapMode, goalMinutes: number): string {
   if (!day.hasData) return 'var(--bg)';
   if (mode === 'goal_met') {

@@ -7,11 +7,13 @@ import {
   SLEEP_OVERVIEW_METRICS,
   SLEEP_SCHEDULE_METRICS,
 } from '../../../lib/statistics-compare';
+import { build7DaySleepTrend, buildMonthlySleepTrend } from '../../../lib/sleep-charts';
 import { SleepInsightsSection } from '../SleepInsightsSection';
+import { Sleep7DayTrendChart, SleepMonthlyTrendChart } from '../SleepCharts';
 import { StatisticsCollapsibleSection } from './StatisticsCollapsibleSection';
 import { AdaptiveMetrics, CompareStatGrid, type StatisticsCompareProps } from './CompareStatGrid';
-import { BarChart } from './SimpleCharts';
 import type { useStatisticsAccordion } from '../../../hooks/useStatisticsAccordion';
+import { useMemo } from 'react';
 
 type Accordion = ReturnType<typeof useStatisticsAccordion>;
 
@@ -34,8 +36,17 @@ export function StatisticsSleepPanel({
   accordion,
   compare,
 }: Props) {
-  const s = stats.sleep;
   const inCompare = Boolean(compare);
+  const goalMinutes = data.settings.sleepGoalHours * 60;
+
+  const trend7 = useMemo(
+    () => build7DaySleepTrend(data.sleepEntries, goalMinutes, rangeEnd),
+    [data.sleepEntries, goalMinutes, rangeEnd]
+  );
+  const trendMonth = useMemo(
+    () => buildMonthlySleepTrend(data.sleepEntries, 6, rangeStart, rangeEnd),
+    [data.sleepEntries, rangeStart, rangeEnd]
+  );
 
   return (
     <div className="space-y-3">
@@ -105,8 +116,8 @@ export function StatisticsSleepPanel({
         ) : (
           <>
             <div className="grid lg:grid-cols-2 gap-3">
-              <BarChart title="7 Day Sleep Trend" data={s.dailyTrend7} valueSuffix=" min" />
-              <BarChart title="Monthly Sleep Trend" data={s.monthlySleepTrend} valueSuffix=" min" />
+              <Sleep7DayTrendChart data={trend7} goalHours={data.settings.sleepGoalHours} />
+              <SleepMonthlyTrendChart data={trendMonth} goalHours={data.settings.sleepGoalHours} />
             </div>
             <SleepInsightsSection
               data={data}

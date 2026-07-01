@@ -1,5 +1,6 @@
 import {
   addDays,
+  endOfDay,
   endOfMonth,
   format,
   getDay,
@@ -210,15 +211,27 @@ function buildFriendRanking(friends: Friend[], hangouts: Hangout[]): FriendRanki
     .sort((a, b) => b.hangouts - a.hangouts || b.hours - a.hours);
 }
 
-function getDailySleepTrend(entries: SleepEntry[], days = 7): TrendPoint[] {
-  const byDay: Record<string, number> = {};
+function getDailySleepTrend(entries: SleepEntry[], days = 7, rangeEnd?: Date): TrendPoint[] {
+  const end = rangeEnd ? endOfDay(rangeEnd) : endOfDay(new Date());
+  const byWakeDate = new Map<string, number>();
+
   for (const s of entries) {
-    const key = format(startOfDay(parseISO(s.wakeUp)), 'MMM d');
-    byDay[key] = (byDay[key] ?? 0) + calcDurationMinutes(s.sleepStart, s.wakeUp);
+    const key = format(startOfDay(parseISO(s.wakeUp)), 'yyyy-MM-dd');
+    byWakeDate.set(key, calcDurationMinutes(s.sleepStart, s.wakeUp));
   }
-  return Object.entries(byDay)
-    .slice(-days)
-    .map(([label, value]) => ({ label, value }));
+
+  const result: TrendPoint[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = startOfDay(subDays(end, i));
+    const key = format(date, 'yyyy-MM-dd');
+    const minutes = byWakeDate.get(key) ?? 0;
+    result.push({
+      label: format(date, 'MMM d'),
+      value: minutes,
+      count: byWakeDate.has(key) ? 1 : 0,
+    });
+  }
+  return result;
 }
 
 function hoursInPeriod(hangouts: Hangout[], periodStart: Date, periodEnd: Date, rangeStart?: Date, rangeEnd?: Date): number {
@@ -535,10 +548,10 @@ export function buildStatisticsBundle(
       debtMonthly: debtStats.monthlyDebt,
       debtLifetime: debtStats.totalDebt,
       naps,
-      dailyTrend7: getDailySleepTrend(sleepEntries, 7),
+      dailyTrend7: getDailySleepTrend(sleepEntries, 7, rangeEnd),
       monthlySleepTrend: monthlyTrends.sleepTrend.map((t) => ({
         label: t.label,
-        value: t.minutes,
+        value: t.count > 0 ? Math.round(t.minutes / t.count) : 0,
         count: t.count,
       })),
     },

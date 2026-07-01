@@ -34,7 +34,7 @@ export function BarChart({
               style={{ height: `${Math.max(4, (d.value / max) * 100)}%`, minHeight: d.value ? 4 : 0 }}
               title={`${d.label}: ${d.value}${valueSuffix}`}
             />
-            <span className="text-[9px] opacity-60 truncate w-full text-center">{d.label.split(' ')[0]}</span>
+            <span className="text-[9px] opacity-60 truncate w-full text-center">{d.label}</span>
           </div>
         ))}
       </div>

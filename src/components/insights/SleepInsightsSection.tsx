@@ -4,12 +4,14 @@ import { Card, StatCard } from '../ui/Card';
 import { avgMinutesToTime, formatDuration } from '../../lib/dates';
 import {
   getSleepInsights,
-  heatmapCellColor,
   formatDebtCalendarShort,
+  sleepCalendarCellStyle,
   WEEKDAY_LABELS,
+  type HeatmapDay,
   type HeatmapMode,
 } from '../../lib/sleep-insights';
-import { minutesToDisplayTime } from '../../lib/sleep-goals';
+import { buildScheduleTrend } from '../../lib/sleep-charts';
+import { BedtimeWakeTrendChart } from './SleepCharts';
 import type { AppData } from '../../types';
 
 interface SleepInsightsSectionProps {
@@ -70,115 +72,25 @@ function WeekdayTimeChart({
   );
 }
 
-function CircadianGraph({
-  points,
-  goalBedtimeMinutes,
-  targetWakeMinutes,
-  goalMinutes,
-}: {
-  points: ReturnType<typeof getSleepInsights>['circadian'];
-  goalBedtimeMinutes: number;
-  targetWakeMinutes: number;
-  goalMinutes: number;
-}) {
-  const width = 640;
-  const height = 220;
-  const pad = { top: 16, right: 16, bottom: 28, left: 44 };
-  const chartW = width - pad.left - pad.right;
-  const chartH = height - pad.top - pad.bottom;
-
-  if (points.length === 0) {
-    return <p className="text-sm opacity-70 text-left">No sleep entries in this range.</p>;
+function modePrimaryText(day: HeatmapDay, mode: HeatmapMode): string {
+  if (!day.hasData) return 'No sleep';
+  if (mode === 'duration') {
+    return day.durationMinutes != null ? formatDuration(day.durationMinutes) : '—';
   }
-
-  const yForMinutes = (mins: number) => {
-    const normalized = mins % (24 * 60);
-    return pad.top + chartH - (normalized / (24 * 60)) * chartH;
-  };
-
-  const xForIndex = (i: number) =>
-    pad.left + (points.length === 1 ? chartW / 2 : (i / (points.length - 1)) * chartW);
-
-  const bedPoints = points.map((p, i) => `${xForIndex(i)},${yForMinutes(p.bedtimeMinutes)}`).join(' ');
-  const wakePoints = points.map((p, i) => `${xForIndex(i)},${yForMinutes(p.wakeMinutes)}`).join(' ');
-
-  const yTicks = [0, 6, 12, 18].map((h) => h * 60);
-
-  return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[320px]" role="img" aria-label="Circadian rhythm chart">
-        {yTicks.map((mins) => (
-          <g key={mins}>
-            <line
-              x1={pad.left}
-              y1={yForMinutes(mins)}
-              x2={width - pad.right}
-              y2={yForMinutes(mins)}
-              stroke="var(--border)"
-              strokeDasharray="4 4"
-            />
-            <text x={4} y={yForMinutes(mins) + 4} fontSize={10} fill="currentColor" opacity={0.6}>
-              {minutesToDisplayTime(mins)}
-            </text>
-          </g>
-        ))}
-        <line
-          x1={pad.left}
-          y1={yForMinutes(goalBedtimeMinutes)}
-          x2={width - pad.right}
-          y2={yForMinutes(goalBedtimeMinutes)}
-          stroke="#818cf8"
-          strokeDasharray="6 4"
-          opacity={0.7}
-        />
-        <line
-          x1={pad.left}
-          y1={yForMinutes(targetWakeMinutes)}
-          x2={width - pad.right}
-          y2={yForMinutes(targetWakeMinutes)}
-          stroke="#34d399"
-          strokeDasharray="6 4"
-          opacity={0.7}
-        />
-        <polyline fill="none" stroke="#6366f1" strokeWidth={2} points={bedPoints} />
-        <polyline fill="none" stroke="#14b8a6" strokeWidth={2} points={wakePoints} />
-        {points.map((p, i) => (
-          <g key={p.dateKey}>
-            <circle cx={xForIndex(i)} cy={yForMinutes(p.bedtimeMinutes)} r={3} fill="#6366f1" />
-            <circle cx={xForIndex(i)} cy={yForMinutes(p.wakeMinutes)} r={3} fill="#14b8a6" />
-            <text
-              x={xForIndex(i)}
-              y={height - 6}
-              textAnchor="middle"
-              fontSize={9}
-              fill="currentColor"
-              opacity={0.65}
-            >
-              {p.dateLabel}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <div className="flex flex-wrap gap-4 mt-2 text-xs opacity-70">
-        <span><span className="inline-block w-3 h-0.5 bg-indigo-500 mr-1 align-middle" /> Bedtime</span>
-        <span><span className="inline-block w-3 h-0.5 bg-teal-500 mr-1 align-middle" /> Wake-up</span>
-        <span><span className="inline-block w-3 h-0.5 border-t border-dashed border-indigo-400 mr-1 align-middle" /> Goal bedtime</span>
-        <span><span className="inline-block w-3 h-0.5 border-t border-dashed border-emerald-400 mr-1 align-middle" /> Target wake ({formatDuration(goalMinutes)} goal)</span>
-      </div>
-    </div>
-  );
+  if (mode === 'debt') {
+    return day.debtMinutes != null ? formatDebtCalendarShort(day.debtMinutes) : '—';
+  }
+  return day.metGoal ? 'Met' : 'Missed';
 }
 
-function SleepHeatmap({
+function SleepCalendar({
   days,
   mode,
   onModeChange,
-  goalMinutes,
 }: {
-  days: ReturnType<typeof getSleepInsights>['heatmapDays'];
+  days: HeatmapDay[];
   mode: HeatmapMode;
   onModeChange: (m: HeatmapMode) => void;
-  goalMinutes: number;
 }) {
   const months = useMemo(() => {
     if (days.length === 0) return [];
@@ -194,6 +106,11 @@ function SleepHeatmap({
   }, [days]);
 
   const dayMap = useMemo(() => new Map(days.map((d) => [d.dateKey, d])), [days]);
+  const hasAnyData = days.some((d) => d.hasData);
+
+  if (!hasAnyData) {
+    return <p className="text-sm opacity-70 text-left">No sleep data for this range.</p>;
+  }
 
   return (
     <div>
@@ -210,24 +127,35 @@ function SleepHeatmap({
           </button>
         ))}
       </div>
+      <div className="flex flex-wrap gap-3 mb-4 text-[10px] opacity-70">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border" style={{ background: 'rgba(52,211,153,0.14)', borderColor: 'rgba(52,211,153,0.35)' }} /> Met / over goal</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border" style={{ background: 'rgba(234,179,8,0.14)', borderColor: 'rgba(234,179,8,0.35)' }} /> Under &lt;1h</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.35)' }} /> Under 1h+</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }} /> No data</span>
+      </div>
       <div className="space-y-6 overflow-x-auto">
         {months.map((monthStart) => {
           const monthEnd = endOfMonth(monthStart);
           const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-          const cells: (ReturnType<typeof getSleepInsights>['heatmapDays'][number] | null)[] = [];
+          const cells: (HeatmapDay | null)[] = [];
           let cursor = gridStart;
           while (cursor <= monthEnd || cells.length % 7 !== 0) {
             if (isSameMonth(cursor, monthStart)) {
               const key = format(cursor, 'yyyy-MM-dd');
-              cells.push(dayMap.get(key) ?? {
-                date: cursor,
-                dateKey: key,
-                dayOfMonth: cursor.getDate(),
-                durationMinutes: null,
-                debtMinutes: null,
-                metGoal: null,
-                hasData: false,
-              });
+              cells.push(
+                dayMap.get(key) ?? {
+                  date: cursor,
+                  dateKey: key,
+                  dateLabel: format(cursor, 'MMM d'),
+                  dayOfMonth: cursor.getDate(),
+                  durationMinutes: null,
+                  debtMinutes: null,
+                  metGoal: null,
+                  hasData: false,
+                  bedtimeLabel: null,
+                  wakeLabel: null,
+                }
+              );
             } else {
               cells.push(null);
             }
@@ -240,31 +168,43 @@ function SleepHeatmap({
               <p className="text-sm font-medium mb-2 text-left" style={{ color: 'var(--text-heading)' }}>
                 {format(monthStart, 'MMMM yyyy')}
               </p>
-              <div className="grid grid-cols-7 gap-1 min-w-[280px]">
+              <div className="grid grid-cols-7 gap-1.5 min-w-[320px]">
                 {WEEKDAY_LABELS.map((l) => (
                   <div key={l} className="text-[10px] text-center opacity-50 pb-1">{l}</div>
                 ))}
-                {cells.map((day, i) =>
-                  day ? (
+                {cells.map((day, i) => {
+                  if (!day) return <div key={`empty-${i}`} className="min-h-[88px]" />;
+                  const style = sleepCalendarCellStyle(day);
+                  return (
                     <div
                       key={day.dateKey}
-                      title={
-                        day.hasData
-                          ? `${day.dateKey}: ${day.durationMinutes != null ? formatDuration(day.durationMinutes) : ''}`
-                          : day.dateKey
-                      }
-                      className="aspect-square rounded text-[10px] flex items-center justify-center"
-                      style={{
-                        background: heatmapCellColor(day, mode, goalMinutes),
-                        color: day.hasData ? 'var(--text)' : 'transparent',
-                      }}
+                      className="min-h-[88px] rounded-lg border p-1.5 text-left text-[10px] leading-snug"
+                      style={style}
                     >
-                      {isSameMonth(day.date, monthStart) ? day.dayOfMonth : ''}
+                      <p className="font-semibold text-[11px]" style={{ color: 'var(--text-heading)' }}>
+                        {day.dateLabel}
+                      </p>
+                      {day.hasData ? (
+                        <>
+                          <p className="mt-1 font-medium">{modePrimaryText(day, mode)}</p>
+                          {mode !== 'debt' && day.debtMinutes != null && (
+                            <p className="opacity-75">{formatDebtCalendarShort(day.debtMinutes)}</p>
+                          )}
+                          {mode !== 'duration' && day.durationMinutes != null && (
+                            <p className="opacity-75">{formatDuration(day.durationMinutes)}</p>
+                          )}
+                          {day.bedtimeLabel && day.wakeLabel && (
+                            <p className="opacity-60 mt-1 truncate" title={`${day.bedtimeLabel} → ${day.wakeLabel}`}>
+                              {day.bedtimeLabel} → {day.wakeLabel}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="mt-2 opacity-40">—</p>
+                      )}
                     </div>
-                  ) : (
-                    <div key={`empty-${i}`} className="aspect-square" />
-                  )
-                )}
+                  );
+                })}
               </div>
             </div>
           );
@@ -303,13 +243,18 @@ function DebtCalendar({ days }: { days: ReturnType<typeof getSleepInsights>['deb
 }
 
 export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel, sectionsToShow }: SleepInsightsSectionProps) {
-  const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('duration');
+  const [calendarMode, setCalendarMode] = useState<HeatmapMode>('duration');
 
   const show = new Set(sectionsToShow ?? ALL_SECTIONS);
 
   const insights = useMemo(
     () => getSleepInsights(data.sleepEntries, data.settings, rangeStart, rangeEnd),
     [data.sleepEntries, data.settings, rangeStart, rangeEnd]
+  );
+
+  const scheduleTrend = useMemo(
+    () => buildScheduleTrend(data.sleepEntries, insights.goalMinutes, rangeStart, rangeEnd),
+    [data.sleepEntries, insights.goalMinutes, rangeStart, rangeEnd]
   );
 
   const { bestDays } = insights;
@@ -329,25 +274,22 @@ export function SleepInsightsSection({ data, rangeStart, rangeEnd, rangeLabel, s
       )}
 
       {show.has('circadian') && (
-      <Card>
-        <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Circadian Rhythm</h4>
-        <CircadianGraph
-          points={insights.circadian}
+        <BedtimeWakeTrendChart
+          points={scheduleTrend}
           goalBedtimeMinutes={insights.goalBedtimeMinutes}
           targetWakeMinutes={insights.targetWakeMinutes}
-          goalMinutes={insights.goalMinutes}
+          goalHours={data.settings.sleepGoalHours}
         />
-      </Card>
       )}
 
       {show.has('heatmap') && (
       <Card>
-        <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Schedule Heatmap</h4>
-        <SleepHeatmap
+        <h4 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Calendar</h4>
+        <p className="text-xs opacity-60 mb-3 text-left">Each day uses wake-up date. Color reflects goal progress.</p>
+        <SleepCalendar
           days={insights.heatmapDays}
-          mode={heatmapMode}
-          onModeChange={setHeatmapMode}
-          goalMinutes={insights.goalMinutes}
+          mode={calendarMode}
+          onModeChange={setCalendarMode}
         />
       </Card>
       )}
