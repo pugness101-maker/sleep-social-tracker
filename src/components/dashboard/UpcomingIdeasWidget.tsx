@@ -16,7 +16,7 @@ export function UpcomingIdeasWidget() {
       .filter((i) => ACTIVE_STATUSES.has(i.status))
       .sort((a, b) => {
         if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-        return b.priority - a.priority;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       })
       .slice(0, 5);
   }, [data.ideas]);
@@ -48,7 +48,7 @@ export function UpcomingIdeasWidget() {
                     {idea.title}
                   </p>
                   <p className="text-xs opacity-70 mt-0.5">
-                    {idea.type}{idea.location ? ` · ${idea.location}` : ''}
+                    {idea.category} · {idea.type}{idea.location ? ` · ${idea.location}` : ''}
                   </p>
                 </div>
                 <Badge color="#6366f1">{idea.status}</Badge>

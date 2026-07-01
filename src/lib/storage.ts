@@ -231,12 +231,25 @@ function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string 
   });
 }
 
-/** Migrate legacy idea.category → idea.type */
+/** Migrate legacy idea.category → idea.type; normalize optional duration. */
 function migrateIdeas(rawIdeas: Array<Partial<HangoutIdea> & { category?: string }>): HangoutIdea[] {
   return rawIdeas.map((idea) => {
     const type = idea.type ?? idea.category ?? DEFAULT_HANGOUT_TYPE;
     const { category: _removed, ...rest } = idea;
-    return { ...rest, type } as HangoutIdea;
+    const rawDuration = idea.estimatedDurationMinutes;
+    const estimatedDurationMinutes =
+      rawDuration == null || rawDuration === ('' as unknown as number) || Number.isNaN(Number(rawDuration))
+        ? null
+        : Number(rawDuration);
+    const occasion = idea.occasion?.trim()
+      ? normalizeOccasion(idea.occasion)
+      : undefined;
+    return {
+      ...rest,
+      type,
+      estimatedDurationMinutes,
+      occasion,
+    } as HangoutIdea;
   });
 }
 

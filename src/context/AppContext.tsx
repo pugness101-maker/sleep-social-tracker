@@ -838,7 +838,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startTime,
           endTime,
           location: idea.location,
-          occasion: DEFAULT_HANGOUT_OCCASION,
+          occasion: idea.occasion?.trim() ? normalizeOccasion(idea.occasion) : DEFAULT_HANGOUT_OCCASION,
           category: idea.category,
           type: ideaType,
           notes: notesParts.join('\n\n'),

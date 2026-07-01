@@ -8,6 +8,7 @@ import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
 import { getActiveTypeOptions, getDefaultHangoutCategoryPair } from '../../lib/hangout-categories';
 import { filterFriendsForPickerPool } from '../../lib/friend-archive';
+import { DEFAULT_HANGOUT_OCCASION } from '../../types';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
@@ -15,21 +16,47 @@ import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
 const costs: CostLevel[] = ['Free', '$', '$$', '$$$'];
 const statuses: IdeaStatus[] = ['Want to Try', 'Planned', 'Completed', 'Archived'];
 
+function formatIdeaDuration(minutes: number | null | undefined): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  return formatDuration(minutes);
+}
+
+function parseDurationInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = parseInt(trimmed, 10);
+  return Number.isNaN(parsed) || parsed <= 0 ? null : parsed;
+}
+
+interface IdeaFormState {
+  title: string;
+  category: string;
+  type: string;
+  occasion: string;
+  estimatedCost: CostLevel;
+  durationInput: string;
+  location: string;
+  status: IdeaStatus;
+  friendIds: string[];
+  notes: string;
+  links: string;
+}
+
 export function IdeasTab() {
   const { data, addIdea, updateIdea, deleteIdea, toggleFavoriteIdea, archiveIdea, convertIdeaToHangout } = useApp();
 
-  const makeEmptyForm = () => {
+  const makeEmptyForm = (): IdeaFormState => {
     const { category, type } = getDefaultHangoutCategoryPair(data.hangoutTypesByCategory ?? {});
     return {
       title: '',
       category,
       type,
-      estimatedCost: 'Free' as CostLevel,
-      estimatedDurationMinutes: 60,
+      occasion: '',
+      estimatedCost: 'Free',
+      durationInput: '',
       location: '',
-      priority: 3,
-      status: 'Want to Try' as IdeaStatus,
-      friendIds: [] as string[],
+      status: 'Want to Try',
+      friendIds: [],
       notes: '',
       links: '',
     };
@@ -82,7 +109,9 @@ export function IdeasTab() {
           i.title.toLowerCase().includes(q) ||
           i.notes.toLowerCase().includes(q) ||
           i.location.toLowerCase().includes(q) ||
-          i.type.toLowerCase().includes(q)
+          i.type.toLowerCase().includes(q) ||
+          (i.occasion ?? '').toLowerCase().includes(q) ||
+          i.category.toLowerCase().includes(q)
       );
     }
     if (filterType) list = list.filter((i) => i.type === filterType);
@@ -90,7 +119,7 @@ export function IdeasTab() {
     if (filterStatus) list = list.filter((i) => i.status === filterStatus);
     list.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      return b.priority - a.priority;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     return list;
   }, [data.ideas, search, filterType, filterCost, filterStatus]);
@@ -99,7 +128,10 @@ export function IdeasTab() {
     const pool = ideas.filter((i) => i.status !== 'Archived' && i.status !== 'Completed');
     if (pool.length === 0) return;
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    alert(`🎲 Random idea: ${pick.title} (${pick.type}, ${pick.estimatedCost})`);
+    const duration = formatIdeaDuration(pick.estimatedDurationMinutes);
+    alert(
+      `🎲 Random idea: ${pick.title} (${pick.category} · ${pick.type}, ${pick.estimatedCost}${duration ? `, ${duration}` : ''})`
+    );
   };
 
   const openAdd = () => {
@@ -114,10 +146,11 @@ export function IdeasTab() {
       title: idea.title,
       category: idea.category,
       type: idea.type,
+      occasion: idea.occasion && idea.occasion !== DEFAULT_HANGOUT_OCCASION ? idea.occasion : '',
       estimatedCost: idea.estimatedCost,
-      estimatedDurationMinutes: idea.estimatedDurationMinutes,
+      durationInput:
+        idea.estimatedDurationMinutes != null ? String(idea.estimatedDurationMinutes) : '',
       location: idea.location,
-      priority: idea.priority,
       status: idea.status,
       friendIds: idea.friendIds,
       notes: idea.notes,
@@ -128,17 +161,34 @@ export function IdeasTab() {
 
   const openConvert = (idea: HangoutIdea) => {
     setConvertModal(idea);
-    const end = new Date();
-    end.setMinutes(end.getMinutes() + (idea.estimatedDurationMinutes || 60));
+    const start = toLocalISO();
+    let end = start;
+    if (idea.estimatedDurationMinutes != null && idea.estimatedDurationMinutes > 0) {
+      const endDate = new Date();
+      endDate.setMinutes(endDate.getMinutes() + idea.estimatedDurationMinutes);
+      end = toLocalISO(endDate);
+    }
     setConvertForm({
       friendIds: [...idea.friendIds],
-      startTime: toLocalISO(),
-      endTime: toLocalISO(end),
+      startTime: start,
+      endTime: end,
     });
   };
 
   const handleSave = () => {
-    const payload = { ...form, links: form.links.split('\n').map((l) => l.trim()).filter(Boolean) };
+    const payload = {
+      title: form.title,
+      category: form.category,
+      type: form.type,
+      occasion: form.occasion.trim() || undefined,
+      estimatedCost: form.estimatedCost,
+      estimatedDurationMinutes: parseDurationInput(form.durationInput),
+      location: form.location,
+      status: form.status,
+      friendIds: form.friendIds,
+      notes: form.notes,
+      links: form.links.split('\n').map((l) => l.trim()).filter(Boolean),
+    };
     if (editIdea) updateIdea(editIdea.id, payload);
     else addIdea(payload);
     setModalOpen(false);
@@ -146,6 +196,9 @@ export function IdeasTab() {
 
   const toggleFriend = (ids: string[], id: string) =>
     ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
+
+  const friendNames = (ids: string[]) =>
+    ids.map((id) => data.friends.find((f) => f.id === id)?.name).filter(Boolean).join(', ');
 
   return (
     <div>
@@ -186,59 +239,61 @@ export function IdeasTab() {
         />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {ideas.map((idea) => (
-            <Card key={idea.id}>
-              <div className="text-left">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>
-                    {idea.isFavorite && '⭐ '}{idea.title}
-                  </h3>
-                  <Badge>{idea.status}</Badge>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  <Badge color="#6366f1">{idea.type || 'Untyped'}</Badge>
-                  <Badge color="#34d399">{idea.estimatedCost}</Badge>
-                  <Badge color="#f59e0b">{formatDuration(idea.estimatedDurationMinutes)}</Badge>
-                </div>
-                {idea.location && <p className="text-xs opacity-70 mt-2">📍 {idea.location}</p>}
-                <p className="text-xs opacity-70 mt-1">
-                  Priority: {'★'.repeat(idea.priority)}{'☆'.repeat(5 - idea.priority)}
-                </p>
-                {idea.friendIds.length > 0 && (
-                  <p className="text-xs opacity-70 mt-1">
-                    👥 {idea.friendIds.map((id) => data.friends.find((f) => f.id === id)?.name).filter(Boolean).join(', ')}
-                  </p>
-                )}
-                {idea.notes && <p className="text-xs opacity-70 mt-2 line-clamp-2">{idea.notes}</p>}
-                {idea.links.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {idea.links.map((link, i) => (
-                      <a
-                        key={i}
-                        href={link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary block truncate"
-                      >
-                        {link}
-                      </a>
-                    ))}
+          {ideas.map((idea) => {
+            const durationLabel = formatIdeaDuration(idea.estimatedDurationMinutes);
+            const interested = friendNames(idea.friendIds);
+            return (
+              <Card key={idea.id}>
+                <div className="text-left space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold" style={{ color: 'var(--text-heading)' }}>
+                      {idea.isFavorite && '⭐ '}{idea.title}
+                    </h3>
+                    <Badge>{idea.status}</Badge>
                   </div>
-                )}
-                <div className="flex flex-wrap gap-1 mt-3">
-                  <Button size="sm" variant="ghost" onClick={() => toggleFavoriteIdea(idea.id)}>
-                    {idea.isFavorite ? 'Unfav' : 'Fav'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(idea)}>Edit</Button>
-                  <Button size="sm" variant="ghost" onClick={() => openConvert(idea)}>→ Hangout</Button>
-                  {idea.status !== 'Archived' && (
-                    <Button size="sm" variant="ghost" onClick={() => archiveIdea(idea.id)}>Archive</Button>
+
+                  {idea.occasion && idea.occasion !== DEFAULT_HANGOUT_OCCASION && (
+                    <IdeaField label="Occasion" value={idea.occasion} />
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => setDeleteId(idea.id)}>Del</Button>
+                  <IdeaField label="Category" value={idea.category} />
+                  <IdeaField label="Type" value={idea.type || '—'} />
+                  <IdeaField label="Estimated Cost" value={idea.estimatedCost} />
+                  {durationLabel && <IdeaField label="Estimated Duration" value={durationLabel} />}
+                  {idea.location && <IdeaField label="Location" value={idea.location} />}
+                  {interested && <IdeaField label="Interested Friends" value={interested} />}
+                  {idea.notes && <IdeaField label="Notes" value={idea.notes} multiline />}
+
+                  {idea.links.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      {idea.links.map((link, i) => (
+                        <a
+                          key={i}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary block truncate"
+                        >
+                          {link}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    <Button size="sm" variant="ghost" onClick={() => toggleFavoriteIdea(idea.id)}>
+                      {idea.isFavorite ? 'Unfav' : 'Fav'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(idea)}>Edit</Button>
+                    <Button size="sm" variant="ghost" onClick={() => openConvert(idea)}>→ Hangout</Button>
+                    {idea.status !== 'Archived' && (
+                      <Button size="sm" variant="ghost" onClick={() => archiveIdea(idea.id)}>Archive</Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => setDeleteId(idea.id)}>Del</Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -256,6 +311,17 @@ export function IdeasTab() {
       >
         <div className="grid sm:grid-cols-2 gap-4">
           <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <Select
+            label="Occasion (optional)"
+            value={form.occasion}
+            onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+            options={[
+              { value: '', label: 'None' },
+              ...data.hangoutOccasions
+                .filter((o) => o !== DEFAULT_HANGOUT_OCCASION)
+                .map((o) => ({ value: o, label: o })),
+            ]}
+          />
           <HangoutCategoryTypeSelect
             category={form.category}
             type={form.type}
@@ -268,25 +334,18 @@ export function IdeasTab() {
             options={costs.map((c) => ({ value: c, label: c }))}
           />
           <Input
-            label="Estimated Duration (minutes)"
+            label="Estimated Duration (minutes, optional)"
             type="number"
-            min={15}
-            value={form.estimatedDurationMinutes}
-            onChange={(e) => setForm({ ...form, estimatedDurationMinutes: parseInt(e.target.value) || 60 })}
+            min={1}
+            placeholder="Leave blank if unknown"
+            value={form.durationInput}
+            onChange={(e) => setForm({ ...form, durationInput: e.target.value })}
           />
           <LocationAutocomplete
             label="Location"
             value={form.location}
             onChange={(location) => setForm({ ...form, location })}
             placeholder="Search locations…"
-          />
-          <Input
-            label="Priority (1-5)"
-            type="number"
-            min={1}
-            max={5}
-            value={form.priority}
-            onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) || 3 })}
           />
           <Select
             label="Status"
@@ -297,7 +356,7 @@ export function IdeasTab() {
           <div className="sm:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span className="block text-sm font-medium text-left" style={{ color: 'var(--text-heading)' }}>
-                Friends Interested
+                Interested Friends
               </span>
               <label className="flex items-center gap-2 cursor-pointer text-xs">
                 <input
@@ -360,7 +419,7 @@ export function IdeasTab() {
         <div className="space-y-4">
           <p className="text-sm opacity-70 text-left">
             Converting: <strong>{convertModal?.title}</strong>
-            {convertModal?.type && <> · Type: {convertModal.type}</>}
+            {convertModal?.category && <> · {convertModal.category} · {convertModal.type}</>}
           </p>
           {convertModal?.location && (
             <p className="text-sm opacity-70 text-left">📍 {convertModal.location}</p>
@@ -420,6 +479,28 @@ export function IdeasTab() {
         title="Delete Idea"
         message="Delete this idea?"
       />
+    </div>
+  );
+}
+
+function IdeaField({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+}) {
+  return (
+    <div className="text-xs">
+      <span className="opacity-60">{label}: </span>
+      <span
+        className={multiline ? 'opacity-80 line-clamp-3' : 'font-medium'}
+        style={{ color: 'var(--text-heading)' }}
+      >
+        {value}
+      </span>
     </div>
   );
 }

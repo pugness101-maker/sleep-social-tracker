@@ -60,11 +60,11 @@ const ideas: HangoutIdea[] = [
   {
     id: 'i1',
     title: 'Museum',
+    category: 'Social',
     type: 'Chill',
     estimatedCost: 'Free',
     estimatedDurationMinutes: 120,
     location: 'Art Museum',
-    priority: 3,
     status: 'Want to Try',
     friendIds: [],
     notes: '',

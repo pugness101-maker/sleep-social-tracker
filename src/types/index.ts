@@ -195,10 +195,14 @@ export interface HangoutIdea {
   title: string;
   category: HangoutCategory;
   type: HangoutType;
+  /** Purpose of the meetup when planned (optional). */
+  occasion?: string;
   estimatedCost: CostLevel;
-  estimatedDurationMinutes: number;
+  /** Minutes; null when not specified. */
+  estimatedDurationMinutes: number | null;
   location: string;
-  priority: number;
+  /** Legacy field — preserved in storage but not shown in UI. */
+  priority?: number;
   status: IdeaStatus;
   friendIds: string[];
   notes: string;

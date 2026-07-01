@@ -14,11 +14,11 @@ import {
   formatTime,
   startOfDay,
 } from '../../lib/dates';
-import { addDays, subDays } from 'date-fns';
+import { addDays } from 'date-fns';
 import type { AppData } from '../../types';
 import { getHangoutDisplayType, segmentHasCalendarTimes } from '../../lib/hangout-segments';
 
-type CalView = 'day' | 'week' | 'month' | 'timeline';
+type CalView = 'day' | 'week' | 'month';
 
 interface CalEvent {
   id: string;
@@ -134,14 +134,12 @@ export function CalendarTab() {
     { id: 'day', label: 'Day' },
     { id: 'week', label: 'Week' },
     { id: 'month', label: 'Month' },
-    { id: 'timeline', label: 'Timeline' },
   ];
 
   const navigate = (dir: -1 | 1) => {
     if (view === 'day') setCurrentDate((d) => addDays(d, dir));
     else if (view === 'week') setCurrentDate((d) => addDays(d, dir * 7));
-    else if (view === 'month') setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + dir, 1));
-    else setCurrentDate((d) => addDays(d, dir));
+    else setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + dir, 1));
   };
 
   return (
@@ -165,7 +163,6 @@ export function CalendarTab() {
       {view === 'day' && <DayView date={currentDate} events={events} />}
       {view === 'week' && <WeekView date={currentDate} events={events} />}
       {view === 'month' && <MonthView date={currentDate} events={events} />}
-      {view === 'timeline' && <TimelineView date={currentDate} events={events} />}
     </div>
   );
 }
@@ -268,35 +265,6 @@ function MonthView({ date, events }: { date: Date; events: CalEvent[] }) {
           );
         })}
       </div>
-    </Card>
-  );
-}
-
-function TimelineView({ date, events }: { date: Date; events: CalEvent[] }) {
-  const rangeStart = subDays(startOfDay(date), 3);
-  const rangeEnd = addDays(startOfDay(date), 4);
-  const filtered = events.filter((e) => e.end > rangeStart && e.start < rangeEnd);
-
-  return (
-    <Card>
-      <h3 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>
-        Timeline: {format(rangeStart, 'MMM d')} – {format(rangeEnd, 'MMM d, yyyy')}
-      </h3>
-      {filtered.length === 0 ? (
-        <p className="text-sm opacity-70 text-left">No events in this range.</p>
-      ) : (
-        <div className="relative pl-6 space-y-0">
-          <div className="absolute left-2 top-0 bottom-0 w-0.5" style={{ background: 'var(--border)' }} />
-          {filtered.map((e) => (
-            <div key={e.id} className="relative pb-6 text-left">
-              <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-white" style={{ background: e.color }} />
-              <p className="text-xs opacity-60">{format(e.start, 'MMM d, h:mm a')} – {format(e.end, 'h:mm a')}</p>
-              <p className="font-medium text-sm" style={{ color: 'var(--text-heading)' }}>{e.label}</p>
-              <span className="text-xs capitalize opacity-70">{e.type}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </Card>
   );
 }
