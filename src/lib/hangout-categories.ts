@@ -130,6 +130,56 @@ export function typesForCategory(catalog: Record<string, string[]>, category: st
   return catalog[category] ?? [];
 }
 
+/** Active category options from saved Settings only (sorted). */
+export function getActiveCategoryOptions(settingsCategories: string[]): string[] {
+  return [...settingsCategories].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+/**
+ * Active type options from saved Settings catalog only.
+ * When selectedCategory is set, returns types for that category (empty for Mixed).
+ * When omitted/empty, returns all types across active settings categories.
+ */
+export function getActiveTypeOptions(
+  catalog: Record<string, string[]>,
+  settingsCategories: string[],
+  selectedCategory = ''
+): string[] {
+  const types = new Set<string>();
+
+  if (selectedCategory.trim()) {
+    if (!isMixedHangoutCategory(selectedCategory)) {
+      for (const t of typesForCategory(catalog, selectedCategory)) types.add(t);
+    }
+  } else {
+    for (const cat of settingsCategories) {
+      if (isMixedHangoutCategory(cat)) continue;
+      for (const t of typesForCategory(catalog, cat)) types.add(t);
+    }
+  }
+
+  return filterTypesForDropdown([...types]).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' })
+  );
+}
+
+export function isActiveTypeInCatalog(
+  type: string,
+  catalog: Record<string, string[]>,
+  settingsCategories: string[],
+  category = ''
+): boolean {
+  if (!type.trim()) return true;
+  return getActiveTypeOptions(catalog, settingsCategories, category).some(
+    (t) => t.toLowerCase() === type.toLowerCase()
+  );
+}
+
+export function isActiveCategoryInSettings(category: string, settingsCategories: string[]): boolean {
+  if (!category.trim()) return true;
+  return settingsCategories.some((c) => c.toLowerCase() === category.toLowerCase());
+}
+
 export function getDefaultTypeForCategory(
   catalog: Record<string, string[]>,
   category: string

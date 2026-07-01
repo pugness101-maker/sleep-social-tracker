@@ -8,26 +8,21 @@ import {
   type HangoutTabFilters,
   typeBelongsToHangoutCategory,
 } from '../lib/hangout-filters';
-import type { Hangout } from '../types';
 
 interface UseHangoutFiltersArgs {
   hangoutCategories: string[];
   hangoutTypesByCategory: Record<string, string[]>;
-  hangoutTypes: string[];
-  hangouts: Hangout[];
 }
 
 export function useHangoutFilters({
   hangoutCategories,
   hangoutTypesByCategory,
-  hangoutTypes,
-  hangouts,
 }: UseHangoutFiltersArgs) {
   const [filters, setFilters] = useState<HangoutTabFilters>(() => loadHangoutTabFilters());
 
   useEffect(() => {
     setFilters((prev) => {
-      const next = sanitizeHangoutTabFilters(prev, hangoutCategories, hangouts, hangoutTypesByCategory);
+      const next = sanitizeHangoutTabFilters(prev, hangoutCategories, hangoutTypesByCategory);
       if (
         next.category !== prev.category ||
         next.type !== prev.type ||
@@ -39,7 +34,7 @@ export function useHangoutFilters({
       }
       return prev;
     });
-  }, [hangouts, hangoutTypesByCategory, hangoutCategories]);
+  }, [hangoutTypesByCategory, hangoutCategories]);
 
   const setSearch = useCallback((search: string) => {
     setFilters((prev) => {
@@ -61,7 +56,7 @@ export function useHangoutFilters({
     (category: string) => {
       setFilters((prev) => {
         let type = prev.type;
-        if (category && type && !typeBelongsToHangoutCategory(type, category, hangouts, hangoutTypesByCategory)) {
+        if (type && !typeBelongsToHangoutCategory(type, category, hangoutTypesByCategory, hangoutCategories)) {
           type = '';
         }
         const next = { ...prev, category, type };
@@ -69,7 +64,7 @@ export function useHangoutFilters({
         return next;
       });
     },
-    [hangouts, hangoutTypesByCategory]
+    [hangoutTypesByCategory, hangoutCategories]
   );
 
   const setType = useCallback((type: string) => {
@@ -81,13 +76,13 @@ export function useHangoutFilters({
   }, []);
 
   const categoryOptions = useMemo(
-    () => getHangoutCategoryFilterOptions(hangoutCategories, hangouts),
-    [hangoutCategories, hangouts]
+    () => getHangoutCategoryFilterOptions(hangoutCategories),
+    [hangoutCategories]
   );
 
   const typeOptions = useMemo(
-    () => getHangoutTypeFilterOptions(hangouts, hangoutTypesByCategory, hangoutTypes, filters.category),
-    [hangouts, hangoutTypesByCategory, hangoutTypes, filters.category]
+    () => getHangoutTypeFilterOptions(hangoutTypesByCategory, hangoutCategories, filters.category),
+    [hangoutTypesByCategory, hangoutCategories, filters.category]
   );
 
   return {

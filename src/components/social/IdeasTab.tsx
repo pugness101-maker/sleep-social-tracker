@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -6,7 +6,7 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/FormFields';
 import { SearchBar, EmptyState, Badge } from '../ui/Misc';
 import { formatDuration, toLocalISO } from '../../lib/dates';
-import { getDefaultHangoutCategoryPair, normalizeHangoutMainFields } from '../../lib/hangout-categories';
+import { getActiveTypeOptions, getDefaultHangoutCategoryPair, normalizeHangoutMainFields } from '../../lib/hangout-categories';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { HangoutCategoryTypeSelect } from './HangoutCategoryTypeSelect';
 import type { HangoutIdea, CostLevel, IdeaStatus } from '../../types';
@@ -43,6 +43,17 @@ export function IdeasTab() {
   const [editIdea, setEditIdea] = useState<HangoutIdea | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(makeEmptyForm);
+
+  const activeTypeFilterOptions = useMemo(
+    () => getActiveTypeOptions(data.hangoutTypesByCategory ?? {}, data.hangoutCategories),
+    [data.hangoutTypesByCategory, data.hangoutCategories]
+  );
+
+  useEffect(() => {
+    if (filterType && !activeTypeFilterOptions.some((t) => t.toLowerCase() === filterType.toLowerCase())) {
+      setFilterType('');
+    }
+  }, [activeTypeFilterOptions, filterType]);
 
   const [convertForm, setConvertForm] = useState({
     friendIds: [] as string[],
@@ -140,7 +151,7 @@ export function IdeasTab() {
           onChange={(e) => setFilterType(e.target.value)}
           options={[
             { value: '', label: 'All Types' },
-            ...data.hangoutTypes.map((t) => ({ value: t, label: t })),
+            ...activeTypeFilterOptions.map((t) => ({ value: t, label: t })),
           ]}
         />
         <Select

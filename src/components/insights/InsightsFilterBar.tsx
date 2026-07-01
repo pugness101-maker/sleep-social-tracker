@@ -4,14 +4,13 @@ import { Button } from '../ui/Button';
 import { Select } from '../ui/FormFields';
 import { Badge } from '../ui/Misc';
 import {
-  collectSegmentTypes,
   filterHangoutsByInsights,
   getInsightsFilterChips,
   hasActiveInsightsFilters,
   type InsightsFilters,
 } from '../../lib/insights-filters';
 import { optionSelectOptions } from '../../lib/social-options';
-import { filterTypesForDropdown } from '../../lib/hangout-categories';
+import { getActiveTypeOptions } from '../../lib/hangout-categories';
 import { LocationAutocomplete } from '../social/LocationAutocomplete';
 
 interface InsightsFilterBarProps {
@@ -31,12 +30,19 @@ export function InsightsFilterBar({
 }: InsightsFilterBarProps) {
   const { data } = useApp();
 
-  const scopedHangouts = useMemo(
-    () => filterHangoutsByInsights(data.hangouts, filters, data.friends),
-    [data.hangouts, data.friends, filters]
+  const catalog = data.hangoutTypesByCategory ?? {};
+  const settingsCategories = data.hangoutCategories ?? [];
+
+  const hangoutTypeOptions = useMemo(
+    () => getActiveTypeOptions(catalog, settingsCategories, filters.hangoutCategory),
+    [catalog, settingsCategories, filters.hangoutCategory]
   );
 
-  const segmentTypes = useMemo(() => collectSegmentTypes(scopedHangouts), [scopedHangouts]);
+  const segmentTypeOptions = useMemo(
+    () => getActiveTypeOptions(catalog, settingsCategories),
+    [catalog, settingsCategories]
+  );
+
   const chips = getInsightsFilterChips(filters, data.friends);
 
   return (
@@ -78,19 +84,17 @@ export function InsightsFilterBar({
           onChange={(e) => setFilter('hangoutType', e.target.value)}
           options={[
             { value: '', label: 'All types' },
-            ...(filters.hangoutCategory
-              ? filterTypesForDropdown(data.hangoutTypesByCategory[filters.hangoutCategory] ?? []).map((t) => ({
-                  value: t,
-                  label: t,
-                }))
-              : optionSelectOptions(filterTypesForDropdown(data.hangoutTypes))),
+            ...optionSelectOptions(hangoutTypeOptions),
           ]}
         />
         <Select
           label="Segment type"
           value={filters.segmentType}
           onChange={(e) => setFilter('segmentType', e.target.value)}
-          options={[{ value: '', label: 'All segment types' }, ...segmentTypes.map((t) => ({ value: t, label: t }))]}
+          options={[
+            { value: '', label: 'All segment types' },
+            ...optionSelectOptions(segmentTypeOptions),
+          ]}
         />
         <LocationAutocomplete
           label="Location"

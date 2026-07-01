@@ -69,7 +69,6 @@ function finalizeHangoutCatalogMutation(next: AppData): AppData {
     sanitizeHangoutTabFilters(
       loadHangoutTabFilters(),
       next.hangoutCategories,
-      next.hangouts,
       next.hangoutTypesByCategory
     )
   );

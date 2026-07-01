@@ -1,4 +1,8 @@
 import { isInRange } from './dates';
+import {
+  isActiveCategoryInSettings,
+  isActiveTypeInCatalog,
+} from './hangout-categories';
 import { friendInHangout, getSegmentFriendIds, hangoutMatchesCategoryFilter, hangoutMatchesTypeFilter } from './hangout-segments';
 import type { AppData, Friend, Hangout } from '../types';
 
@@ -50,6 +54,28 @@ export function loadInsightsFilters(): InsightsFilters {
 
 export function saveInsightsFilters(filters: InsightsFilters): void {
   localStorage.setItem(INSIGHTS_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+}
+
+export function sanitizeInsightsFilters(
+  filters: InsightsFilters,
+  settingsCategories: string[],
+  catalog: Record<string, string[]>
+): InsightsFilters {
+  let { hangoutCategory, hangoutType, segmentType } = filters;
+
+  if (hangoutCategory && !isActiveCategoryInSettings(hangoutCategory, settingsCategories)) {
+    hangoutCategory = '';
+  }
+
+  if (hangoutType && !isActiveTypeInCatalog(hangoutType, catalog, settingsCategories, hangoutCategory)) {
+    hangoutType = '';
+  }
+
+  if (segmentType && !isActiveTypeInCatalog(segmentType, catalog, settingsCategories)) {
+    segmentType = '';
+  }
+
+  return { ...filters, hangoutCategory, hangoutType, segmentType };
 }
 
 export function hasActiveInsightsFilters(filters: InsightsFilters): boolean {

@@ -5,8 +5,10 @@ import {
   getHangoutCategoryFilterOptions,
   getHangoutTypeFilterOptions,
   hangoutMatchesSearch,
+  sanitizeHangoutTabFilters,
   typeBelongsToHangoutCategory,
 } from './hangout-filters';
+import { getActiveTypeOptions } from './hangout-categories';
 
 const hangouts: Hangout[] = [
   {
@@ -52,7 +54,8 @@ const friends = [
   { id: 'f2', name: 'Sophie' },
 ] as Parameters<typeof hangoutMatchesSearch>[2];
 
-const catalog = { Food: ['Dinner', 'Dessert'], Mixed: [] };
+const settingsCategories = ['Social', 'Food', 'Mixed'];
+const catalog = { Social: ['Chill'], Food: ['Dinner', 'Dessert'], Mixed: [] };
 
 describe('hangoutMatchesSearch', () => {
   it('finds friend names and segment fields', () => {
@@ -86,20 +89,44 @@ describe('filterHangoutsForTab', () => {
 });
 
 describe('filter options', () => {
-  it('includes orphan categories from hangout data', () => {
-    const opts = getHangoutCategoryFilterOptions(['Social'], hangouts);
+  it('uses settings categories only', () => {
+    const opts = getHangoutCategoryFilterOptions(settingsCategories);
     expect(opts).toContain('Food');
-    expect(opts).toContain('Mixed');
+    expect(opts).toContain('Social');
+    expect(opts).not.toContain('DeletedCategory');
   });
 
-  it('scopes types to selected category', () => {
-    const opts = getHangoutTypeFilterOptions(hangouts, catalog, [], 'Food');
+  it('scopes types to selected category from settings', () => {
+    const opts = getHangoutTypeFilterOptions(catalog, settingsCategories, 'Food');
     expect(opts).toContain('Dinner');
     expect(opts).toContain('Dessert');
+    expect(opts).not.toContain('Chill');
   });
 
-  it('validates type belongs to category', () => {
-    expect(typeBelongsToHangoutCategory('Dinner', 'Food', hangouts, catalog)).toBe(true);
-    expect(typeBelongsToHangoutCategory('Dinner', 'Social', hangouts, catalog)).toBe(false);
+  it('excludes deleted types and orphan hangout types when All Categories', () => {
+    const opts = getHangoutTypeFilterOptions(catalog, settingsCategories, '');
+    expect(opts).toContain('Chill');
+    expect(opts).toContain('Dinner');
+    expect(opts).not.toContain('LegacyDeletedType');
+  });
+
+  it('excludes types from deleted categories when All Categories', () => {
+    const opts = getActiveTypeOptions(catalog, settingsCategories);
+    expect(opts).not.toContain('Gym');
+  });
+
+  it('validates type belongs to category via settings catalog', () => {
+    expect(typeBelongsToHangoutCategory('Dinner', 'Food', catalog, settingsCategories)).toBe(true);
+    expect(typeBelongsToHangoutCategory('Dinner', 'Social', catalog, settingsCategories)).toBe(false);
+    expect(typeBelongsToHangoutCategory('LegacyDeletedType', '', catalog, settingsCategories)).toBe(false);
+  });
+
+  it('resets deleted type filter to All Types', () => {
+    const sanitized = sanitizeHangoutTabFilters(
+      { search: '', category: '', type: 'Chill', location: '' },
+      ['Social'],
+      { Social: ['Party'] }
+    );
+    expect(sanitized.type).toBe('');
   });
 });

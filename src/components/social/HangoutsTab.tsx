@@ -36,8 +36,6 @@ export function HangoutsTab() {
   } = useHangoutFilters({
     hangoutCategories: data.hangoutCategories,
     hangoutTypesByCategory: data.hangoutTypesByCategory ?? {},
-    hangoutTypes: data.hangoutTypes,
-    hangouts: data.hangouts,
   });
 
   const makeEmptyForm = () => {

@@ -1,8 +1,10 @@
 import { formatDate, formatDateTime } from './dates';
 import {
-  filterTypesForDropdown,
+  getActiveCategoryOptions,
+  getActiveTypeOptions,
+  isActiveCategoryInSettings,
+  isActiveTypeInCatalog,
   isMixedHangoutCategory,
-  typesForCategory,
 } from './hangout-categories';
 import {
   getSegmentFriendIds,
@@ -50,75 +52,27 @@ export function saveHangoutTabFilters(filters: HangoutTabFilters): void {
   localStorage.setItem(HANGOUT_FILTERS_STORAGE_KEY, JSON.stringify(filters));
 }
 
-/** Categories from settings plus any still referenced in hangout/segment data. */
-export function getHangoutCategoryFilterOptions(
-  settingsCategories: string[],
-  hangouts: Hangout[]
-): string[] {
-  const set = new Set(settingsCategories);
-  for (const h of hangouts) {
-    if (h.category?.trim()) set.add(h.category);
-    for (const s of h.segments ?? []) {
-      if (s.category?.trim()) set.add(s.category);
-    }
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+/** Category filter options from saved Settings only. */
+export function getHangoutCategoryFilterOptions(settingsCategories: string[]): string[] {
+  return getActiveCategoryOptions(settingsCategories);
 }
 
-function collectTypesForCategoryFromHangouts(hangouts: Hangout[], category: string): string[] {
-  const set = new Set<string>();
-  for (const h of hangouts) {
-    if (h.category === category && h.type?.trim()) set.add(h.type);
-    for (const s of h.segments ?? []) {
-      if (s.category === category && s.type?.trim()) set.add(s.type);
-    }
-  }
-  return [...set];
-}
-
-/** Types for filter dropdown — scoped to category when set, otherwise all known types. */
+/** Type filter options from saved Settings catalog only. */
 export function getHangoutTypeFilterOptions(
-  hangouts: Hangout[],
   catalog: Record<string, string[]>,
-  flatTypes: string[],
+  settingsCategories: string[],
   selectedCategory: string
 ): string[] {
-  const set = new Set<string>();
-
-  if (selectedCategory) {
-    for (const t of typesForCategory(catalog, selectedCategory)) set.add(t);
-    for (const t of collectTypesForCategoryFromHangouts(hangouts, selectedCategory)) set.add(t);
-  } else {
-    for (const types of Object.values(catalog)) {
-      types.forEach((t) => set.add(t));
-    }
-    flatTypes.forEach((t) => set.add(t));
-    for (const h of hangouts) {
-      if (h.type?.trim() && !isMixedHangoutCategory(h.category)) set.add(h.type);
-      for (const s of h.segments ?? []) {
-        if (s.type?.trim()) set.add(s.type);
-      }
-    }
-  }
-
-  return filterTypesForDropdown([...set]).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' })
-  );
+  return getActiveTypeOptions(catalog, settingsCategories, selectedCategory);
 }
 
 export function typeBelongsToHangoutCategory(
   type: string,
   category: string,
-  hangouts: Hangout[],
-  catalog: Record<string, string[]>
+  catalog: Record<string, string[]>,
+  settingsCategories: string[]
 ): boolean {
-  if (!type) return true;
-  if (!category) return true;
-  const catalogTypes = typesForCategory(catalog, category);
-  if (catalogTypes.some((t) => t.toLowerCase() === type.toLowerCase())) return true;
-  return collectTypesForCategoryFromHangouts(hangouts, category).some(
-    (t) => t.toLowerCase() === type.toLowerCase()
-  );
+  return isActiveTypeInCatalog(type, catalog, settingsCategories, category);
 }
 
 export function hangoutMatchesLocationFilter(hangout: Hangout, filterLocation: string): boolean {
@@ -215,26 +169,17 @@ export function filterHangoutsForTab(
 export function sanitizeHangoutTabFilters(
   filters: HangoutTabFilters,
   settingsCategories: string[],
-  hangouts: Hangout[],
   catalog: Record<string, string[]>
 ): HangoutTabFilters {
   let { category, type } = filters;
-  const categoryOptions = getHangoutCategoryFilterOptions(settingsCategories, hangouts);
-  if (category && !categoryOptions.includes(category)) {
+
+  if (category && !isActiveCategoryInSettings(category, settingsCategories)) {
     category = '';
   }
-  if (type && category && !typeBelongsToHangoutCategory(type, category, hangouts, catalog)) {
+
+  if (type && !isActiveTypeInCatalog(type, catalog, settingsCategories, category)) {
     type = '';
   }
-  const typeOptions = getHangoutTypeFilterOptions(hangouts, catalog, [], category);
-  if (type && !typeOptions.some((t) => t.toLowerCase() === type.toLowerCase())) {
-    const stillUsed = hangouts.some((h) => {
-      if (h.type === type && (!category || h.category === category)) return true;
-      return h.segments?.some(
-        (s) => s.type === type && (!category || s.category === category)
-      );
-    });
-    if (!stillUsed) type = '';
-  }
+
   return { ...filters, category, type };
 }

@@ -2,11 +2,10 @@ import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Select } from '../ui/FormFields';
 import {
-  filterTypesForDropdown,
+  getActiveTypeOptions,
   getDefaultTypeForCategory,
   isMixedHangoutCategory,
   MIXED_HANGOUT_MAIN_TYPE,
-  typesForCategory,
 } from '../../lib/hangout-categories';
 import { optionSelectOptions } from '../../lib/social-options';
 
@@ -44,10 +43,8 @@ export function HangoutCategoryTypeSelect({
   }, [allCategories, category, mode]);
 
   const typeOptions = useMemo(() => {
-    const list = typesForCategory(catalog, category);
-    const source = list.length === 0 ? filterTypesForDropdown(data.hangoutTypes) : list;
-    return filterTypesForDropdown(source);
-  }, [catalog, category, data.hangoutTypes]);
+    return getActiveTypeOptions(catalog, allCategories, category);
+  }, [catalog, allCategories, category]);
 
   const isMixedMain = mode === 'main' && isMixedHangoutCategory(category);
 
@@ -57,7 +54,7 @@ export function HangoutCategoryTypeSelect({
       onTypeChange(MIXED_HANGOUT_MAIN_TYPE);
       return;
     }
-    const types = typesForCategory(catalog, nextCategory);
+    const types = getActiveTypeOptions(catalog, allCategories, nextCategory);
     if (!types.includes(type)) {
       onTypeChange(getDefaultTypeForCategory(catalog, nextCategory));
     }

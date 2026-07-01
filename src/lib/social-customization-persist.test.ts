@@ -126,7 +126,6 @@ describe('social customization persistence', () => {
     const sanitized = sanitizeHangoutTabFilters(
       loadHangoutTabFilters(),
       normalized.hangoutCategories,
-      normalized.hangouts,
       normalized.hangoutTypesByCategory
     );
     expect(sanitized.category).toBe('');
