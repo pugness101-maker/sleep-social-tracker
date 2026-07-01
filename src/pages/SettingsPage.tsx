@@ -6,11 +6,12 @@ import { Input, Select } from '../components/ui/FormFields';
 import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
 import { SectionImport } from '../components/settings/SectionImport';
+import { SleepSpreadsheetImport } from '../components/settings/SleepSpreadsheetImport';
 import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
 
 export function SettingsPage() {
-  const { data, updateSettings, exportData, importData, importSections, resetData } = useApp();
+  const { data, updateSettings, exportData, importData, importSections, importSleepSpreadsheet, resetData } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [message, setMessage] = useState('');
@@ -219,6 +220,12 @@ export function SettingsPage() {
             <Button variant="secondary" onClick={() => fileRef.current?.click()}>Import JSON</Button>
             <SectionImport
               onImport={(json, preset, mode) => importSections(json, preset, mode)}
+              onMessage={showMsg}
+            />
+            <SleepSpreadsheetImport
+              onImport={(sleepEntries, napEntries, mode) =>
+                importSleepSpreadsheet(sleepEntries, napEntries, mode)
+              }
               onMessage={showMsg}
             />
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />

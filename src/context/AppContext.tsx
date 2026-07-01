@@ -25,6 +25,7 @@ import {
   type ImportMode,
   type ImportSectionPreset,
 } from '../lib/import-sections';
+import { applySpreadsheetImport, type SpreadsheetImportMode } from '../lib/spreadsheet-import';
 import { generateId, toLocalISO } from '../lib/dates';
 import {
   normalizeOptionName,
@@ -97,6 +98,11 @@ interface AppContextValue {
     preset: ImportSectionPreset,
     mode: ImportMode
   ) => { success: boolean; error?: string };
+  importSleepSpreadsheet: (
+    sleepEntries: Omit<SleepEntry, 'id' | 'createdAt'>[],
+    napEntries: Omit<NapEntry, 'id' | 'createdAt'>[],
+    mode: SpreadsheetImportMode
+  ) => { success: boolean; error?: string; sleepCount: number; napCount: number };
   resetData: () => void;
 }
 
@@ -720,6 +726,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [data]
   );
 
+  const importSleepSpreadsheetFn = useCallback(
+    (
+      sleepEntries: Omit<SleepEntry, 'id' | 'createdAt'>[],
+      napEntries: Omit<NapEntry, 'id' | 'createdAt'>[],
+      mode: SpreadsheetImportMode
+    ) => {
+      if (sleepEntries.length === 0 && napEntries.length === 0) {
+        return { success: false, error: 'No entries to import.', sleepCount: 0, napCount: 0 };
+      }
+
+      createPreImportBackup();
+
+      const sleepCount = sleepEntries.length;
+      const napCount = napEntries.length;
+
+      patch((prev) => {
+        const imported = applySpreadsheetImport(
+          prev.sleepEntries,
+          prev.napEntries,
+          sleepEntries,
+          napEntries,
+          mode
+        );
+        return {
+          ...prev,
+          sleepEntries: imported.sleepEntries,
+          napEntries: imported.napEntries,
+        };
+      });
+
+      return { success: true, sleepCount, napCount };
+    },
+    [patch]
+  );
+
   const resetData = useCallback(() => {
     setData(clearAllData());
   }, []);
@@ -768,6 +809,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     exportData: exportDataFn,
     importData: importDataFn,
     importSections: importSectionsFn,
+    importSleepSpreadsheet: importSleepSpreadsheetFn,
     resetData,
   };
 
