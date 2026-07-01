@@ -10,6 +10,7 @@ import { useInsightsFilters } from '../../hooks/useInsightsFilters';
 import { StatsDateRangeFilter } from './StatsDateRangeFilter';
 import { InsightsFilterBar, useFilteredAppData } from './InsightsFilterBar';
 import { getLocationHistory, friendNamesAtLocation, formatLocationDate } from '../../lib/location-history';
+import { SleepInsightsSection } from './SleepInsightsSection';
 
 export function StatisticsTab() {
   const { data } = useApp();
@@ -205,6 +206,12 @@ export function StatisticsTab() {
             </div>
           )}
         </Card>
+        <SleepInsightsSection
+          data={filteredData}
+          rangeStart={start}
+          rangeEnd={end}
+          rangeLabel={resolved.isFiltered ? resolved.label : undefined}
+        />
         <div className="mt-6">
           <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Naps (Sleep Log)</h3>
           <div className="grid sm:grid-cols-3 gap-4">
