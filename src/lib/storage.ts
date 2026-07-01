@@ -252,6 +252,8 @@ function migrateHangouts(rawHangouts: Partial<Hangout>[], catalog: Record<string
       type: pair.type,
       occasion: normalizeOccasion(h.occasion),
       segments,
+      isArchived: h.isArchived ?? false,
+      archivedAt: h.isArchived ? h.archivedAt : undefined,
     } as Hangout;
   });
   return migrateHangoutsOccasions(base);

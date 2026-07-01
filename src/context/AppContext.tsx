@@ -46,6 +46,7 @@ import {
   loadBackupHistory,
   loadUndoSnapshot,
   saveUndoSnapshot,
+  UNDO_BULK_HANGOUT_KEY,
   UNDO_CLEANUP_KEY,
   UNDO_IMPORT_KEY,
 } from '../lib/backup-history';
@@ -59,6 +60,14 @@ import {
   normalizeImportedFriendNames,
   renameFriendEverywhere,
 } from '../lib/data-cleanup';
+import {
+  bulkArchiveHangouts,
+  bulkDeleteHangouts,
+  bulkDuplicateHangouts,
+  bulkEditHangouts,
+  type BulkDuplicateTarget,
+  type HangoutBulkEditPatch,
+} from '../lib/hangout-bulk';
 import { allTypesFromCatalogExcludingMixed, applyRetiredTypeResolution, inferCategoryAndType, normalizeHangoutMainFields, isMixedHangoutCategory, type RetiredTypeResolution } from '../lib/hangout-categories';
 import { normalizeOccasion } from '../lib/hangout-occasions';
 import { loadHangoutTabFilters, saveHangoutTabFilters, sanitizeHangoutTabFilters } from '../lib/hangout-filters';
@@ -128,6 +137,12 @@ interface AppContextValue {
   updateHangout: (id: string, hangout: Partial<Hangout>) => void;
   deleteHangout: (id: string) => void;
   duplicateHangout: (id: string) => void;
+  bulkEditHangouts: (hangoutIds: string[], patch: HangoutBulkEditPatch) => number;
+  bulkDuplicateHangouts: (hangoutIds: string[], target: BulkDuplicateTarget) => number;
+  bulkArchiveHangouts: (hangoutIds: string[], archive?: boolean) => number;
+  bulkDeleteHangouts: (hangoutIds: string[]) => number;
+  undoLastBulkHangout: () => boolean;
+  canUndoBulkHangout: () => boolean;
   // Ideas
   addIdea: (idea: Omit<HangoutIdea, 'id' | 'createdAt' | 'isFavorite'>) => void;
   updateIdea: (id: string, idea: Partial<HangoutIdea>) => void;
@@ -663,6 +678,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...hangout,
           ...main,
           occasion: normalizeOccasion(hangout.occasion),
+          isArchived: hangout.isArchived ?? false,
           id: generateId(),
           createdAt: toLocalISO(),
         }],
@@ -694,6 +710,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ...prev, hangouts: [...prev.hangouts, copy] };
     });
   }, [patch]);
+
+  const withBulkHangoutBackup = useCallback((fn: (prev: AppData) => AppData) => {
+    patch((prev) => {
+      saveUndoSnapshot(UNDO_BULK_HANGOUT_KEY, prev);
+      return fn(prev);
+    });
+  }, [patch]);
+
+  const bulkEditHangoutsFn = useCallback(
+    (hangoutIds: string[], patch: HangoutBulkEditPatch) => {
+      let count = 0;
+      withBulkHangoutBackup((prev) => {
+        count = hangoutIds.length;
+        return bulkEditHangouts(prev, hangoutIds, patch);
+      });
+      return count;
+    },
+    [withBulkHangoutBackup]
+  );
+
+  const bulkDuplicateHangoutsFn = useCallback(
+    (hangoutIds: string[], target: BulkDuplicateTarget) => {
+      let count = 0;
+      withBulkHangoutBackup((prev) => {
+        count = hangoutIds.length;
+        return bulkDuplicateHangouts(prev, hangoutIds, target);
+      });
+      return count;
+    },
+    [withBulkHangoutBackup]
+  );
+
+  const bulkArchiveHangoutsFn = useCallback(
+    (hangoutIds: string[], archive = true) => {
+      let count = 0;
+      withBulkHangoutBackup((prev) => {
+        count = hangoutIds.length;
+        return bulkArchiveHangouts(prev, hangoutIds, archive);
+      });
+      return count;
+    },
+    [withBulkHangoutBackup]
+  );
+
+  const bulkDeleteHangoutsFn = useCallback(
+    (hangoutIds: string[]) => {
+      withBulkHangoutBackup((prev) => bulkDeleteHangouts(prev, hangoutIds));
+      return hangoutIds.length;
+    },
+    [withBulkHangoutBackup]
+  );
+
+  const undoLastBulkHangoutFn = useCallback(() => {
+    const snapshot = loadUndoSnapshot(UNDO_BULK_HANGOUT_KEY);
+    if (!snapshot) return false;
+    setData(snapshot);
+    clearUndoSnapshot(UNDO_BULK_HANGOUT_KEY);
+    return true;
+  }, []);
+
+  const canUndoBulkHangoutFn = useCallback(() => loadUndoSnapshot(UNDO_BULK_HANGOUT_KEY) !== null, []);
 
   const addIdea = useCallback((idea: Omit<HangoutIdea, 'id' | 'createdAt' | 'isFavorite'>) => {
     patch((prev) => ({
@@ -1456,6 +1533,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateHangout,
     deleteHangout,
     duplicateHangout,
+    bulkEditHangouts: bulkEditHangoutsFn,
+    bulkDuplicateHangouts: bulkDuplicateHangoutsFn,
+    bulkArchiveHangouts: bulkArchiveHangoutsFn,
+    bulkDeleteHangouts: bulkDeleteHangoutsFn,
+    undoLastBulkHangout: undoLastBulkHangoutFn,
+    canUndoBulkHangout: canUndoBulkHangoutFn,
     addIdea,
     updateIdea,
     deleteIdea,

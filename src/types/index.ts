@@ -183,6 +183,9 @@ export interface Hangout {
   notes: string;
   segments: HangoutSegment[];
   createdAt: string;
+  /** Hidden from default hangout list; still included in lifetime statistics. */
+  isArchived?: boolean;
+  archivedAt?: string;
   source?: string;
   sourceCalendarUid?: string;
 }

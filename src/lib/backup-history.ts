@@ -4,6 +4,7 @@ import type { AppData } from '../types';
 export const BACKUP_HISTORY_KEY = 'sleep-social-tracker-backup-history';
 export const UNDO_IMPORT_KEY = 'sleep-social-tracker-undo-import';
 export const UNDO_CLEANUP_KEY = 'sleep-social-tracker-undo-cleanup';
+export const UNDO_BULK_HANGOUT_KEY = 'sleep-social-tracker-undo-bulk-hangout';
 export const MAX_BACKUPS = 20;
 
 export interface BackupMeta {

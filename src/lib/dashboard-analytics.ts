@@ -204,7 +204,7 @@ export function getDashboardRecentActivity(data: AppData, limit = 10): RecentAct
     });
   });
 
-  data.hangouts.forEach((h) => {
+  data.hangouts.filter((h) => !h.isArchived).forEach((h) => {
     const names = h.friendIds.map(friendName).join(', ');
     items.push({
       id: `hangout-${h.id}`,
