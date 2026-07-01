@@ -7,6 +7,8 @@ import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/FormFields';
 import { EmptyState } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, formatTime, toLocalISO } from '../../lib/dates';
+import { formatSleepDebt } from '../../lib/sleep-goals';
+import { getEntrySleepDebt } from '../../lib/stats';
 import type { SleepEntry } from '../../types';
 
 export function SleepLogTab() {
@@ -86,6 +88,7 @@ export function SleepLogTab() {
                 <th className="px-4 py-3 font-medium">Sleep Start</th>
                 <th className="px-4 py-3 font-medium">Wake Up</th>
                 <th className="px-4 py-3 font-medium">Duration</th>
+                <th className="px-4 py-3 font-medium">Debt / Surplus</th>
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Notes</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -96,6 +99,7 @@ export function SleepLogTab() {
                   <td className="px-4 py-3">{formatDateTime(entry.sleepStart)}</td>
                   <td className="px-4 py-3">{formatDateTime(entry.wakeUp)}</td>
                   <td className="px-4 py-3 font-medium">{formatDuration(calcDurationMinutes(entry.sleepStart, entry.wakeUp))}</td>
+                  <td className="px-4 py-3">{formatSleepDebt(getEntrySleepDebt(data, entry))}</td>
                   <td className="px-4 py-3 hidden sm:table-cell opacity-70 truncate max-w-[150px]">{entry.notes || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
@@ -126,7 +130,13 @@ export function SleepLogTab() {
           <Input label="Sleep Start" type="datetime-local" value={form.sleepStart} onChange={(e) => setForm({ ...form, sleepStart: e.target.value })} />
           <Input label="Wake Up" type="datetime-local" value={form.wakeUp} onChange={(e) => setForm({ ...form, wakeUp: e.target.value })} />
           {form.sleepStart && form.wakeUp && (
-            <p className="text-sm opacity-70">Duration: {formatDuration(calcDurationMinutes(form.sleepStart, form.wakeUp))}</p>
+            <p className="text-sm opacity-70">
+              Duration: {formatDuration(calcDurationMinutes(form.sleepStart, form.wakeUp))}
+              {' · '}
+              {formatSleepDebt(
+                data.settings.sleepGoalHours * 60 - calcDurationMinutes(form.sleepStart, form.wakeUp)
+              )}
+            </p>
           )}
           <Textarea label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </div>

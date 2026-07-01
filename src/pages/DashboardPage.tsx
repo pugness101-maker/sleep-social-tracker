@@ -11,9 +11,10 @@ import {
   getAverageSleepThisWeek,
   getRecentActivity,
   getLastNightSleepVsGoal,
+  getSleepDebtStats,
 } from '../lib/stats';
 import { formatDuration, formatTime, calcDurationMinutes, formatDurationLive, formatDateTime } from '../lib/dates';
-import { getSleepSchedule, formatSleepGoalDiff } from '../lib/sleep-goals';
+import { getSleepSchedule, formatSleepDebt } from '../lib/sleep-goals';
 
 export function DashboardPage() {
   const { data } = useApp();
@@ -28,6 +29,7 @@ export function DashboardPage() {
   const socialHours = getSocialHoursThisWeek(data);
   const avgSleep = getAverageSleepThisWeek(data);
   const recent = getRecentActivity(data);
+  const debtStats = getSleepDebtStats(data);
   const goalMinutes = data.settings.sleepGoalHours * 60;
 
   const isSleeping = !!data.activeTimers.sleepStart;
@@ -75,13 +77,46 @@ export function DashboardPage() {
           value={lastSleep ? formatDuration(calcDurationMinutes(lastSleep.sleepStart, lastSleep.wakeUp)) : '—'}
           sub={
             sleepVsGoal
-              ? formatSleepGoalDiff(sleepVsGoal.diff)
+              ? formatSleepDebt(sleepVsGoal.debt)
               : lastSleep
                 ? formatTime(lastSleep.wakeUp) + ' wake-up'
                 : 'No sleep logged'
           }
           accent="sleep"
           icon="😴"
+        />
+        <StatCard
+          label="Today's Sleep Debt"
+          value={
+            debtStats.todaySleepDebt !== null
+              ? formatSleepDebt(debtStats.todaySleepDebt)
+              : '—'
+          }
+          sub={`Goal: ${data.settings.sleepGoalHours}h/night`}
+          accent="sleep"
+          icon="📉"
+        />
+        <StatCard
+          label="This Week's Sleep Debt"
+          value={
+            debtStats.weekNightCount > 0
+              ? formatSleepDebt(debtStats.weeklyDebt)
+              : '—'
+          }
+          sub={`${debtStats.weekNightCount} night${debtStats.weekNightCount === 1 ? '' : 's'} logged this week`}
+          accent="sleep"
+          icon="📆"
+        />
+        <StatCard
+          label="Sleep Goal Progress"
+          value={`${debtStats.goalProgress.toFixed(0)}%`}
+          sub={
+            debtStats.nightCount > 0
+              ? `${debtStats.nightsAtGoal} of ${debtStats.nightCount} nights met goal`
+              : `Target: ${data.settings.sleepGoalHours}h/night`
+          }
+          accent="sleep"
+          icon="✅"
         />
         <StatCard
           label="Today's Wake-up"
@@ -115,7 +150,7 @@ export function DashboardPage() {
           value={avgSleep ? formatDuration(avgSleep) : '—'}
           sub={
             weeklyVsGoal !== null
-              ? formatSleepGoalDiff(weeklyVsGoal)
+              ? formatSleepDebt(-weeklyVsGoal)
               : `Goal: ${data.settings.sleepGoalHours}h`
           }
           accent="sleep"

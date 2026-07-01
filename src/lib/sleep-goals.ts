@@ -60,15 +60,27 @@ export function getSleepSchedule(settings: AppSettings) {
   };
 }
 
-export function formatSleepGoalDiff(diffMinutes: number): string {
-  if (diffMinutes === 0) return 'On goal';
-  const sign = diffMinutes > 0 ? '+' : '−';
-  const abs = Math.abs(diffMinutes);
+/** sleepDebtMinutes = goalMinutes - actualMinutes (positive = debt, negative = surplus) */
+export function calcSleepDebtMinutes(goalMinutes: number, actualMinutes: number): number {
+  return goalMinutes - actualMinutes;
+}
+
+export function formatSleepDebt(debtMinutes: number): string {
+  if (debtMinutes === 0) return 'Met goal';
+  const abs = Math.abs(debtMinutes);
   const h = Math.floor(abs / 60);
   const m = Math.round(abs % 60);
-  if (h === 0) return `${sign}${m}m vs goal`;
-  if (m === 0) return `${sign}${h}h vs goal`;
-  return `${sign}${h}h ${m}m vs goal`;
+  let timeStr: string;
+  if (h === 0) timeStr = `${m}m`;
+  else if (m === 0) timeStr = `${h}h`;
+  else timeStr = `${h}h ${m}m`;
+  if (debtMinutes > 0) return `${timeStr} sleep debt`;
+  return `${timeStr} over goal`;
+}
+
+/** @deprecated use formatSleepDebt with calcSleepDebtMinutes; diff = actual - goal */
+export function formatSleepGoalDiff(diffMinutes: number): string {
+  return formatSleepDebt(-diffMinutes);
 }
 
 export function formatGoalProgressPercent(actualMinutes: number, goalMinutes: number): string {

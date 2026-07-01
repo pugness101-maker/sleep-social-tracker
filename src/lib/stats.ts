@@ -1,4 +1,5 @@
 import type { AppData, Friend, Hangout, SleepEntry } from '../types';
+import { calcSleepDebtMinutes } from './sleep-goals';
 import {
   calcDurationMinutes,
   getWeekRange,
@@ -67,12 +68,74 @@ export function getSocialHoursThisWeek(data: AppData): number {
   return minutes / 60;
 }
 
-export function getLastNightSleepVsGoal(data: AppData): { actual: number; goal: number; diff: number } | null {
+export function getLastNightSleepVsGoal(data: AppData): { actual: number; goal: number; diff: number; debt: number } | null {
   const last = getLastNightSleep(data);
   if (!last) return null;
   const actual = calcDurationMinutes(last.sleepStart, last.wakeUp);
   const goal = data.settings.sleepGoalHours * 60;
-  return { actual, goal, diff: actual - goal };
+  return { actual, goal, diff: actual - goal, debt: calcSleepDebtMinutes(goal, actual) };
+}
+
+export interface SleepDebtEntry {
+  entry: SleepEntry;
+  actual: number;
+  debt: number;
+}
+
+export function getSleepDebtStats(data: AppData) {
+  const goalMinutes = data.settings.sleepGoalHours * 60;
+
+  const entries: SleepDebtEntry[] = data.sleepEntries.map((entry) => {
+    const actual = calcDurationMinutes(entry.sleepStart, entry.wakeUp);
+    return { entry, actual, debt: calcSleepDebtMinutes(goalMinutes, actual) };
+  });
+
+  const lastNight = getLastNightSleepVsGoal(data);
+  const todaySleepDebt = lastNight?.debt ?? null;
+
+  const { start: weekStart, end: weekEnd } = getWeekRange();
+  const weekEntries = entries.filter((e) => isInRange(e.entry.sleepStart, weekStart, weekEnd));
+  const weeklyDebt = weekEntries.reduce((sum, e) => sum + e.debt, 0);
+
+  const { start: monthStart, end: monthEnd } = getMonthRange();
+  const monthEntries = entries.filter((e) => isInRange(e.entry.sleepStart, monthStart, monthEnd));
+  const monthlyDebt = monthEntries.reduce((sum, e) => sum + e.debt, 0);
+
+  const totalDebt = entries.reduce((sum, e) => sum + e.debt, 0);
+  const avgDebtPerNight = entries.length ? totalDebt / entries.length : 0;
+
+  const bestRecovery = entries.length
+    ? entries.reduce((best, e) => (e.debt < best.debt ? e : best))
+    : null;
+
+  const worstDebt = entries.length
+    ? entries.reduce((worst, e) => (e.debt > worst.debt ? e : worst))
+    : null;
+
+  const nightsAtGoal = entries.filter((e) => e.debt <= 0).length;
+  const goalProgress = entries.length ? (nightsAtGoal / entries.length) * 100 : 0;
+
+  return {
+    goalMinutes,
+    todaySleepDebt,
+    weeklyDebt,
+    monthlyDebt,
+    totalDebt,
+    avgDebtPerNight,
+    bestRecovery,
+    worstDebt,
+    goalProgress,
+    nightsAtGoal,
+    nightCount: entries.length,
+    weekNightCount: weekEntries.length,
+    monthNightCount: monthEntries.length,
+  };
+}
+
+export function getEntrySleepDebt(data: AppData, entry: SleepEntry): number {
+  const goalMinutes = data.settings.sleepGoalHours * 60;
+  const actual = calcDurationMinutes(entry.sleepStart, entry.wakeUp);
+  return calcSleepDebtMinutes(goalMinutes, actual);
 }
 
 export function getAverageSleepThisWeek(data: AppData): number {
@@ -174,14 +237,31 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
   );
 
   const goalMinutes = data.settings.sleepGoalHours * 60;
-  const sleepDebt = entries.reduce((debt, s) => {
-    const dur = calcDurationMinutes(s.sleepStart, s.wakeUp);
-    return debt + Math.max(0, goalMinutes - dur);
-  }, 0);
 
-  const nightsAtGoal = durations.filter((d) => d >= goalMinutes).length;
+  const entryDebts = entries.map((s) => {
+    const actual = calcDurationMinutes(s.sleepStart, s.wakeUp);
+    return calcSleepDebtMinutes(goalMinutes, actual);
+  });
+
+  const sleepDebt = entryDebts.reduce((sum, d) => sum + d, 0);
+  const sleepDebtPositiveOnly = entryDebts.reduce((sum, d) => sum + Math.max(0, d), 0);
+
+  const nightsAtGoal = entryDebts.filter((d) => d <= 0).length;
   const goalProgress = entries.length ? (nightsAtGoal / entries.length) * 100 : 0;
   const avgVsGoal = avg - goalMinutes;
+  const avgDebtPerNight = entries.length ? sleepDebt / entries.length : 0;
+
+  const bestRecoveryEntry = entries.length
+    ? entries.reduce((best, s, i) =>
+        entryDebts[i] < calcSleepDebtMinutes(goalMinutes, calcDurationMinutes(best.sleepStart, best.wakeUp)) ? s : best
+      )
+    : null;
+
+  const worstDebtEntry = entries.length
+    ? entries.reduce((worst, s, i) =>
+        entryDebts[i] > calcSleepDebtMinutes(goalMinutes, calcDurationMinutes(worst.sleepStart, worst.wakeUp)) ? s : worst
+      )
+    : null;
 
   const consistency = durations.length > 1
     ? 100 - Math.min(100, stdDev(durations) / 60 * 10)
@@ -196,6 +276,10 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
     shortest: durations.length ? Math.min(...durations) : 0,
     consistency,
     sleepDebt,
+    sleepDebtPositiveOnly,
+    avgDebtPerNight,
+    bestRecoveryEntry,
+    worstDebtEntry,
     goalProgress,
     avgVsGoal,
     goalMinutes,

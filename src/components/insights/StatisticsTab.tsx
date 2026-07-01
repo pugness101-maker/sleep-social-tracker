@@ -1,13 +1,14 @@
 import { useApp } from '../../context/AppContext';
 import { Card, StatCard } from '../ui/Card';
-import { getSleepStats, getNapStats, getSocialStats, getAwakeStats, getMonthlyTrends } from '../../lib/stats';
-import { formatDuration, avgMinutesToTime, weekdayLabel } from '../../lib/dates';
-import { formatSleepGoalDiff, formatGoalProgressPercent } from '../../lib/sleep-goals';
+import { getSleepStats, getNapStats, getSocialStats, getAwakeStats, getMonthlyTrends, getSleepDebtStats } from '../../lib/stats';
+import { formatDuration, avgMinutesToTime, weekdayLabel, formatDateTime } from '../../lib/dates';
+import { formatSleepDebt, formatGoalProgressPercent } from '../../lib/sleep-goals';
 import { getAverageSleepThisWeek } from '../../lib/stats';
 
 export function StatisticsTab() {
   const { data } = useApp();
   const sleep = getSleepStats(data);
+  const debtStats = getSleepDebtStats(data);
   const naps = getNapStats(data);
   const social = getSocialStats(data);
   const awake = getAwakeStats(data);
@@ -35,26 +36,82 @@ export function StatisticsTab() {
           <StatCard label="Longest Sleep" value={formatDuration(sleep.longest)} accent="sleep" />
           <StatCard label="Shortest Sleep" value={formatDuration(sleep.shortest)} accent="sleep" />
           <StatCard label="Sleep Consistency" value={`${sleep.consistency.toFixed(0)}%`} accent="sleep" />
-          <StatCard label="Sleep Debt" value={formatDuration(sleep.sleepDebt)} sub={`Goal: ${data.settings.sleepGoalHours}h/night`} accent="sleep" />
           <StatCard
             label="Goal Progress"
             value={`${sleep.goalProgress.toFixed(0)}%`}
-            sub={`${sleep.nightsAtGoal} of ${sleep.count} nights at goal`}
+            sub={`${sleep.nightsAtGoal} of ${sleep.count} nights met goal`}
             accent="sleep"
           />
           <StatCard
             label="Avg vs Goal"
-            value={sleep.avg ? formatSleepGoalDiff(sleep.avgVsGoal) : '—'}
+            value={sleep.avg ? formatSleepDebt(-sleep.avgVsGoal) : '—'}
             sub={sleep.avg ? `${formatGoalProgressPercent(sleep.avg, sleep.goalMinutes)} of nightly goal` : 'No sleep data'}
             accent="sleep"
           />
           <StatCard
             label="Weekly Avg vs Goal"
             value={weeklyAvg ? formatDuration(weeklyAvg) : '—'}
-            sub={weeklyVsGoal !== null ? formatSleepGoalDiff(weeklyVsGoal) : `Goal: ${data.settings.sleepGoalHours}h`}
+            sub={weeklyVsGoal !== null ? formatSleepDebt(-weeklyVsGoal) : `Goal: ${data.settings.sleepGoalHours}h`}
             accent="sleep"
           />
         </div>
+        <Card className="mt-4">
+          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Debt</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard
+              label="Daily Sleep Debt"
+              value={debtStats.todaySleepDebt !== null ? formatSleepDebt(debtStats.todaySleepDebt) : '—'}
+              sub="Last logged night vs goal"
+              accent="sleep"
+            />
+            <StatCard
+              label="Weekly Sleep Debt"
+              value={debtStats.weekNightCount > 0 ? formatSleepDebt(debtStats.weeklyDebt) : '—'}
+              sub={`${debtStats.weekNightCount} night${debtStats.weekNightCount === 1 ? '' : 's'} this week`}
+              accent="sleep"
+            />
+            <StatCard
+              label="Monthly Sleep Debt"
+              value={debtStats.monthNightCount > 0 ? formatSleepDebt(debtStats.monthlyDebt) : '—'}
+              sub={`${debtStats.monthNightCount} night${debtStats.monthNightCount === 1 ? '' : 's'} this month`}
+              accent="sleep"
+            />
+            <StatCard
+              label="Avg Sleep Debt / Night"
+              value={debtStats.nightCount > 0 ? formatSleepDebt(Math.round(debtStats.avgDebtPerNight)) : '—'}
+              sub={`Across ${debtStats.nightCount} logged night${debtStats.nightCount === 1 ? '' : 's'}`}
+              accent="sleep"
+            />
+            <StatCard
+              label="Best Recovery Night"
+              value={
+                debtStats.bestRecovery
+                  ? formatSleepDebt(debtStats.bestRecovery.debt)
+                  : '—'
+              }
+              sub={
+                debtStats.bestRecovery
+                  ? `${formatDuration(debtStats.bestRecovery.actual)} · ${formatDateTime(debtStats.bestRecovery.entry.sleepStart)}`
+                  : 'No sleep data'
+              }
+              accent="sleep"
+            />
+            <StatCard
+              label="Worst Sleep Debt Night"
+              value={
+                debtStats.worstDebt
+                  ? formatSleepDebt(debtStats.worstDebt.debt)
+                  : '—'
+              }
+              sub={
+                debtStats.worstDebt
+                  ? `${formatDuration(debtStats.worstDebt.actual)} · ${formatDateTime(debtStats.worstDebt.entry.sleepStart)}`
+                  : 'No sleep data'
+              }
+              accent="sleep"
+            />
+          </div>
+        </Card>
         <Card className="mt-4">
           <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep by Weekday</h3>
           <div className="grid grid-cols-7 gap-2">
