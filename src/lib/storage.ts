@@ -1,5 +1,6 @@
 import type { AppData, AppSettings, ActiveTimers, HangoutIdea, Friend, Hangout } from '../types';
 import { normalizeHangoutSegments } from './hangout-segments';
+import { normalizeSleepAutoCalcSettings } from './sleep-goals';
 import {
   DEFAULT_FRIEND_TAGS,
   DEFAULT_HANGOUT_TYPES,
@@ -189,7 +190,14 @@ export function normalizeAppData(
     ideas,
     hangouts,
     activeTimers,
-    settings: { ...defaultSettings, ...raw.settings },
+    settings: {
+      ...defaultSettings,
+      ...raw.settings,
+      ...normalizeSleepAutoCalcSettings({
+        autoCalculateBedtime: raw.settings?.autoCalculateBedtime ?? defaultSettings.autoCalculateBedtime,
+        autoCalculateWakeTime: raw.settings?.autoCalculateWakeTime ?? defaultSettings.autoCalculateWakeTime,
+      }),
+    },
     ...social,
   };
 }

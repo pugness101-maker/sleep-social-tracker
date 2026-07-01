@@ -61,14 +61,26 @@ export function DashboardPage() {
         <StatCard
           label="Recommended Bedtime"
           value={schedule.recommendedBedtime}
-          sub={`Wake goal ${schedule.effectiveWakeTime}`}
+          sub={
+            schedule.autoCalculateBedtime
+              ? `Wake goal ${schedule.effectiveWakeTime} − ${schedule.goalHours}h`
+              : schedule.autoCalculateWakeTime
+                ? `Target bedtime ${schedule.effectiveBedtime}`
+                : `Target ${schedule.effectiveBedtime}`
+          }
           accent="sleep"
           icon="🌙"
         />
         <StatCard
           label="Recommended Wake Time"
           value={schedule.recommendedWakeTime}
-          sub={`Bedtime goal ${schedule.effectiveBedtime}`}
+          sub={
+            schedule.autoCalculateWakeTime
+              ? `Bedtime goal ${schedule.effectiveBedtime} + ${schedule.goalHours}h`
+              : schedule.autoCalculateBedtime
+                ? `Target wake-up ${schedule.effectiveWakeTime}`
+                : `Target ${schedule.effectiveWakeTime}`
+          }
           accent="sleep"
           icon="☀️"
         />

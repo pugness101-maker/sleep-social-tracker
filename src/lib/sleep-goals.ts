@@ -1,5 +1,7 @@
 import type { AppSettings } from '../types';
 
+const MINUTES_PER_DAY = 24 * 60;
+
 /** Parse "HH:mm" to minutes from midnight */
 export function timeStringToMinutes(time: string): number {
   if (!time) return 0;
@@ -7,47 +9,87 @@ export function timeStringToMinutes(time: string): number {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
+export function goalHoursToMinutes(hours: number): number {
+  return Math.round(hours * 60);
+}
+
+export function wrapMinutes(totalMinutes: number): number {
+  return ((totalMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+}
+
+export function addMinutes(baseMinutes: number, deltaMinutes: number): number {
+  return wrapMinutes(baseMinutes + deltaMinutes);
+}
+
+export function subtractMinutes(baseMinutes: number, deltaMinutes: number): number {
+  return wrapMinutes(baseMinutes - deltaMinutes);
+}
+
 /** Minutes from midnight → "HH:mm" (24h) */
 export function minutesToTimeString(totalMinutes: number): string {
-  const wrapped = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const wrapped = wrapMinutes(totalMinutes);
   const h = Math.floor(wrapped / 60);
-  const m = Math.round(wrapped % 60);
+  const m = wrapped % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
 /** Minutes from midnight → "h:mm a" display */
 export function minutesToDisplayTime(totalMinutes: number): string {
-  const wrapped = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const wrapped = wrapMinutes(totalMinutes);
   const h = Math.floor(wrapped / 60);
-  const m = Math.round(wrapped % 60);
+  const m = wrapped % 60;
   const period = h >= 12 ? 'PM' : 'AM';
   const displayH = h % 12 || 12;
   return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
 }
 
-export function getRecommendedBedtimeMinutes(settings: AppSettings): number {
+/** Bedtime = wake-up time − sleep goal (minute arithmetic, wraps at midnight). */
+export function getRecommendedBedtimeMinutes(settings: Pick<AppSettings, 'targetWakeUpTime' | 'sleepGoalHours'>): number {
   const wakeMin = timeStringToMinutes(settings.targetWakeUpTime);
-  const goalMin = settings.sleepGoalHours * 60;
-  return wakeMin - goalMin;
+  const goalMin = goalHoursToMinutes(settings.sleepGoalHours);
+  return subtractMinutes(wakeMin, goalMin);
 }
 
-export function getRecommendedWakeTimeMinutes(settings: AppSettings): number {
+/** Wake-up time = bedtime + sleep goal (minute arithmetic, wraps at midnight). */
+export function getRecommendedWakeTimeMinutes(settings: Pick<AppSettings, 'targetBedtime' | 'sleepGoalHours'>): number {
   const bedMin = timeStringToMinutes(settings.targetBedtime);
-  const goalMin = settings.sleepGoalHours * 60;
-  return bedMin + goalMin;
+  const goalMin = goalHoursToMinutes(settings.sleepGoalHours);
+  return addMinutes(bedMin, goalMin);
+}
+
+export function normalizeSleepAutoCalcSettings(
+  settings: Pick<AppSettings, 'autoCalculateBedtime' | 'autoCalculateWakeTime'>
+): Pick<AppSettings, 'autoCalculateBedtime' | 'autoCalculateWakeTime'> {
+  if (settings.autoCalculateBedtime && settings.autoCalculateWakeTime) {
+    return { autoCalculateBedtime: true, autoCalculateWakeTime: false };
+  }
+  return {
+    autoCalculateBedtime: settings.autoCalculateBedtime,
+    autoCalculateWakeTime: settings.autoCalculateWakeTime,
+  };
 }
 
 export function getSleepSchedule(settings: AppSettings) {
-  const recommendedBedtimeMin = getRecommendedBedtimeMinutes(settings);
-  const recommendedWakeMin = getRecommendedWakeTimeMinutes(settings);
+  const wakeMin = timeStringToMinutes(settings.targetWakeUpTime);
+  const bedMin = timeStringToMinutes(settings.targetBedtime);
+  const goalMin = goalHoursToMinutes(settings.sleepGoalHours);
 
-  const effectiveBedtimeMin = settings.autoCalculateBedtime
-    ? recommendedBedtimeMin
-    : timeStringToMinutes(settings.targetBedtime);
+  let recommendedBedtimeMin: number;
+  let recommendedWakeMin: number;
 
-  const effectiveWakeMin = settings.autoCalculateWakeTime
-    ? recommendedWakeMin
-    : timeStringToMinutes(settings.targetWakeUpTime);
+  if (settings.autoCalculateBedtime) {
+    recommendedBedtimeMin = subtractMinutes(wakeMin, goalMin);
+    recommendedWakeMin = wakeMin;
+  } else if (settings.autoCalculateWakeTime) {
+    recommendedBedtimeMin = bedMin;
+    recommendedWakeMin = addMinutes(bedMin, goalMin);
+  } else {
+    recommendedBedtimeMin = bedMin;
+    recommendedWakeMin = wakeMin;
+  }
+
+  const effectiveBedtimeMin = settings.autoCalculateBedtime ? recommendedBedtimeMin : bedMin;
+  const effectiveWakeMin = settings.autoCalculateWakeTime ? recommendedWakeMin : wakeMin;
 
   return {
     recommendedBedtime: minutesToDisplayTime(recommendedBedtimeMin),
@@ -57,6 +99,8 @@ export function getSleepSchedule(settings: AppSettings) {
     effectiveBedtime: minutesToDisplayTime(effectiveBedtimeMin),
     effectiveWakeTime: minutesToDisplayTime(effectiveWakeMin),
     goalHours: settings.sleepGoalHours,
+    autoCalculateBedtime: settings.autoCalculateBedtime,
+    autoCalculateWakeTime: settings.autoCalculateWakeTime,
   };
 }
 

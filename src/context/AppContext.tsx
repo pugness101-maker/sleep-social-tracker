@@ -145,7 +145,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateSettings = useCallback((settings: Partial<AppSettings>) => {
-    patch((prev) => ({ ...prev, settings: { ...prev.settings, ...settings } }));
+    patch((prev) => {
+      const next = { ...prev.settings, ...settings };
+      if (next.autoCalculateBedtime && next.autoCalculateWakeTime) {
+        if (settings.autoCalculateBedtime === true) {
+          next.autoCalculateWakeTime = false;
+        } else if (settings.autoCalculateWakeTime === true) {
+          next.autoCalculateBedtime = false;
+        } else {
+          next.autoCalculateWakeTime = false;
+        }
+      }
+      return { ...prev, settings: next };
+    });
   }, [patch]);
 
   const startSleep = useCallback(() => {

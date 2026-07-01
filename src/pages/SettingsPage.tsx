@@ -116,7 +116,7 @@ export function SettingsPage() {
               <Input
                 label="Target Wake-up Time"
                 type="time"
-                value={data.settings.targetWakeUpTime}
+                value={data.settings.autoCalculateWakeTime ? schedule.recommendedWakeTime24 : data.settings.targetWakeUpTime}
                 disabled={data.settings.autoCalculateWakeTime}
                 onChange={(e) => updateSettings({ targetWakeUpTime: e.target.value })}
               />
@@ -134,7 +134,13 @@ export function SettingsPage() {
                 <input
                   type="checkbox"
                   checked={data.settings.autoCalculateBedtime}
-                  onChange={(e) => updateSettings({ autoCalculateBedtime: e.target.checked })}
+                  onChange={(e) =>
+                    updateSettings(
+                      e.target.checked
+                        ? { autoCalculateBedtime: true, autoCalculateWakeTime: false }
+                        : { autoCalculateBedtime: false }
+                    )
+                  }
                   className="rounded"
                 />
                 <span className="text-sm">Auto-calculate bedtime from wake-up goal and sleep goal</span>
@@ -143,7 +149,13 @@ export function SettingsPage() {
                 <input
                   type="checkbox"
                   checked={data.settings.autoCalculateWakeTime}
-                  onChange={(e) => updateSettings({ autoCalculateWakeTime: e.target.checked })}
+                  onChange={(e) =>
+                    updateSettings(
+                      e.target.checked
+                        ? { autoCalculateWakeTime: true, autoCalculateBedtime: false }
+                        : { autoCalculateWakeTime: false }
+                    )
+                  }
                   className="rounded"
                 />
                 <span className="text-sm">Auto-calculate wake time from bedtime goal and sleep goal</span>
@@ -155,18 +167,44 @@ export function SettingsPage() {
               style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
             >
               <p className="font-medium" style={{ color: 'var(--text-heading)' }}>Recommendations</p>
-              <p>
-                Recommended bedtime: <strong>{schedule.recommendedBedtime}</strong>
-                <span className="opacity-60 ml-1">
-                  (wake {schedule.effectiveWakeTime} − {schedule.goalHours}h)
-                </span>
-              </p>
-              <p>
-                Recommended wake time: <strong>{schedule.recommendedWakeTime}</strong>
-                <span className="opacity-60 ml-1">
-                  (bedtime {schedule.effectiveBedtime} + {schedule.goalHours}h)
-                </span>
-              </p>
+              {data.settings.autoCalculateBedtime ? (
+                <>
+                  <p>
+                    Recommended bedtime: <strong>{schedule.recommendedBedtime}</strong>
+                    <span className="opacity-60 ml-1">
+                      (wake {schedule.effectiveWakeTime} − {schedule.goalHours}h)
+                    </span>
+                  </p>
+                  <p>
+                    Recommended wake time: <strong>{schedule.recommendedWakeTime}</strong>
+                    <span className="opacity-60 ml-1">(target wake-up)</span>
+                  </p>
+                </>
+              ) : data.settings.autoCalculateWakeTime ? (
+                <>
+                  <p>
+                    Recommended bedtime: <strong>{schedule.recommendedBedtime}</strong>
+                    <span className="opacity-60 ml-1">(target bedtime)</span>
+                  </p>
+                  <p>
+                    Recommended wake time: <strong>{schedule.recommendedWakeTime}</strong>
+                    <span className="opacity-60 ml-1">
+                      (bedtime {schedule.effectiveBedtime} + {schedule.goalHours}h)
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Recommended bedtime: <strong>{schedule.recommendedBedtime}</strong>
+                    <span className="opacity-60 ml-1">(manual target)</span>
+                  </p>
+                  <p>
+                    Recommended wake time: <strong>{schedule.recommendedWakeTime}</strong>
+                    <span className="opacity-60 ml-1">(manual target)</span>
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </Card>
