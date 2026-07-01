@@ -58,8 +58,8 @@ export const IMPORT_PRESET_OPTIONS: {
 }[] = [
   {
     id: 'sleep',
-    label: 'Sleep Data',
-    description: 'Sleep entries, naps, and sleep/nap timers',
+    label: 'Sleep Log Data',
+    description: 'Sleep entries, naps, and sleep/nap timers (Sleep Log)',
   },
   {
     id: 'social',

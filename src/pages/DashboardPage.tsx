@@ -127,7 +127,7 @@ export function DashboardPage() {
         <StatCard
           label="Today's Nap Total"
           value={formatDuration(napTotal)}
-          sub={data.activeTimers.napStart ? 'Nap in progress...' : `${data.napEntries.filter((n) => n.napStart.startsWith(new Date().toISOString().slice(0, 10))).length} naps`}
+          sub={data.activeTimers.napStart ? 'Nap in progress…' : `${data.napEntries.filter((n) => n.napStart.startsWith(new Date().toISOString().slice(0, 10))).length} naps in Sleep Log`}
           accent="nap"
           icon="💤"
         />

@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLiveTimer } from '../../hooks/useLiveTimer';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/FormFields';
-import { EmptyState } from '../ui/Misc';
+import { EmptyState, SearchBar } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, formatTime, toLocalISO } from '../../lib/dates';
 import type { NapEntry } from '../../types';
 
 export function NapsTab() {
-  const { data, startNap, endNap, addNapEntry, updateNapEntry, deleteNapEntry } = useApp();
+  const { data, startNap, endNap, addNapEntry, updateNapEntry, deleteNapEntry, duplicateNapEntry } = useApp();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<NapEntry | null>(null);
@@ -18,13 +18,26 @@ export function NapsTab() {
   const [endNotes, setEndNotes] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
   const [form, setForm] = useState({ napStart: '', napEnd: '', notes: '' });
+  const [search, setSearch] = useState('');
 
   const isNapping = !!data.activeTimers.napStart;
   const napElapsed = useLiveTimer(isNapping, data.activeTimers.napStart);
 
-  const sorted = [...data.napEntries].sort(
-    (a, b) => new Date(b.napStart).getTime() - new Date(a.napStart).getTime()
-  );
+  const sorted = useMemo(() => {
+    let list = [...data.napEntries].sort(
+      (a, b) => new Date(b.napStart).getTime() - new Date(a.napStart).getTime()
+    );
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (entry) =>
+          entry.notes.toLowerCase().includes(q) ||
+          formatDateTime(entry.napStart).toLowerCase().includes(q) ||
+          formatDateTime(entry.napEnd).toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [data.napEntries, search]);
 
   const openAdd = () => {
     setEditEntry(null);
@@ -55,6 +68,12 @@ export function NapsTab() {
         <Button variant="secondary" onClick={openAdd}>Add Nap Entry</Button>
       </div>
 
+      {data.napEntries.length > 0 && (
+        <div className="mb-4">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search nap entries..." />
+        </div>
+      )}
+
       {isNapping && (
         <Card className="mb-6 border-nap/30 bg-nap/5">
           <p className="text-sm opacity-70">Napping since {formatDateTime(data.activeTimers.napStart!)}</p>
@@ -65,7 +84,11 @@ export function NapsTab() {
       )}
 
       {sorted.length === 0 ? (
-        <EmptyState title="No naps logged" description="Start a nap or add a manual entry." action={<Button onClick={openAdd}>Add Nap Entry</Button>} />
+        <EmptyState
+          title={search ? 'No matching naps' : 'No naps logged'}
+          description={search ? 'Try a different search term.' : 'Start a nap or add a manual entry.'}
+          action={!search ? <Button onClick={openAdd}>Add Nap Entry</Button> : undefined}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border)' }}>
           <table className="w-full text-sm text-left">
@@ -88,6 +111,7 @@ export function NapsTab() {
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(entry)}>Edit</Button>
+                      <Button size="sm" variant="ghost" onClick={() => duplicateNapEntry(entry.id)}>Dup</Button>
                       <Button size="sm" variant="ghost" onClick={() => setDeleteId(entry.id)}>Del</Button>
                     </div>
                   </td>
@@ -98,7 +122,7 @@ export function NapsTab() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editEntry ? 'Edit Nap' : 'Add Nap'}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editEntry ? 'Edit Nap Entry' : 'Add Nap Entry'}
         footer={<><Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></>}>
         <div className="space-y-4">
           <Input label="Nap Start" type="datetime-local" value={form.napStart} onChange={(e) => setForm({ ...form, napStart: e.target.value })} />
@@ -114,7 +138,7 @@ export function NapsTab() {
         <p className="text-sm mt-2 opacity-70">End time: {formatTime(toLocalISO())}</p>
       </Modal>
 
-      <ConfirmModal open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteId && deleteNapEntry(deleteId)} title="Delete Nap" message="Delete this nap entry?" />
+      <ConfirmModal open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteId && deleteNapEntry(deleteId)} title="Delete Nap Entry" message="Are you sure you want to delete this nap entry?" />
     </div>
   );
 }

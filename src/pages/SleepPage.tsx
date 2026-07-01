@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Tabs } from '../components/ui/Tabs';
-import { SleepLogTab } from '../components/sleep/SleepLogTab';
-import { NapsTab } from '../components/sleep/NapsTab';
+import { SleepLogPanel } from '../components/sleep/SleepLogPanel';
 import { AwakeTimeTab } from '../components/sleep/AwakeTimeTab';
 
 const tabs = [
   { id: 'log', label: 'Sleep Log' },
-  { id: 'naps', label: 'Naps' },
   { id: 'awake', label: 'Awake Time' },
 ];
 
@@ -22,8 +20,7 @@ export function SleepPage() {
       <div className="mb-6">
         <Tabs tabs={tabs} active={active} onChange={setActive} />
       </div>
-      {active === 'log' && <SleepLogTab />}
-      {active === 'naps' && <NapsTab />}
+      {active === 'log' && <SleepLogPanel />}
       {active === 'awake' && <AwakeTimeTab />}
     </div>
   );

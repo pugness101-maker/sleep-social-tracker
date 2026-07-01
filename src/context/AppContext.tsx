@@ -59,6 +59,7 @@ interface AppContextValue {
   addNapEntry: (entry: Omit<NapEntry, 'id' | 'createdAt'>) => void;
   updateNapEntry: (id: string, entry: Partial<NapEntry>) => void;
   deleteNapEntry: (id: string) => void;
+  duplicateNapEntry: (id: string) => void;
   // Friends
   addFriend: (friend: Omit<Friend, 'id' | 'createdAt'>) => void;
   updateFriend: (id: string, friend: Partial<Friend>) => void;
@@ -228,6 +229,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteNapEntry = useCallback((id: string) => {
     patch((prev) => ({ ...prev, napEntries: prev.napEntries.filter((n) => n.id !== id) }));
+  }, [patch]);
+
+  const duplicateNapEntry = useCallback((id: string) => {
+    patch((prev) => {
+      const original = prev.napEntries.find((n) => n.id === id);
+      if (!original) return prev;
+      const copy: NapEntry = { ...original, id: generateId(), createdAt: toLocalISO() };
+      return { ...prev, napEntries: [...prev.napEntries, copy] };
+    });
   }, [patch]);
 
   const addFriend = useCallback((friend: Omit<Friend, 'id' | 'createdAt'>) => {
@@ -779,6 +789,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addNapEntry,
     updateNapEntry,
     deleteNapEntry,
+    duplicateNapEntry,
     addFriend,
     updateFriend,
     deleteFriend,

@@ -130,7 +130,7 @@ export function SectionImport({ onImport, onMessage }: SectionImportProps) {
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-2">
                   <p>Sleep entries: <strong>{preview.sleepEntries}</strong></p>
-                  <p>Naps: <strong>{preview.napEntries}</strong></p>
+                  <p>Nap entries (Sleep Log): <strong>{preview.napEntries}</strong></p>
                   <p>Friends: <strong>{preview.friends}</strong></p>
                   <p>Hangouts: <strong>{preview.hangouts}</strong></p>
                   <p>Ideas: <strong>{preview.ideas}</strong></p>

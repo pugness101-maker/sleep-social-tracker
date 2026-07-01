@@ -234,8 +234,8 @@ export function SleepSpreadsheetImport({ onImport, onMessage }: SleepSpreadsheet
           {step === 0 && (
             <div className="space-y-4">
               <p className="text-sm opacity-70">
-                Upload a .xlsx or .csv file with sleep and nap data. Expected columns include
-                Date, Bedtime, Wake-Up, Nap Start, Nap End, and optional duration/notes fields.
+                Upload a .xlsx or .csv file with sleep and nap data for the Sleep Log.
+                Expected columns include Date, Bedtime, Wake-Up, Nap Start, Nap End, and optional duration/notes fields.
               </p>
               <Button variant="secondary" onClick={() => fileRef.current?.click()}>
                 {workbook ? 'Choose Different File' : 'Choose Spreadsheet'}
@@ -396,7 +396,7 @@ export function SleepSpreadsheetImport({ onImport, onMessage }: SleepSpreadsheet
                   </label>
                 </div>
                 <p className="text-xs opacity-60 mt-2">
-                  Replace overwrites sleep entries and naps only. Friends, hangouts, and settings are not affected.
+                  Replace overwrites sleep and nap entries in Sleep Log only. Friends, hangouts, and settings are not affected.
                 </p>
               </div>
             </div>
@@ -407,7 +407,7 @@ export function SleepSpreadsheetImport({ onImport, onMessage }: SleepSpreadsheet
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        title="Replace Sleep Data?"
+        title="Replace Sleep Log Data?"
         footer={
           <>
             <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancel</Button>
@@ -418,7 +418,7 @@ export function SleepSpreadsheetImport({ onImport, onMessage }: SleepSpreadsheet
         }
       >
         <p className="text-sm">
-          This will replace all existing sleep entries and naps with the imported spreadsheet data.
+          This will replace all existing sleep and nap entries in Sleep Log with the imported spreadsheet data.
         </p>
         <p className="text-sm opacity-70 mt-2">
           A backup of your current data will be saved automatically before importing.

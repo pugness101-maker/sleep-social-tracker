@@ -238,8 +238,8 @@ export function SettingsPage() {
             All data is stored locally in your browser. Clearing data cannot be undone.
           </p>
           <div className="text-left text-sm opacity-70 mb-4">
-            <p>Sleep entries: {data.sleepEntries.length}</p>
-            <p>Nap entries: {data.napEntries.length}</p>
+            <p>Sleep entries (Sleep Log): {data.sleepEntries.length}</p>
+            <p>Nap entries (Sleep Log): {data.napEntries.length}</p>
             <p>Friends: {data.friends.length}</p>
             <p>Hangouts: {data.hangouts.length}</p>
             <p>Ideas: {data.ideas.length}</p>

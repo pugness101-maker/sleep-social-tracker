@@ -144,14 +144,13 @@ export function StatisticsTab() {
             })}
           </div>
         </Card>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Nap Statistics</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <StatCard label="Total Naps" value={String(naps.totalNaps)} accent="nap" />
-          <StatCard label="Total Nap Time" value={formatDuration(naps.totalTime)} accent="nap" />
-          <StatCard label="Average Nap Duration" value={formatDuration(naps.avgDuration)} accent="nap" />
+        <div className="mt-6">
+          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Naps (Sleep Log)</h3>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <StatCard label="Total Naps" value={String(naps.totalNaps)} accent="nap" />
+            <StatCard label="Total Nap Time" value={formatDuration(naps.totalTime)} accent="nap" />
+            <StatCard label="Average Nap Duration" value={formatDuration(naps.avgDuration)} accent="nap" />
+          </div>
         </div>
       </section>
 

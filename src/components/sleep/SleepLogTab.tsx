@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLiveTimer } from '../../hooks/useLiveTimer';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Modal, ConfirmModal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/FormFields';
-import { EmptyState } from '../ui/Misc';
+import { EmptyState, SearchBar } from '../ui/Misc';
 import { calcDurationMinutes, formatDuration, formatDateTime, formatTime, toLocalISO } from '../../lib/dates';
 import { formatSleepDebt } from '../../lib/sleep-goals';
 import { getEntrySleepDebt } from '../../lib/stats';
@@ -29,13 +29,26 @@ export function SleepLogTab() {
   const [showWakeModal, setShowWakeModal] = useState(false);
 
   const [form, setForm] = useState({ sleepStart: '', wakeUp: '', notes: '' });
+  const [search, setSearch] = useState('');
 
   const isSleeping = !!data.activeTimers.sleepStart;
   const sleepElapsed = useLiveTimer(isSleeping, data.activeTimers.sleepStart);
 
-  const sorted = [...data.sleepEntries].sort(
-    (a, b) => new Date(b.sleepStart).getTime() - new Date(a.sleepStart).getTime()
-  );
+  const sorted = useMemo(() => {
+    let list = [...data.sleepEntries].sort(
+      (a, b) => new Date(b.sleepStart).getTime() - new Date(a.sleepStart).getTime()
+    );
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (entry) =>
+          entry.notes.toLowerCase().includes(q) ||
+          formatDateTime(entry.sleepStart).toLowerCase().includes(q) ||
+          formatDateTime(entry.wakeUp).toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [data.sleepEntries, search]);
 
   const openAdd = () => {
     setEditEntry(null);
@@ -69,6 +82,12 @@ export function SleepLogTab() {
         <Button variant="secondary" onClick={openAdd}>Add Sleep Entry</Button>
       </div>
 
+      {data.sleepEntries.length > 0 && (
+        <div className="mb-4">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search sleep entries..." />
+        </div>
+      )}
+
       {isSleeping && (
         <Card className="mb-6 border-sleep/30 bg-sleep/5">
           <p className="text-sm opacity-70">Currently sleeping since {formatDateTime(data.activeTimers.sleepStart!)}</p>
@@ -79,7 +98,11 @@ export function SleepLogTab() {
       )}
 
       {sorted.length === 0 ? (
-        <EmptyState title="No sleep entries" description="Start sleep or add a manual entry to begin tracking." action={<Button onClick={openAdd}>Add Sleep Entry</Button>} />
+        <EmptyState
+          title={search ? 'No matching sleep entries' : 'No sleep entries'}
+          description={search ? 'Try a different search term.' : 'Start sleep or add a manual entry to begin tracking.'}
+          action={!search ? <Button onClick={openAdd}>Add Sleep Entry</Button> : undefined}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border)' }}>
           <table className="w-full text-sm text-left">
