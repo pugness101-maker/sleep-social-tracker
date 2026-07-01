@@ -18,6 +18,13 @@ import type {
   FriendLink,
 } from '../types';
 import { loadAppData, saveAppData, clearAllData, importAppData, exportAppData } from '../lib/storage';
+import {
+  createPreImportBackup,
+  importSectionsFromJsonData,
+  parseBackupJson,
+  type ImportMode,
+  type ImportSectionPreset,
+} from '../lib/import-sections';
 import { generateId, toLocalISO } from '../lib/dates';
 import {
   normalizeOptionName,
@@ -84,7 +91,12 @@ interface AppContextValue {
   deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
   // Data
   exportData: () => string;
-  importData: (json: string) => void;
+  importData: (json: string) => { success: boolean; error?: string };
+  importSections: (
+    json: string,
+    preset: ImportSectionPreset,
+    mode: ImportMode
+  ) => { success: boolean; error?: string };
   resetData: () => void;
 }
 
@@ -687,8 +699,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const exportDataFn = useCallback(() => exportAppData(data), [data]);
 
   const importDataFn = useCallback((json: string) => {
+    const parsed = parseBackupJson(json);
+    if (!parsed.ok) {
+      return { success: false, error: parsed.error };
+    }
+    createPreImportBackup();
     setData(importAppData(json));
+    return { success: true };
   }, []);
+
+  const importSectionsFn = useCallback(
+    (json: string, preset: ImportSectionPreset, mode: ImportMode) => {
+      const result = importSectionsFromJsonData(data, json, { preset, mode });
+      if (result.success) {
+        setData(result.data);
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    },
+    [data]
+  );
 
   const resetData = useCallback(() => {
     setData(clearAllData());
@@ -737,6 +767,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteHangoutType,
     exportData: exportDataFn,
     importData: importDataFn,
+    importSections: importSectionsFn,
     resetData,
   };
 

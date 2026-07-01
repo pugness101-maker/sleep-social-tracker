@@ -5,18 +5,24 @@ import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/FormFields';
 import { Modal } from '../components/ui/Modal';
 import { SocialCustomization } from '../components/settings/SocialCustomization';
+import { SectionImport } from '../components/settings/SectionImport';
 import { getSleepSchedule } from '../lib/sleep-goals';
 import type { ThemeMode } from '../types';
 
 export function SettingsPage() {
-  const { data, updateSettings, exportData, importData, resetData } = useApp();
+  const { data, updateSettings, exportData, importData, importSections, resetData } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageIsError, setMessageIsError] = useState(false);
 
-  const showMsg = (msg: string) => {
+  const showMsg = (msg: string, isError = false) => {
     setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
+    setMessageIsError(isError);
+    setTimeout(() => {
+      setMessage('');
+      setMessageIsError(false);
+    }, 4000);
   };
 
   const handleExport = () => {
@@ -36,11 +42,11 @@ export function SettingsPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        importData(reader.result as string);
-        showMsg('Data imported successfully!');
-      } catch {
-        showMsg('Invalid JSON file.');
+      const result = importData(reader.result as string);
+      if (result.success) {
+        showMsg('Data imported successfully! A backup of your previous data was saved automatically.');
+      } else {
+        showMsg(result.error ?? 'Invalid JSON file.', true);
       }
     };
     reader.readAsText(file);
@@ -57,7 +63,12 @@ export function SettingsPage() {
       </div>
 
       {message && (
-        <div className="mb-4 p-3 rounded-lg bg-social/10 text-social text-sm">{message}</div>
+        <div
+          className={`mb-4 p-3 rounded-lg text-sm ${messageIsError ? '' : 'bg-social/10 text-social'}`}
+          style={messageIsError ? { background: 'rgba(239,68,68,0.1)', color: '#ef4444' } : undefined}
+        >
+          {message}
+        </div>
       )}
 
       <div className="space-y-6">
@@ -200,10 +211,16 @@ export function SettingsPage() {
           <h2 className="font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Backup & Restore</h2>
           <p className="text-sm opacity-70 mb-4 text-left">
             Export your data as JSON for backup, or import a previous backup to restore.
+            Supports full backups with <code className="text-xs">version</code>,{' '}
+            <code className="text-xs">exportedAt</code>, and a <code className="text-xs">data</code> object.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={handleExport}>Export JSON</Button>
             <Button variant="secondary" onClick={() => fileRef.current?.click()}>Import JSON</Button>
+            <SectionImport
+              onImport={(json, preset, mode) => importSections(json, preset, mode)}
+              onMessage={showMsg}
+            />
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           </div>
         </Card>

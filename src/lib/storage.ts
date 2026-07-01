@@ -9,6 +9,7 @@ import {
 } from '../types';
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
+export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
 export const DATA_VERSION = 6;
 
 export const defaultSettings: AppSettings = {
