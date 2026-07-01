@@ -136,6 +136,7 @@ export function SectionImport({ onImport, onMessage }: SectionImportProps) {
                   <p>Ideas: <strong>{preview.ideas}</strong></p>
                   <p>Friend tags: <strong>{preview.friendTags}</strong></p>
                   <p>Relationship statuses: <strong>{preview.relationshipStatuses}</strong></p>
+                  <p>Relationship types: <strong>{preview.relationshipTypes}</strong></p>
                   <p>Hangout types: <strong>{preview.hangoutTypes}</strong></p>
                   <p>Settings: <strong>{preview.hasSettings ? 'Yes' : 'No'}</strong></p>
                 </div>

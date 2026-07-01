@@ -5,12 +5,13 @@ import {
   DEFAULT_HANGOUT_TYPE,
   DEFAULT_RELATIONSHIP_STATUSES,
   DEFAULT_RELATIONSHIP_STATUS,
+  DEFAULT_RELATIONSHIP_TYPES,
   RELATIONSHIP_TAGS_TO_MIGRATE,
 } from '../types';
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
 export const PRE_IMPORT_BACKUP_KEY = 'sleep-social-tracker-data-pre-import-backup';
-export const DATA_VERSION = 6;
+export const DATA_VERSION = 7;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -44,6 +45,7 @@ export const defaultAppData: AppData = {
   settings: defaultSettings,
   friendTags: [...DEFAULT_FRIEND_TAGS],
   relationshipStatuses: [...DEFAULT_RELATIONSHIP_STATUSES],
+  relationshipTypes: [...DEFAULT_RELATIONSHIP_TYPES],
   hangoutTypes: [...DEFAULT_HANGOUT_TYPES],
 };
 
@@ -51,12 +53,13 @@ const migratedRelationshipTagSet = new Set<string>(RELATIONSHIP_TAGS_TO_MIGRATE)
 
 function mergeSocialOptions(
   data: Partial<AppData> & { friendCategories?: string[] }
-): Pick<AppData, 'friendTags' | 'relationshipStatuses' | 'hangoutTypes'> {
+): Pick<AppData, 'friendTags' | 'relationshipStatuses' | 'relationshipTypes' | 'hangoutTypes'> {
   const friendTags = [...(data.friendTags ?? data.friendCategories ?? defaultAppData.friendTags)]
     .filter((t) => !migratedRelationshipTagSet.has(t));
   const relationshipStatuses = [
     ...(data.relationshipStatuses ?? defaultAppData.relationshipStatuses),
   ];
+  const relationshipTypes = [...(data.relationshipTypes ?? defaultAppData.relationshipTypes)];
 
   data.friends?.forEach((f) => {
     const friend = f as Friend & { category?: string };
@@ -74,6 +77,14 @@ function mergeSocialOptions(
     if (status && !relationshipStatuses.some((s) => s.toLowerCase() === status.toLowerCase())) {
       relationshipStatuses.push(status);
     }
+    friend.relationships?.forEach((link) => {
+      if (
+        link.type &&
+        !relationshipTypes.some((t) => t.toLowerCase() === link.type.toLowerCase())
+      ) {
+        relationshipTypes.push(link.type);
+      }
+    });
   });
 
   const hangoutTypes = [...(data.hangoutTypes ?? defaultAppData.hangoutTypes)];
@@ -96,7 +107,7 @@ function mergeSocialOptions(
     hangoutTypes.push(data.activeTimers.hangoutType);
   }
 
-  return { friendTags, relationshipStatuses, hangoutTypes };
+  return { friendTags, relationshipStatuses, relationshipTypes, hangoutTypes };
 }
 
 /** Migrate legacy friend.category → tags, and relationship labels out of tags */

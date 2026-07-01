@@ -7,6 +7,7 @@ import { Badge } from '../ui/Misc';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
 import { linkTypeOptions } from '../../lib/friend-links';
+import { getDefaultRelationshipType } from '../../lib/social-options';
 import type { Friend, FriendLink } from '../../types';
 
 interface FriendDetailModalProps {
@@ -27,7 +28,7 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
 
   const [linkForm, setLinkForm] = useState({
     relatedFriendId: '',
-    type: 'Friend',
+    type: getDefaultRelationshipType(data.relationshipTypes),
     notes: '',
   });
 
@@ -37,7 +38,11 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
 
   const openAddLink = () => {
     setEditLink(null);
-    setLinkForm({ relatedFriendId: otherFriends[0]?.id ?? '', type: 'Friend', notes: '' });
+    setLinkForm({
+      relatedFriendId: otherFriends[0]?.id ?? '',
+      type: getDefaultRelationshipType(data.relationshipTypes),
+      notes: '',
+    });
     setError('');
     setLinkModalOpen(true);
   };
@@ -167,7 +172,7 @@ export function FriendDetailModal({ friendId, onClose, onEdit }: FriendDetailMod
             label="Relationship Type"
             value={linkForm.type}
             onChange={(e) => setLinkForm({ ...linkForm, type: e.target.value })}
-            options={linkTypeOptions(linkForm.type)}
+            options={linkTypeOptions(data.relationshipTypes, linkForm.type)}
           />
           <Textarea
             label="Notes (optional)"

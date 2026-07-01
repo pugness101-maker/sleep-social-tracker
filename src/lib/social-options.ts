@@ -1,4 +1,4 @@
-import { DEFAULT_HANGOUT_TYPE } from '../types';
+import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 export function normalizeOptionName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
@@ -51,6 +51,15 @@ export function countFriendsWithRelationshipStatus(
   status: string
 ): number {
   return friends.filter((f) => f.relationshipStatus === status).length;
+}
+
+export function countFriendLinksWithType(friends: { relationships: { type: string }[] }[], type: string): number {
+  return friends.reduce((sum, f) => sum + f.relationships.filter((r) => r.type === type).length, 0);
+}
+
+export function getDefaultRelationshipType(types: string[]): string {
+  if (types.includes('Friend')) return 'Friend';
+  return types[0] ?? DEFAULT_RELATIONSHIP_TYPE;
 }
 
 export function optionSelectOptions(options: string[], current?: string) {

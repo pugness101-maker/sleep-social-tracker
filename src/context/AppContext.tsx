@@ -37,8 +37,8 @@ import {
   normalizeOptionName,
   validateOptionName,
 } from '../lib/social-options';
-import { getReciprocalLinkType, removeLinksToFriend } from '../lib/friend-links';
-import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
+import { getReciprocalLinkType, removeLinksToFriend, replaceFriendLinkType, updateAllFriendLinkTypes } from '../lib/friend-links';
+import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../types';
 
 export type DeleteTagResolution =
   | { action: 'remove' }
@@ -97,6 +97,9 @@ interface AppContextValue {
   addHangoutType: (name: string) => string | null;
   updateHangoutType: (oldName: string, newName: string) => string | null;
   deleteHangoutType: (name: string, resolution: DeleteTypeResolution) => void;
+  addRelationshipType: (name: string) => string | null;
+  updateRelationshipType: (oldName: string, newName: string) => string | null;
+  deleteRelationshipType: (name: string, resolution: DeleteTypeResolution) => void;
   // Data
   exportData: () => string;
   importData: (json: string) => { success: boolean; error?: string };
@@ -723,6 +726,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [patch]);
 
+  const addRelationshipType = useCallback((name: string): string | null => {
+    const normalized = normalizeOptionName(name);
+    const error = validateOptionName(normalized, data.relationshipTypes);
+    if (error) return error;
+    patch((prev) => ({ ...prev, relationshipTypes: [...prev.relationshipTypes, normalized] }));
+    return null;
+  }, [patch, data.relationshipTypes]);
+
+  const updateRelationshipType = useCallback((oldName: string, newName: string): string | null => {
+    const normalized = normalizeOptionName(newName);
+    const error = validateOptionName(normalized, data.relationshipTypes, oldName);
+    if (error) return error;
+    patch((prev) => ({
+      ...prev,
+      relationshipTypes: prev.relationshipTypes.map((t) => (t === oldName ? normalized : t)),
+      friends: updateAllFriendLinkTypes(prev.friends, oldName, normalized) as typeof prev.friends,
+    }));
+    return null;
+  }, [patch, data.relationshipTypes]);
+
+  const deleteRelationshipType = useCallback((name: string, resolution: DeleteTypeResolution) => {
+    patch((prev) => {
+      let replacement = DEFAULT_RELATIONSHIP_TYPE;
+      if (resolution.action === 'default') {
+        replacement = prev.relationshipTypes.includes(DEFAULT_RELATIONSHIP_TYPE)
+          ? DEFAULT_RELATIONSHIP_TYPE
+          : prev.relationshipTypes.find((t) => t !== name) ?? DEFAULT_RELATIONSHIP_TYPE;
+      } else if (resolution.action === 'other') {
+        replacement = resolution.name;
+      } else if (resolution.action === 'clear') {
+        replacement = '';
+      }
+
+      return {
+        ...prev,
+        relationshipTypes: prev.relationshipTypes.filter((t) => t !== name),
+        friends: replaceFriendLinkType(prev.friends, name, replacement) as typeof prev.friends,
+      };
+    });
+  }, [patch]);
+
   const exportDataFn = useCallback(() => exportAppData(data), [data]);
 
   const importDataFn = useCallback((json: string) => {
@@ -853,6 +897,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,
+    addRelationshipType,
+    updateRelationshipType,
+    deleteRelationshipType,
     exportData: exportDataFn,
     importData: importDataFn,
     importSections: importSectionsFn,

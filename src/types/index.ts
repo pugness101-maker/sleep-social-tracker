@@ -39,8 +39,8 @@ export const DEFAULT_RELATIONSHIP_STATUSES = [
 
 export const DEFAULT_RELATIONSHIP_STATUS = 'None';
 
-/** How a friend is connected to others in the friends list (not romantic status with me) */
-export const DEFAULT_FRIEND_LINK_TYPES = [
+/** Linked relationship types between friends (Settings → Relationship Types) */
+export const DEFAULT_RELATIONSHIP_TYPES = [
   'Dating',
   'Partner',
   'Spouse',
@@ -58,6 +58,11 @@ export const DEFAULT_FRIEND_LINK_TYPES = [
   'Mutual Friend',
   'Other',
 ] as const;
+
+export const DEFAULT_RELATIONSHIP_TYPE = 'Other';
+
+/** @deprecated use DEFAULT_RELATIONSHIP_TYPES */
+export const DEFAULT_FRIEND_LINK_TYPES = DEFAULT_RELATIONSHIP_TYPES;
 
 export type FriendLinkType = string;
 
@@ -173,6 +178,7 @@ export interface AppData {
   settings: AppSettings;
   friendTags: string[];
   relationshipStatuses: string[];
+  relationshipTypes: string[];
   hangoutTypes: string[];
 }
 

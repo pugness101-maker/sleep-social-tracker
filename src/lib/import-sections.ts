@@ -30,6 +30,7 @@ export interface ImportPreview {
   ideas: number;
   friendTags: number;
   relationshipStatuses: number;
+  relationshipTypes: number;
   hangoutTypes: number;
   hasSettings: boolean;
 }
@@ -103,6 +104,7 @@ const APP_DATA_KEYS = [
   'settings',
   'friendTags',
   'relationshipStatuses',
+  'relationshipTypes',
   'hangoutTypes',
 ] as const;
 
@@ -114,6 +116,7 @@ interface PresetConfig {
   ideas?: boolean;
   friendTags?: boolean;
   relationshipStatuses?: boolean;
+  relationshipTypes?: boolean;
   hangoutTypes?: boolean;
   settings?: boolean;
   sleepTimers?: boolean;
@@ -133,6 +136,7 @@ const PRESET_CONFIG: Record<ImportSectionPreset, PresetConfig> = {
     ideas: true,
     friendTags: true,
     relationshipStatuses: true,
+    relationshipTypes: true,
     hangoutTypes: true,
     hangoutTimers: true,
     importMissingFriends: true,
@@ -141,6 +145,7 @@ const PRESET_CONFIG: Record<ImportSectionPreset, PresetConfig> = {
     friends: true,
     friendTags: true,
     relationshipStatuses: true,
+    relationshipTypes: true,
   },
   hangouts: {
     hangouts: true,
@@ -161,6 +166,7 @@ const PRESET_CONFIG: Record<ImportSectionPreset, PresetConfig> = {
     ideas: true,
     friendTags: true,
     relationshipStatuses: true,
+    relationshipTypes: true,
     hangoutTypes: true,
     settings: true,
     sleepTimers: true,
@@ -212,6 +218,7 @@ export function parseBackupJson(json: string): { ok: true; backup: ParsedBackup 
     'ideas',
     'friendTags',
     'relationshipStatuses',
+    'relationshipTypes',
     'hangoutTypes',
   ];
 
@@ -252,6 +259,7 @@ export function getImportPreview(json: string): ImportPreview {
       ideas: 0,
       friendTags: 0,
       relationshipStatuses: 0,
+      relationshipTypes: 0,
       hangoutTypes: 0,
       hasSettings: false,
     };
@@ -271,6 +279,7 @@ export function getImportPreview(json: string): ImportPreview {
     ideas: data.ideas?.length ?? 0,
     friendTags: data.friendTags?.length ?? 0,
     relationshipStatuses: data.relationshipStatuses?.length ?? 0,
+    relationshipTypes: data.relationshipTypes?.length ?? 0,
     hangoutTypes: data.hangoutTypes?.length ?? 0,
     hasSettings: !!data.settings && Object.keys(data.settings).length > 0,
   };
@@ -426,6 +435,13 @@ export function applySectionImport(
       mode
     );
   }
+  if (config.relationshipTypes) {
+    next.relationshipTypes = applyStringListSection(
+      current.relationshipTypes,
+      source.relationshipTypes,
+      mode
+    );
+  }
   if (config.hangoutTypes) {
     next.hangoutTypes = applyStringListSection(current.hangoutTypes, source.hangoutTypes, mode);
   }
@@ -460,6 +476,12 @@ export function applySectionImport(
     next.relationshipStatuses = mergeUniqueStrings(
       next.relationshipStatuses,
       normalized.relationshipStatuses
+    );
+  }
+  if (config.relationshipTypes || config.friends) {
+    next.relationshipTypes = mergeUniqueStrings(
+      next.relationshipTypes,
+      normalized.relationshipTypes
     );
   }
   if (config.hangoutTypes || config.hangouts || config.ideas) {

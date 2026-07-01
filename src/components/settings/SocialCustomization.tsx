@@ -3,10 +3,11 @@ import { CustomOptionListCard } from './CustomOptionListCard';
 import {
   countFriendsWithTag,
   countFriendsWithRelationshipStatus,
+  countFriendLinksWithType,
   countHangoutsWithType,
   countIdeasWithType,
 } from '../../lib/social-options';
-import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../../types';
+import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS, DEFAULT_RELATIONSHIP_TYPE } from '../../types';
 
 export function SocialCustomization() {
   const {
@@ -20,6 +21,9 @@ export function SocialCustomization() {
     addHangoutType,
     updateHangoutType,
     deleteHangoutType,
+    addRelationshipType,
+    updateRelationshipType,
+    deleteRelationshipType,
   } = useApp();
 
   return (
@@ -52,6 +56,22 @@ export function SocialCustomization() {
           if (action === 'default') deleteRelationshipStatus(name, { action: 'default' });
           else if (action === 'other' && otherName) deleteRelationshipStatus(name, { action: 'other', name: otherName });
           else deleteRelationshipStatus(name, { action: 'clear' });
+        }}
+      />
+
+      <CustomOptionListCard
+        title="Relationship Types"
+        description="Customize types for linked relationships between friends (Add/Edit Relationship on a friend's profile)."
+        options={data.relationshipTypes}
+        usageCount={(name) => countFriendLinksWithType(data.friends, name)}
+        defaultFallbackLabel={DEFAULT_RELATIONSHIP_TYPE}
+        deleteMode="hangout"
+        onAdd={addRelationshipType}
+        onEdit={updateRelationshipType}
+        onDelete={(name, action, otherName) => {
+          if (action === 'default') deleteRelationshipType(name, { action: 'default' });
+          else if (action === 'other' && otherName) deleteRelationshipType(name, { action: 'other', name: otherName });
+          else deleteRelationshipType(name, { action: 'clear' });
         }}
       />
 
