@@ -12,6 +12,7 @@ import {
   format,
   isSameDay,
 } from './dates';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 export function getLastWakeUp(data: AppData): string | null {
   const { activeTimers, sleepEntries } = data;
@@ -83,23 +84,53 @@ export interface SleepDebtEntry {
   debt: number;
 }
 
-export function getSleepDebtStats(data: AppData) {
-  const goalMinutes = data.settings.sleepGoalHours * 60;
+export function filterSleepByWakeRange(entries: SleepEntry[], rangeStart?: Date, rangeEnd?: Date) {
+  if (!rangeStart || !rangeEnd) return entries;
+  return entries.filter((s) => isInRange(s.wakeUp, rangeStart, rangeEnd));
+}
 
-  const entries: SleepDebtEntry[] = data.sleepEntries.map((entry) => {
+export function filterNapsByRange(
+  entries: AppData['napEntries'],
+  rangeStart?: Date,
+  rangeEnd?: Date
+) {
+  if (!rangeStart || !rangeEnd) return entries;
+  return entries.filter(
+    (n) => isInRange(n.napStart, rangeStart, rangeEnd) || isInRange(n.napEnd, rangeStart, rangeEnd)
+  );
+}
+
+export function getSleepDebtStats(data: AppData, rangeStart?: Date, rangeEnd?: Date) {
+  const goalMinutes = data.settings.sleepGoalHours * 60;
+  const isRangeFiltered = !!(rangeStart && rangeEnd);
+
+  let entries: SleepDebtEntry[] = data.sleepEntries.map((entry) => {
     const actual = calcDurationMinutes(entry.sleepStart, entry.wakeUp);
     return { entry, actual, debt: calcSleepDebtMinutes(goalMinutes, actual) };
   });
 
-  const lastNight = getLastNightSleepVsGoal(data);
-  const todaySleepDebt = lastNight?.debt ?? null;
+  if (isRangeFiltered) {
+    entries = entries.filter((e) => isInRange(e.entry.wakeUp, rangeStart!, rangeEnd!));
+  }
+
+  const sortedByWake = [...entries].sort(
+    (a, b) => parseISO(b.entry.wakeUp).getTime() - parseISO(a.entry.wakeUp).getTime()
+  );
+  const latestInSet = sortedByWake[0] ?? null;
+  const todaySleepDebt = isRangeFiltered
+    ? (latestInSet?.debt ?? null)
+    : (getLastNightSleepVsGoal(data)?.debt ?? null);
 
   const { start: weekStart, end: weekEnd } = getWeekRange();
-  const weekEntries = entries.filter((e) => isInRange(e.entry.sleepStart, weekStart, weekEnd));
+  const weekEntries = isRangeFiltered
+    ? entries
+    : entries.filter((e) => isInRange(e.entry.wakeUp, weekStart, weekEnd));
   const weeklyDebt = weekEntries.reduce((sum, e) => sum + e.debt, 0);
 
   const { start: monthStart, end: monthEnd } = getMonthRange();
-  const monthEntries = entries.filter((e) => isInRange(e.entry.sleepStart, monthStart, monthEnd));
+  const monthEntries = isRangeFiltered
+    ? entries
+    : entries.filter((e) => isInRange(e.entry.wakeUp, monthStart, monthEnd));
   const monthlyDebt = monthEntries.reduce((sum, e) => sum + e.debt, 0);
 
   const totalDebt = entries.reduce((sum, e) => sum + e.debt, 0);
@@ -119,8 +150,8 @@ export function getSleepDebtStats(data: AppData) {
   return {
     goalMinutes,
     todaySleepDebt,
-    weeklyDebt,
-    monthlyDebt,
+    weeklyDebt: isRangeFiltered ? totalDebt : weeklyDebt,
+    monthlyDebt: isRangeFiltered ? totalDebt : monthlyDebt,
     totalDebt,
     avgDebtPerNight,
     bestRecovery,
@@ -130,6 +161,7 @@ export function getSleepDebtStats(data: AppData) {
     nightCount: entries.length,
     weekNightCount: weekEntries.length,
     monthNightCount: monthEntries.length,
+    isRangeFiltered,
   };
 }
 
@@ -141,7 +173,7 @@ export function getEntrySleepDebt(data: AppData, entry: SleepEntry): number {
 
 export function getAverageSleepThisWeek(data: AppData): number {
   const { start, end } = getWeekRange();
-  const entries = data.sleepEntries.filter((s) => isInRange(s.sleepStart, start, end));
+  const entries = data.sleepEntries.filter((s) => isInRange(s.wakeUp, start, end));
   if (entries.length === 0) return 0;
   const total = entries.reduce(
     (sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp),
@@ -167,10 +199,14 @@ export function getFriendStats(friendId: string, hangouts: Hangout[]) {
   };
 }
 
-export function getAwakeStats(data: AppData) {
-  const sorted = [...data.sleepEntries].sort(
+export function getAwakeStats(data: AppData, rangeStart?: Date, rangeEnd?: Date) {
+  let sorted = [...data.sleepEntries].sort(
     (a, b) => parseISO(a.sleepStart).getTime() - parseISO(b.sleepStart).getTime()
   );
+
+  if (rangeStart && rangeEnd) {
+    sorted = sorted.filter((s) => isInRange(s.wakeUp, rangeStart, rangeEnd));
+  }
 
   const awakePeriods: number[] = [];
   let longestStreak = 0;
@@ -185,7 +221,8 @@ export function getAwakeStats(data: AppData) {
     }
   }
 
-  const currentAwake = getAwakeMs(data) / 60000;
+  const includeCurrentAwake = !rangeStart || !rangeEnd;
+  const currentAwake = includeCurrentAwake ? getAwakeMs(data) / 60000 : 0;
   if (currentAwake > 0) {
     awakePeriods.push(currentAwake);
     longestStreak = Math.max(longestStreak, currentAwake);
@@ -196,19 +233,19 @@ export function getAwakeStats(data: AppData) {
     : 0;
 
   const lastSleep = sorted[sorted.length - 1];
-  const awakeBeforeBed = lastSleep && data.activeTimers.sleepStart
-    ? calcDurationMinutes(lastSleep.wakeUp, data.activeTimers.sleepStart)
-    : currentAwake;
+  const awakeBeforeBed =
+    lastSleep && includeCurrentAwake && data.activeTimers.sleepStart
+      ? calcDurationMinutes(lastSleep.wakeUp, data.activeTimers.sleepStart)
+      : includeCurrentAwake
+        ? currentAwake
+        : 0;
 
   return { avgAwake, longestStreak, awakeBeforeBed, currentAwake };
 }
 
 // Sleep statistics
 export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date) {
-  let entries = [...data.sleepEntries];
-  if (rangeStart && rangeEnd) {
-    entries = entries.filter((s) => isInRange(s.sleepStart, rangeStart, rangeEnd));
-  }
+  let entries = filterSleepByWakeRange([...data.sleepEntries], rangeStart, rangeEnd);
 
   const durations = entries.map((s) => calcDurationMinutes(s.sleepStart, s.wakeUp));
   const total = durations.reduce((a, b) => a + b, 0);
@@ -228,7 +265,7 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
 
   const byWeekday: Record<number, number[]> = {};
   entries.forEach((s) => {
-    const day = getDay(parseISO(s.sleepStart));
+    const day = getDay(parseISO(s.wakeUp));
     if (!byWeekday[day]) byWeekday[day] = [];
     byWeekday[day].push(calcDurationMinutes(s.sleepStart, s.wakeUp));
   });
@@ -291,10 +328,7 @@ export function getSleepStats(data: AppData, rangeStart?: Date, rangeEnd?: Date)
 }
 
 export function getNapStats(data: AppData, rangeStart?: Date, rangeEnd?: Date) {
-  let entries = [...data.napEntries];
-  if (rangeStart && rangeEnd) {
-    entries = entries.filter((n) => isInRange(n.napStart, rangeStart, rangeEnd));
-  }
+  const entries = filterNapsByRange([...data.napEntries], rangeStart, rangeEnd);
   const durations = entries.map((n) => calcDurationMinutes(n.napStart, n.napEnd));
   return {
     totalNaps: entries.length,
@@ -347,16 +381,49 @@ export function getSocialStats(data: AppData, rangeStart?: Date, rangeEnd?: Date
   };
 }
 
-export function getMonthlyTrends(data: AppData, months = 6) {
+export function getMonthlyTrends(
+  data: AppData,
+  months = 6,
+  rangeStart?: Date,
+  rangeEnd?: Date
+) {
   const sleepTrend: { label: string; minutes: number; count: number }[] = [];
   const socialTrend: { label: string; minutes: number; count: number }[] = [];
+
+  if (rangeStart && rangeEnd) {
+    let cursor = startOfMonth(rangeStart);
+    while (cursor <= rangeEnd) {
+      const bucketStart = cursor < rangeStart ? rangeStart : startOfMonth(cursor);
+      const bucketEnd = endOfMonth(cursor) > rangeEnd ? rangeEnd : endOfMonth(cursor);
+      const label = format(cursor, 'MMM yyyy');
+
+      const sleepEntries = data.sleepEntries.filter((s) =>
+        isInRange(s.wakeUp, bucketStart, bucketEnd)
+      );
+      const sleepMin = sleepEntries.reduce(
+        (sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp),
+        0
+      );
+      sleepTrend.push({ label, minutes: sleepMin, count: sleepEntries.length });
+
+      const hangouts = data.hangouts.filter((h) => isInRange(h.startTime, bucketStart, bucketEnd));
+      const socialMin = hangouts.reduce(
+        (sum, h) => sum + calcDurationMinutes(h.startTime, h.endTime),
+        0
+      );
+      socialTrend.push({ label, minutes: socialMin, count: hangouts.length });
+
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+    return { sleepTrend, socialTrend };
+  }
 
   for (let i = months - 1; i >= 0; i--) {
     const date = subDays(new Date(), i * 30);
     const { start, end } = getMonthRange(date);
     const label = format(start, 'MMM yyyy');
 
-    const sleepEntries = data.sleepEntries.filter((s) => isInRange(s.sleepStart, start, end));
+    const sleepEntries = data.sleepEntries.filter((s) => isInRange(s.wakeUp, start, end));
     const sleepMin = sleepEntries.reduce(
       (sum, s) => sum + calcDurationMinutes(s.sleepStart, s.wakeUp),
       0

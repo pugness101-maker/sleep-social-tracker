@@ -4,16 +4,22 @@ import { getSleepStats, getNapStats, getSocialStats, getAwakeStats, getMonthlyTr
 import { formatDuration, avgMinutesToTime, weekdayLabel, formatDateTime } from '../../lib/dates';
 import { formatSleepDebt, formatGoalProgressPercent } from '../../lib/sleep-goals';
 import { getAverageSleepThisWeek } from '../../lib/stats';
+import { useStatsDateRange, statsRangeArgs } from '../../hooks/useStatsDateRange';
+import { StatsDateRangeFilter } from './StatsDateRangeFilter';
 
 export function StatisticsTab() {
   const { data } = useApp();
-  const sleep = getSleepStats(data);
-  const debtStats = getSleepDebtStats(data);
-  const naps = getNapStats(data);
-  const social = getSocialStats(data);
-  const awake = getAwakeStats(data);
-  const trends = getMonthlyTrends(data);
-  const weeklyAvg = getAverageSleepThisWeek(data);
+  const { range, resolved, setPreset, setCustomDates, clearFilter } = useStatsDateRange();
+  const { start, end } = statsRangeArgs(resolved);
+
+  const sleep = getSleepStats(data, start, end);
+  const debtStats = getSleepDebtStats(data, start, end);
+  const naps = getNapStats(data, start, end);
+  const social = getSocialStats(data, start, end);
+  const awake = getAwakeStats(data, start, end);
+  const trends = getMonthlyTrends(data, 6, start, end);
+
+  const weeklyAvg = resolved.isFiltered ? sleep.avg : getAverageSleepThisWeek(data);
   const weeklyVsGoal = weeklyAvg ? weeklyAvg - data.settings.sleepGoalHours * 60 : null;
 
   const topFriends = Object.entries(social.friendCounts)
@@ -24,8 +30,18 @@ export function StatisticsTab() {
       count,
     }));
 
+  const rangeScope = resolved.isFiltered ? 'in selected range' : 'this week';
+
   return (
     <div className="space-y-8">
+      <StatsDateRangeFilter
+        range={range}
+        label={resolved.label}
+        onPreset={setPreset}
+        onCustomDates={setCustomDates}
+        onClear={clearFilter}
+      />
+
       <section>
         <h2 className="text-lg font-semibold mb-4 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Statistics</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -49,7 +65,7 @@ export function StatisticsTab() {
             accent="sleep"
           />
           <StatCard
-            label="Weekly Avg vs Goal"
+            label={resolved.isFiltered ? 'Avg Sleep in Range' : 'Weekly Avg vs Goal'}
             value={weeklyAvg ? formatDuration(weeklyAvg) : '—'}
             sub={weeklyVsGoal !== null ? formatSleepDebt(-weeklyVsGoal) : `Goal: ${data.settings.sleepGoalHours}h`}
             accent="sleep"
@@ -59,21 +75,43 @@ export function StatisticsTab() {
           <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Sleep Debt</h3>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard
-              label="Daily Sleep Debt"
+              label={debtStats.isRangeFiltered ? 'Latest Sleep Debt' : 'Daily Sleep Debt'}
               value={debtStats.todaySleepDebt !== null ? formatSleepDebt(debtStats.todaySleepDebt) : '—'}
-              sub="Last logged night vs goal"
+              sub={debtStats.isRangeFiltered ? 'Most recent wake-up in range' : 'Last logged night vs goal'}
               accent="sleep"
             />
             <StatCard
-              label="Weekly Sleep Debt"
-              value={debtStats.weekNightCount > 0 ? formatSleepDebt(debtStats.weeklyDebt) : '—'}
-              sub={`${debtStats.weekNightCount} night${debtStats.weekNightCount === 1 ? '' : 's'} this week`}
+              label={debtStats.isRangeFiltered ? 'Total Sleep Debt' : 'Weekly Sleep Debt'}
+              value={
+                debtStats.isRangeFiltered
+                  ? debtStats.nightCount > 0
+                    ? formatSleepDebt(debtStats.totalDebt)
+                    : '—'
+                  : debtStats.weekNightCount > 0
+                    ? formatSleepDebt(debtStats.weeklyDebt)
+                    : '—'
+              }
+              sub={
+                debtStats.isRangeFiltered
+                  ? `${debtStats.nightCount} night${debtStats.nightCount === 1 ? '' : 's'} in range`
+                  : `${debtStats.weekNightCount} night${debtStats.weekNightCount === 1 ? '' : 's'} ${rangeScope}`
+              }
               accent="sleep"
             />
             <StatCard
-              label="Monthly Sleep Debt"
-              value={debtStats.monthNightCount > 0 ? formatSleepDebt(debtStats.monthlyDebt) : '—'}
-              sub={`${debtStats.monthNightCount} night${debtStats.monthNightCount === 1 ? '' : 's'} this month`}
+              label={debtStats.isRangeFiltered ? 'Nights in Range' : 'Monthly Sleep Debt'}
+              value={
+                debtStats.isRangeFiltered
+                  ? String(debtStats.nightCount)
+                  : debtStats.monthNightCount > 0
+                    ? formatSleepDebt(debtStats.monthlyDebt)
+                    : '—'
+              }
+              sub={
+                debtStats.isRangeFiltered
+                  ? 'Logged wake-ups in selected range'
+                  : `${debtStats.monthNightCount} night${debtStats.monthNightCount === 1 ? '' : 's'} this month`
+              }
               accent="sleep"
             />
             <StatCard
@@ -91,7 +129,7 @@ export function StatisticsTab() {
               }
               sub={
                 debtStats.bestRecovery
-                  ? `${formatDuration(debtStats.bestRecovery.actual)} · ${formatDateTime(debtStats.bestRecovery.entry.sleepStart)}`
+                  ? `${formatDuration(debtStats.bestRecovery.actual)} · ${formatDateTime(debtStats.bestRecovery.entry.wakeUp)}`
                   : 'No sleep data'
               }
               accent="sleep"
@@ -105,7 +143,7 @@ export function StatisticsTab() {
               }
               sub={
                 debtStats.worstDebt
-                  ? `${formatDuration(debtStats.worstDebt.actual)} · ${formatDateTime(debtStats.worstDebt.entry.sleepStart)}`
+                  ? `${formatDuration(debtStats.worstDebt.actual)} · ${formatDateTime(debtStats.worstDebt.entry.wakeUp)}`
                   : 'No sleep data'
               }
               accent="sleep"
@@ -131,18 +169,24 @@ export function StatisticsTab() {
           </div>
         </Card>
         <Card className="mt-4">
-          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Monthly Sleep Trend</h3>
-          <div className="flex items-end gap-2 h-32">
-            {trends.sleepTrend.map((t) => {
-              const maxMin = Math.max(...trends.sleepTrend.map((x) => x.minutes), 1);
-              return (
-                <div key={t.label} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full bg-sleep/60 rounded-t" style={{ height: `${(t.minutes / maxMin) * 100}%`, minHeight: t.minutes ? 4 : 0 }} />
-                  <span className="text-[9px] opacity-60 truncate w-full text-center">{t.label.split(' ')[0]}</span>
-                </div>
-              );
-            })}
-          </div>
+          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>
+            {resolved.isFiltered ? 'Sleep Trend in Range' : 'Monthly Sleep Trend'}
+          </h3>
+          {trends.sleepTrend.length === 0 ? (
+            <p className="text-sm opacity-70 text-left">No sleep data for this range.</p>
+          ) : (
+            <div className="flex items-end gap-2 h-32">
+              {trends.sleepTrend.map((t) => {
+                const maxMin = Math.max(...trends.sleepTrend.map((x) => x.minutes), 1);
+                return (
+                  <div key={t.label} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full bg-sleep/60 rounded-t" style={{ height: `${(t.minutes / maxMin) * 100}%`, minHeight: t.minutes ? 4 : 0 }} />
+                    <span className="text-[9px] opacity-60 truncate w-full text-center">{t.label.split(' ')[0]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
         <div className="mt-6">
           <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Naps (Sleep Log)</h3>
@@ -176,7 +220,7 @@ export function StatisticsTab() {
           <Card>
             <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Most-Seen Friends</h3>
             {topFriends.length === 0 ? (
-              <p className="text-sm opacity-70 text-left">No hangout data yet.</p>
+              <p className="text-sm opacity-70 text-left">No hangout data for this range.</p>
             ) : (
               <ul className="space-y-2 text-left">
                 {topFriends.map((f) => (
@@ -191,7 +235,7 @@ export function StatisticsTab() {
           <Card>
             <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Activity Count by Type</h3>
             {Object.keys(social.activityCountByType).length === 0 ? (
-              <p className="text-sm opacity-70 text-left">No hangout data yet.</p>
+              <p className="text-sm opacity-70 text-left">No hangout data for this range.</p>
             ) : (
               <ul className="space-y-2 text-left">
                 {Object.entries(social.activityCountByType).sort(([, a], [, b]) => b - a).map(([type, count]) => (
@@ -206,7 +250,7 @@ export function StatisticsTab() {
           <Card>
             <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Activity Time by Type</h3>
             {Object.keys(social.activityTimeByType).length === 0 ? (
-              <p className="text-sm opacity-70 text-left">No hangout data yet.</p>
+              <p className="text-sm opacity-70 text-left">No timed activity data for this range.</p>
             ) : (
               <ul className="space-y-2 text-left">
                 {Object.entries(social.activityTimeByType).sort(([, a], [, b]) => b - a).map(([type, minutes]) => (
@@ -221,7 +265,7 @@ export function StatisticsTab() {
           <Card>
             <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Hangouts by Type</h3>
             {Object.keys(social.byType).length === 0 ? (
-              <p className="text-sm opacity-70 text-left">No hangout data yet.</p>
+              <p className="text-sm opacity-70 text-left">No hangout data for this range.</p>
             ) : (
               <ul className="space-y-2 text-left">
                 {Object.entries(social.byType).sort(([, a], [, b]) => b - a).map(([type, count]) => (
@@ -236,18 +280,24 @@ export function StatisticsTab() {
         </div>
 
         <Card className="mt-4">
-          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>Monthly Social Trend</h3>
-          <div className="flex items-end gap-2 h-32">
-            {trends.socialTrend.map((t) => {
-              const maxMin = Math.max(...trends.socialTrend.map((x) => x.minutes), 1);
-              return (
-                <div key={t.label} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full bg-social/60 rounded-t" style={{ height: `${(t.minutes / maxMin) * 100}%`, minHeight: t.minutes ? 4 : 0 }} />
-                  <span className="text-[9px] opacity-60 truncate w-full text-center">{t.label.split(' ')[0]}</span>
-                </div>
-              );
-            })}
-          </div>
+          <h3 className="font-medium mb-3 text-left" style={{ color: 'var(--text-heading)' }}>
+            {resolved.isFiltered ? 'Social Trend in Range' : 'Monthly Social Trend'}
+          </h3>
+          {trends.socialTrend.length === 0 ? (
+            <p className="text-sm opacity-70 text-left">No hangout data for this range.</p>
+          ) : (
+            <div className="flex items-end gap-2 h-32">
+              {trends.socialTrend.map((t) => {
+                const maxMin = Math.max(...trends.socialTrend.map((x) => x.minutes), 1);
+                return (
+                  <div key={t.label} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full bg-social/60 rounded-t" style={{ height: `${(t.minutes / maxMin) * 100}%`, minHeight: t.minutes ? 4 : 0 }} />
+                    <span className="text-[9px] opacity-60 truncate w-full text-center">{t.label.split(' ')[0]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       </section>
     </div>
