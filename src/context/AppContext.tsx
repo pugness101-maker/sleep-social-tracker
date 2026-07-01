@@ -15,6 +15,7 @@ import type {
   HangoutIdea,
   AppSettings,
   HangoutType,
+  FriendLink,
 } from '../types';
 import { loadAppData, saveAppData, clearAllData, importAppData, exportAppData } from '../lib/storage';
 import { generateId, toLocalISO } from '../lib/dates';
@@ -22,6 +23,7 @@ import {
   normalizeOptionName,
   validateOptionName,
 } from '../lib/social-options';
+import { getReciprocalLinkType, removeLinksToFriend } from '../lib/friend-links';
 import { DEFAULT_HANGOUT_TYPE, DEFAULT_RELATIONSHIP_STATUS } from '../types';
 
 export type DeleteTagResolution =
@@ -53,6 +55,9 @@ interface AppContextValue {
   addFriend: (friend: Omit<Friend, 'id' | 'createdAt'>) => void;
   updateFriend: (id: string, friend: Partial<Friend>) => void;
   deleteFriend: (id: string) => void;
+  addFriendLink: (friendId: string, relatedFriendId: string, type: string, notes?: string) => string | null;
+  updateFriendLink: (friendId: string, linkId: string, updates: { relatedFriendId?: string; type?: string; notes?: string }) => string | null;
+  deleteFriendLink: (friendId: string, linkId: string) => void;
   // Hangouts
   startHangout: (friendIds: string[], type?: HangoutType, location?: string) => void;
   endHangout: (notes?: string) => void;
@@ -210,7 +215,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addFriend = useCallback((friend: Omit<Friend, 'id' | 'createdAt'>) => {
     patch((prev) => ({
       ...prev,
-      friends: [...prev.friends, { ...friend, id: generateId(), createdAt: toLocalISO() }],
+      friends: [
+        ...prev.friends,
+        { ...friend, relationships: friend.relationships ?? [], id: generateId(), createdAt: toLocalISO() },
+      ],
     }));
   }, [patch]);
 
@@ -222,18 +230,178 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patch]);
 
   const deleteFriend = useCallback((id: string) => {
-    patch((prev) => ({
-      ...prev,
-      friends: prev.friends.filter((f) => f.id !== id),
-      hangouts: prev.hangouts.map((h) => ({
-        ...h,
-        friendIds: h.friendIds.filter((fid) => fid !== id),
-      })),
-      ideas: prev.ideas.map((i) => ({
-        ...i,
-        friendIds: i.friendIds.filter((fid) => fid !== id),
-      })),
-    }));
+    patch((prev) => {
+      const withoutDeleted = prev.friends.filter((f) => f.id !== id);
+      const cleaned = removeLinksToFriend(withoutDeleted, id);
+      return {
+        ...prev,
+        friends: cleaned,
+        hangouts: prev.hangouts.map((h) => ({
+          ...h,
+          friendIds: h.friendIds.filter((fid) => fid !== id),
+        })),
+        ideas: prev.ideas.map((i) => ({
+          ...i,
+          friendIds: i.friendIds.filter((fid) => fid !== id),
+        })),
+      };
+    });
+  }, [patch]);
+
+  const addFriendLink = useCallback(
+    (friendId: string, relatedFriendId: string, type: string, notes = ''): string | null => {
+      if (friendId === relatedFriendId) return 'A friend cannot be linked to themselves.';
+      const related = data.friends.find((f) => f.id === relatedFriendId);
+      if (!related) return 'Related friend not found.';
+      const owner = data.friends.find((f) => f.id === friendId);
+      if (!owner) return 'Friend not found.';
+      if (owner.relationships.some((r) => r.relatedFriendId === relatedFriendId)) {
+        return 'A relationship with this friend already exists.';
+      }
+
+      patch((prev) => {
+        const reciprocalType = getReciprocalLinkType(type);
+        const newLink: FriendLink = {
+          id: generateId(),
+          relatedFriendId,
+          type,
+          notes,
+          createdAt: toLocalISO(),
+        };
+        const reciprocalLink: FriendLink = {
+          id: generateId(),
+          relatedFriendId: friendId,
+          type: reciprocalType,
+          notes,
+          createdAt: toLocalISO(),
+        };
+
+        return {
+          ...prev,
+          friends: prev.friends.map((f) => {
+            if (f.id === friendId) {
+              return { ...f, relationships: [...f.relationships, newLink] };
+            }
+            if (f.id === relatedFriendId) {
+              return { ...f, relationships: [...f.relationships, reciprocalLink] };
+            }
+            return f;
+          }),
+        };
+      });
+      return null;
+    },
+    [patch, data.friends]
+  );
+
+  const updateFriendLink = useCallback(
+    (
+      friendId: string,
+      linkId: string,
+      updates: { relatedFriendId?: string; type?: string; notes?: string }
+    ): string | null => {
+      const owner = data.friends.find((f) => f.id === friendId);
+      const link = owner?.relationships.find((r) => r.id === linkId);
+      if (!owner || !link) return 'Relationship not found.';
+
+      const newRelatedId = updates.relatedFriendId ?? link.relatedFriendId;
+      if (newRelatedId === friendId) return 'A friend cannot be linked to themselves.';
+
+      if (
+        newRelatedId !== link.relatedFriendId &&
+        owner.relationships.some((r) => r.id !== linkId && r.relatedFriendId === newRelatedId)
+      ) {
+        return 'A relationship with this friend already exists.';
+      }
+
+      const newType = updates.type ?? link.type;
+      const newNotes = updates.notes ?? link.notes;
+      const oldRelatedId = link.relatedFriendId;
+      const reciprocalType = getReciprocalLinkType(newType);
+
+      patch((prev) => {
+        let friends = prev.friends.map((f) => {
+          if (f.id === oldRelatedId && oldRelatedId !== newRelatedId) {
+            return {
+              ...f,
+              relationships: f.relationships.filter((r) => r.relatedFriendId !== friendId),
+            };
+          }
+          return f;
+        });
+
+        friends = friends.map((f) => {
+          if (f.id === friendId) {
+            return {
+              ...f,
+              relationships: f.relationships.map((r) =>
+                r.id === linkId
+                  ? { ...r, relatedFriendId: newRelatedId, type: newType, notes: newNotes }
+                  : r
+              ),
+            };
+          }
+          return f;
+        });
+
+        friends = friends.map((f) => {
+          if (f.id !== newRelatedId) return f;
+          const existing = f.relationships.find((r) => r.relatedFriendId === friendId);
+          if (existing) {
+            return {
+              ...f,
+              relationships: f.relationships.map((r) =>
+                r.relatedFriendId === friendId
+                  ? { ...r, type: reciprocalType, notes: newNotes }
+                  : r
+              ),
+            };
+          }
+          return {
+            ...f,
+            relationships: [
+              ...f.relationships,
+              {
+                id: generateId(),
+                relatedFriendId: friendId,
+                type: reciprocalType,
+                notes: newNotes,
+                createdAt: toLocalISO(),
+              },
+            ],
+          };
+        });
+
+        return { ...prev, friends };
+      });
+      return null;
+    },
+    [patch, data.friends]
+  );
+
+  const deleteFriendLink = useCallback((friendId: string, linkId: string) => {
+    patch((prev) => {
+      const owner = prev.friends.find((f) => f.id === friendId);
+      const link = owner?.relationships.find((r) => r.id === linkId);
+      if (!link) return prev;
+
+      const relatedId = link.relatedFriendId;
+      return {
+        ...prev,
+        friends: prev.friends.map((f) => {
+          if (f.id === friendId) {
+            return { ...f, relationships: f.relationships.filter((r) => r.id !== linkId) };
+          }
+          if (f.id === relatedId) {
+            return {
+              ...f,
+              relationships: f.relationships.filter((r) => r.relatedFriendId !== friendId),
+            };
+          }
+          return f;
+        }),
+      };
+    });
   }, [patch]);
 
   const startHangout = useCallback(
@@ -543,6 +711,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFriend,
     updateFriend,
     deleteFriend,
+    addFriendLink,
+    updateFriendLink,
+    deleteFriendLink,
     startHangout,
     endHangout,
     addHangout,

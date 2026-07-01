@@ -39,6 +39,36 @@ export const DEFAULT_RELATIONSHIP_STATUSES = [
 
 export const DEFAULT_RELATIONSHIP_STATUS = 'None';
 
+/** How a friend is connected to others in the friends list (not romantic status with me) */
+export const DEFAULT_FRIEND_LINK_TYPES = [
+  'Dating',
+  'Partner',
+  'Spouse',
+  'Ex',
+  'Sibling',
+  'Parent',
+  'Child',
+  'Cousin',
+  'Friend',
+  'Best Friend',
+  'Coworker',
+  'Classmate',
+  'Roommate',
+  'Teammate',
+  'Mutual Friend',
+  'Other',
+] as const;
+
+export type FriendLinkType = string;
+
+export interface FriendLink {
+  id: string;
+  relatedFriendId: string;
+  type: FriendLinkType;
+  notes: string;
+  createdAt: string;
+}
+
 export const DEFAULT_HANGOUT_TYPES = [
   'Chill', 'Food', 'Study', 'Gym', 'Party', 'Shopping', 'Travel', 'Sleepover', 'Work', 'Other',
 ] as const;
@@ -78,6 +108,7 @@ export interface Friend {
   contactInfo: string;
   notes: string;
   favoriteActivities: string[];
+  relationships: FriendLink[];
   createdAt: string;
 }
 

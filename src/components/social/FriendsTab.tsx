@@ -9,6 +9,7 @@ import { TagPicker } from '../ui/TagPicker';
 import { enrichFriend } from '../../lib/stats';
 import { formatDate, formatDuration } from '../../lib/dates';
 import { friendMatchesTagFilter, optionSelectOptions } from '../../lib/social-options';
+import { FriendDetailModal } from './FriendDetailModal';
 import type { Friend } from '../../types';
 import { DEFAULT_RELATIONSHIP_STATUS } from '../../types';
 
@@ -21,11 +22,13 @@ export function FriendsTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [detailFriendId, setDetailFriendId] = useState<string | null>(null);
 
   const emptyForm = {
     name: '',
     tags: [] as string[],
     relationshipStatus: DEFAULT_RELATIONSHIP_STATUS,
+    relationships: [] as Friend['relationships'],
     birthday: '',
     contactInfo: '',
     notes: '',
@@ -81,6 +84,7 @@ export function FriendsTab() {
       name: friend.name,
       tags: [...friend.tags],
       relationshipStatus: friend.relationshipStatus || DEFAULT_RELATIONSHIP_STATUS,
+      relationships: friend.relationships,
       birthday: friend.birthday,
       contactInfo: friend.contactInfo,
       notes: friend.notes,
@@ -189,7 +193,13 @@ export function FriendsTab() {
                   </div>
                 )}
                 {friend.notes && <p className="text-xs opacity-70 mt-2 line-clamp-2">{friend.notes}</p>}
+                {friend.relationships.length > 0 && (
+                  <p className="text-xs opacity-70 mt-2">
+                    {friend.relationships.length} linked relationship{friend.relationships.length !== 1 ? 's' : ''}
+                  </p>
+                )}
                 <div className="flex gap-1 mt-3">
+                  <Button size="sm" variant="ghost" onClick={() => setDetailFriendId(friend.id)}>View</Button>
                   <Button size="sm" variant="ghost" onClick={() => openEdit(friend)}>Edit</Button>
                   <Button size="sm" variant="ghost" onClick={() => setDeleteId(friend.id)}>Delete</Button>
                 </div>
@@ -242,6 +252,12 @@ export function FriendsTab() {
           </div>
         </div>
       </Modal>
+
+      <FriendDetailModal
+        friendId={detailFriendId}
+        onClose={() => setDetailFriendId(null)}
+        onEdit={(friend) => openEdit(friend)}
+      />
 
       <ConfirmModal
         open={!!deleteId}

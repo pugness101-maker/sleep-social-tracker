@@ -9,7 +9,7 @@ import {
 } from '../types';
 
 export const STORAGE_KEY = 'sleep-social-tracker-data';
-export const DATA_VERSION = 5;
+export const DATA_VERSION = 6;
 
 export const defaultSettings: AppSettings = {
   theme: 'system',
@@ -112,8 +112,10 @@ function migrateFriends(rawFriends: Array<Partial<Friend> & { category?: string 
 
     if (!relationshipStatus) relationshipStatus = DEFAULT_RELATIONSHIP_STATUS;
 
+    const relationships = friend.relationships ?? [];
+
     const { category: _removed, ...rest } = friend;
-    return { ...rest, tags, relationshipStatus } as Friend;
+    return { ...rest, tags, relationshipStatus, relationships } as Friend;
   });
 }
 
