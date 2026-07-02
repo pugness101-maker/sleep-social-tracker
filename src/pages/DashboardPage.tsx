@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { useAwakeTimer } from '../hooks/useLiveTimer';
 import { useApp } from '../context/AppContext';
 import { StatCard } from '../components/ui/Card';
@@ -29,6 +30,35 @@ import {
   type DashboardWidgetGroup,
 } from '../lib/dashboard-layout';
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function DashboardHeader() {
+  return (
+    <header
+      className="ios-header -mx-4 px-4 pb-5 mb-2 md:mx-0 md:px-0 md:pt-0 md:pb-6"
+      style={{ background: 'var(--bg)' }}
+    >
+      <p className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        {format(new Date(), 'EEEE, MMMM d')}
+      </p>
+      <h1
+        className="text-[26px] sm:text-[28px] font-bold tracking-tight leading-tight mt-0.5"
+        style={{ color: 'var(--text-heading)' }}
+      >
+        {getGreeting()}
+      </h1>
+      <p className="text-[15px] mt-1.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
+        Your sleep & social at a glance
+      </p>
+    </header>
+  );
+}
+
 function DashboardSection({
   title,
   children,
@@ -37,8 +67,11 @@ function DashboardSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wide opacity-60 mb-3 text-left">
+    <section className="mb-6">
+      <h2
+        className="text-[13px] font-semibold mb-2.5 text-left px-0.5 uppercase tracking-wide"
+        style={{ color: 'var(--text-muted)' }}
+      >
         {title}
       </h2>
       {children}
@@ -72,92 +105,92 @@ export function DashboardPage() {
     () => ({
       awake_timer: (
         <StatCard
-          label="Current Awake Timer"
+          label="Awake timer"
           value={isSleeping ? 'Sleeping' : formatDurationLive(awakeMs)}
-          sub={isSleeping ? 'Timer paused while sleeping' : 'Since last wake-up'}
+          sub={isSleeping ? 'Paused while sleeping' : 'Since last wake-up'}
           accent="awake"
-          icon="⏱️"
+          icon="timer"
         />
       ),
       last_night_sleep: (
         <StatCard
-          label="Last Night's Sleep"
+          label="Last night"
           value={lastSleep ? formatDuration(calcDurationMinutes(lastSleep.sleepStart, lastSleep.wakeUp)) : '—'}
-          sub={sleepVsGoal ? formatSleepDebt(sleepVsGoal.debt) : lastSleep ? `${formatTime(lastSleep.wakeUp)} wake-up` : 'No sleep logged'}
+          sub={sleepVsGoal ? formatSleepDebt(sleepVsGoal.debt) : lastSleep ? `${formatTime(lastSleep.wakeUp)} wake-up` : 'No sleep logged yet'}
           accent="sleep"
-          icon="😴"
+          icon="bed"
         />
       ),
       today_sleep_debt: (
         <StatCard
-          label="Today's Sleep Debt"
+          label="Sleep debt"
           value={debtStats.todaySleepDebt !== null ? formatSleepDebt(debtStats.todaySleepDebt) : '—'}
           sub={`Goal: ${data.settings.sleepGoalHours}h/night`}
           accent="sleep"
-          icon="📉"
+          icon="trend-down"
         />
       ),
       sleep_goal_progress: (
         <StatCard
-          label="Sleep Goal Progress"
+          label="Goal progress"
           value={`${debtStats.goalProgress.toFixed(0)}%`}
-          sub={debtStats.nightCount > 0 ? `${debtStats.nightsAtGoal} of ${debtStats.nightCount} nights met goal` : `Target: ${data.settings.sleepGoalHours}h/night`}
+          sub={debtStats.nightCount > 0 ? `${debtStats.nightsAtGoal} of ${debtStats.nightCount} nights` : `Target: ${data.settings.sleepGoalHours}h`}
           accent="sleep"
-          icon="✅"
+          icon="check"
         />
       ),
       recommended_bedtime: (
         <StatCard
-          label="Recommended Bedtime"
+          label="Bedtime"
           value={schedule.recommendedBedtime}
-          sub={schedule.autoCalculateBedtime ? `Wake goal ${schedule.effectiveWakeTime} − ${schedule.goalHours}h` : `Target ${schedule.effectiveBedtime}`}
+          sub={schedule.autoCalculateBedtime ? `Wake ${schedule.effectiveWakeTime} − ${schedule.goalHours}h` : `Target ${schedule.effectiveBedtime}`}
           accent="sleep"
-          icon="🌙"
+          icon="moon"
         />
       ),
       recommended_wake: (
         <StatCard
-          label="Recommended Wake-up"
+          label="Wake-up"
           value={schedule.recommendedWakeTime}
-          sub={schedule.autoCalculateWakeTime ? `Bedtime goal ${schedule.effectiveBedtime} + ${schedule.goalHours}h` : `Target ${schedule.effectiveWakeTime}`}
+          sub={schedule.autoCalculateWakeTime ? `Bed ${schedule.effectiveBedtime} + ${schedule.goalHours}h` : `Target ${schedule.effectiveWakeTime}`}
           accent="sleep"
-          icon="☀️"
+          icon="sun"
         />
       ),
       total_friends: (
         <StatCard
-          label="Total Friends"
+          label="Friends"
           value={String(getActiveFriendCount(data))}
           sub={`${data.hangouts.length} hangouts logged`}
           accent="social"
-          icon="👥"
+          icon="users"
         />
       ),
       total_hangouts: (
         <StatCard
-          label="Total Hangouts"
+          label="Hangouts"
           value={String(data.hangouts.length)}
           sub={weekSocial.totalHangouts > 0 ? `${weekSocial.totalHangouts} this week` : 'None this week yet'}
           accent="social"
-          icon="🤝"
+          icon="handshake"
         />
       ),
       hours_this_week: (
         <StatCard
-          label="Hours This Week"
+          label="This week"
           value={`${weekSocial.totalHours.toFixed(1)}h`}
           sub={weekSocial.topType ? `Top: ${weekSocial.topType}` : 'Social time logged'}
           accent="social"
-          icon="📅"
+          icon="calendar"
         />
       ),
       last_seen: (
         <StatCard
-          label="Last Seen"
+          label="Last seen"
           value={lastSeen ? formatDaysSinceLabel(lastSeen.daysAgo) : '—'}
           sub={lastSeen ? `${lastSeen.friendNames} · ${formatDateTime(lastSeen.timestamp)}` : 'No hangouts logged yet'}
           accent="social"
-          icon="👋"
+          icon="wave"
         />
       ),
       catch_up: null,
@@ -185,7 +218,7 @@ export function DashboardPage() {
     return (
       <DashboardSection key={group} title={DASHBOARD_WIDGET_GROUPS.find((g) => g.id === group)!.label}>
         {statIds.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-2.5">
             {statIds.map((id) => (
               <div key={id}>{statCards[id]}</div>
             ))}
@@ -195,10 +228,10 @@ export function DashboardPage() {
           <div
             className={
               group === 'activity'
-                ? 'space-y-3'
+                ? 'space-y-2.5'
                 : group === 'planning'
-                  ? 'grid grid-cols-1 md:grid-cols-2 gap-3'
-                  : 'space-y-3'
+                  ? 'grid grid-cols-1 md:grid-cols-2 gap-2.5'
+                  : 'space-y-2.5'
             }
           >
             {panelIds.map((id) => (
@@ -212,10 +245,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Dashboard</h1>
-        <p className="text-sm opacity-70 mt-1">Today at a glance — sleep, social, and quick actions</p>
-      </div>
+      <DashboardHeader />
 
       {DASHBOARD_WIDGET_GROUPS.map((g) => renderGroup(g.id))}
 

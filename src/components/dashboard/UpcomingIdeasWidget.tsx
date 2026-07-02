@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Misc';
+import { Badge, EmptyState } from '../ui/Misc';
+import { Icon } from '../ui/Icon';
 import type { HangoutIdea } from '../../types';
 
 const ACTIVE_STATUSES = new Set(['Want to Try', 'Planned']);
@@ -24,30 +25,47 @@ export function UpcomingIdeasWidget() {
   return (
     <Card>
       <div className="flex items-start justify-between gap-2 mb-3 text-left">
-        <h2 className="text-base font-semibold" style={{ color: 'var(--text-heading)' }}>
+        <h2 className="text-[17px] font-semibold tracking-tight" style={{ color: 'var(--text-heading)' }}>
           Upcoming Ideas
         </h2>
         <button
           type="button"
           onClick={() => navigate('/social')}
-          className="text-xs opacity-70 hover:opacity-100 shrink-0"
+          className="flex items-center gap-0.5 text-[13px] font-medium shrink-0 active:opacity-70"
+          style={{ color: 'var(--text-muted)' }}
         >
-          View all →
+          View all
+          <Icon name="chevron-right" size={14} />
         </button>
       </div>
       {ideas.length === 0 ? (
-        <p className="text-sm opacity-70 text-left">No active ideas. Add some in Social → Ideas.</p>
+        <EmptyState
+          icon={<Icon name="lightbulb" size={20} />}
+          title="No active ideas"
+          description="Add hangout ideas in Social to plan what's next."
+          action={
+            <button
+              type="button"
+              onClick={() => navigate('/social')}
+              className="text-[13px] font-semibold text-primary"
+            >
+              Browse Ideas
+            </button>
+          }
+        />
       ) : (
         <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
           {ideas.map((idea: HangoutIdea) => (
             <li key={idea.id} className="py-2.5 text-left">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text-heading)' }}>
-                    {idea.isFavorite && <span className="mr-1">⭐</span>}
+                  <p className="font-medium text-[15px] truncate flex items-center gap-1" style={{ color: 'var(--text-heading)' }}>
+                    {idea.isFavorite && (
+                      <Icon name="star" size={14} className="text-awake shrink-0" />
+                    )}
                     {idea.title}
                   </p>
-                  <p className="text-xs opacity-70 mt-0.5">
+                  <p className="text-[12px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
                     {idea.category} · {idea.type}{idea.location ? ` · ${idea.location}` : ''}
                   </p>
                 </div>

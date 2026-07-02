@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { StatCard } from '../components/ui/Card';
 import { Tabs } from '../components/ui/Tabs';
+import { PageIntro } from '../components/layout/PageIntro';
 import { FriendsTab } from '../components/social/FriendsTab';
 import { HangoutsTab } from '../components/social/HangoutsTab';
 import { IdeasTab } from '../components/social/IdeasTab';
@@ -26,33 +27,33 @@ export function SocialPage() {
 
   return (
     <div>
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Social</h1>
-        <p className="text-sm opacity-70 mt-1">Friends, hangouts, and activity ideas</p>
-      </div>
+      <PageIntro
+        title="Social"
+        description="Friends, hangouts, and activity ideas"
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 md:mb-6">
         <StatCard
-          label="Active Friends"
+          label="Friends"
           value={String(friendCount)}
           accent="social"
-          icon="👥"
+          icon="users"
         />
         <StatCard
-          label="Total Hangouts"
+          label="Hangouts"
           value={String(hangoutCount)}
           accent="social"
-          icon="🤝"
+          icon="handshake"
         />
         <StatCard
-          label="Total Ideas"
+          label="Ideas"
           value={String(ideaCount)}
           accent="social"
-          icon="💡"
+          icon="lightbulb"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 md:mb-6">
         <Tabs tabs={tabs} active={active} onChange={setActive} />
       </div>
       {active === 'friends' && <FriendsTab />}

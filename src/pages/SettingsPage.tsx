@@ -12,6 +12,7 @@ import { IcsCalendarImport } from '../components/social/IcsCalendarImport';
 import { SettingsAccordionProvider, useSettingsAccordionContext } from '../components/settings/SettingsAccordionContext';
 import { SettingsAccordionSection } from '../components/settings/SettingsAccordionSection';
 import { getSleepSchedule } from '../lib/sleep-goals';
+import { PageIntro } from '../components/layout/PageIntro';
 import type { ThemeMode } from '../types';
 
 function SettingsPageContent() {
@@ -63,9 +64,8 @@ function SettingsPageContent() {
   return (
     <div>
       <div className="mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Settings</h1>
-          <p className="text-sm opacity-70 mt-1">Customize your tracker preferences</p>
+        <div className="flex-1 min-w-0 [&>div]:mb-0">
+          <PageIntro title="Settings" description="Customize your tracker preferences" />
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           <Button size="sm" variant="secondary" onClick={expandAll}>Expand All</Button>

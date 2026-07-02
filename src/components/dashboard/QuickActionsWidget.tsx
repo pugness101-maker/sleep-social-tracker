@@ -1,35 +1,36 @@
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
+import { Icon, type IconName } from '../ui/Icon';
 
-const ACTIONS = [
-  { label: 'Log Sleep', icon: '😴', path: '/sleep' },
-  { label: 'Social / Hangouts', icon: '🤝', path: '/social' },
-  { label: 'View Insights', icon: '📊', path: '/insights' },
-  { label: 'Settings', icon: '⚙️', path: '/settings' },
-] as const;
+const ACTIONS: { label: string; icon: IconName; path: string }[] = [
+  { label: 'Log Sleep', icon: 'bed', path: '/sleep' },
+  { label: 'Social', icon: 'handshake', path: '/social' },
+  { label: 'Insights', icon: 'insights', path: '/insights' },
+  { label: 'Settings', icon: 'settings', path: '/settings' },
+];
 
 export function QuickActionsWidget() {
   const navigate = useNavigate();
 
   return (
     <Card>
-      <h2 className="text-base font-semibold mb-3 text-left" style={{ color: 'var(--text-heading)' }}>
+      <h2 className="text-[17px] font-semibold tracking-tight mb-3 text-left" style={{ color: 'var(--text-heading)' }}>
         Quick Actions
       </h2>
       <div className="grid grid-cols-2 gap-2">
         {ACTIONS.map((action) => (
-          <Button
+          <button
             key={action.path}
-            variant="secondary"
-            size="sm"
             type="button"
-            className="justify-start gap-2 h-auto py-2.5"
             onClick={() => navigate(action.path)}
+            className="flex items-center gap-2.5 rounded-xl border px-3 py-3 text-left text-[14px] font-medium active:opacity-70 transition-opacity"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-heading)', background: 'var(--bg)' }}
           >
-            <span aria-hidden>{action.icon}</span>
+            <span style={{ color: 'var(--text-muted)' }}>
+              <Icon name={action.icon} size={18} />
+            </span>
             {action.label}
-          </Button>
+          </button>
         ))}
       </div>
     </Card>

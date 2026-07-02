@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { Icon, type IconName } from './Icon';
 
 interface CardProps {
   children: ReactNode;
@@ -9,7 +10,7 @@ interface CardProps {
 export function Card({ children, className = '', onClick }: CardProps) {
   return (
     <div
-      className={`rounded-xl border p-4 md:p-5 ${onClick ? 'cursor-pointer hover:border-primary/40 transition-colors' : ''} ${className}`}
+      className={`rounded-2xl border p-3.5 sm:p-4 ${onClick ? 'cursor-pointer active:opacity-80 transition-opacity' : ''} ${className}`}
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
       onClick={onClick}
     >
@@ -23,28 +24,41 @@ interface StatCardProps {
   value: string;
   sub?: string;
   accent?: 'sleep' | 'nap' | 'awake' | 'social' | 'default';
-  icon?: ReactNode;
+  icon?: IconName;
 }
 
-const accentColors = {
-  sleep: 'text-sleep border-sleep/30 bg-sleep/5',
-  nap: 'text-nap border-nap/30 bg-nap/5',
-  awake: 'text-awake border-awake/30 bg-awake/5',
-  social: 'text-social border-social/30 bg-social/5',
-  default: 'text-primary border-primary/30 bg-primary/5',
+const accentStyles = {
+  sleep: { text: 'text-sleep', bg: 'bg-sleep/8', border: 'border-sleep/20' },
+  nap: { text: 'text-nap', bg: 'bg-nap/8', border: 'border-nap/20' },
+  awake: { text: 'text-awake', bg: 'bg-awake/8', border: 'border-awake/20' },
+  social: { text: 'text-social', bg: 'bg-social/8', border: 'border-social/20' },
+  default: { text: 'text-primary', bg: 'bg-primary/8', border: 'border-primary/20' },
 };
 
 export function StatCard({ label, value, sub, accent = 'default', icon }: StatCardProps) {
+  const styles = accentStyles[accent];
+
   return (
-    <Card className={`${accentColors[accent]} border`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-left min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide opacity-70 mb-1">{label}</p>
-          <p className="text-2xl font-bold truncate" style={{ color: 'var(--text-heading)' }}>{value}</p>
-          {sub && <p className="text-sm mt-1 opacity-70">{sub}</p>}
+    <Card className={`${styles.bg} ${styles.border} border min-h-[100px] flex flex-col p-3 sm:p-3.5`}>
+      {icon && (
+        <div className={`mb-2 ${styles.text}`}>
+          <Icon name={icon} size={16} />
         </div>
-        {icon && <div className="text-2xl opacity-80 shrink-0">{icon}</div>}
-      </div>
+      )}
+      <p
+        className="text-[22px] sm:text-[26px] md:text-[28px] font-bold tracking-tight leading-none truncate tabular-nums"
+        style={{ color: 'var(--text-heading)' }}
+      >
+        {value}
+      </p>
+      <p className="text-[12px] font-medium mt-2 leading-snug" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </p>
+      {sub && (
+        <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+          {sub}
+        </p>
+      )}
     </Card>
   );
 }

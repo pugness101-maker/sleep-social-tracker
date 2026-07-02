@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { PageIntro } from '../components/layout/PageIntro';
 import { CalendarTab } from '../components/insights/CalendarTab';
 import { StatisticsTab } from '../components/insights/StatisticsTab';
 import { TimelineTab } from '../components/insights/TimelineTab';
@@ -19,11 +20,11 @@ export function InsightsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>Insights</h1>
-        <p className="text-sm opacity-70 mt-1">Deep analytics, charts, trends, and historical metrics</p>
-      </div>
-      <div className="mb-6">
+      <PageIntro
+        title="Insights"
+        description="Deep analytics, charts, trends, and historical metrics"
+      />
+      <div className="mb-4 md:mb-6">
         <Tabs tabs={tabs} active={active} onChange={setActive} />
       </div>
       <ErrorBoundary key={resetKey} onReset={() => setResetKey((k) => k + 1)}>
